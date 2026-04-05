@@ -1,0 +1,20 @@
+# Rust
+solver/target/
+solver/pkg/
+
+# Node
+web/node_modules/
+web/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Executables (reference only, not tracked)
+*.exe
+
+# PDFs (reference only, stored locally)
+docs/references/*.pdf
+
+# Misc
+--sqlite

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useUndoRedo } from './hooks/useUndoRedo';
+import { decodeFromUrl, useUrlState, encodeToUrl } from './hooks/useUrlState';
 import { initSolver } from './solver/wasm-bridge';
 import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
@@ -13,6 +14,7 @@ import { SaveLoadControls } from './components/SaveLoadControls';
 import { ExportControls } from './components/ExportControls';
 import { NumericInput } from './components/NumericInput';
 import { ImportOverlay, type OverlayData } from './components/ImportOverlay';
+import { EnclosureSchematic } from './components/EnclosureSchematic';
 import { BiquadExport } from './components/BiquadExport';
 import { OptimizerPanel } from './components/OptimizerPanel';
 import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput } from './types';
@@ -70,10 +72,13 @@ function App() {
   const [snapshots, setSnapshots] = useState<{ name: string; spl: number[]; freqs: number[] }[]>([]);
 
   // Single-way state with undo/redo (Ctrl+Z / Ctrl+Y)
-  const inputUndo = useUndoRedo<SimulationInput>(DEFAULT_INPUT);
+  // Initialize from URL hash if present (for shared design links)
+  const initialInput = decodeFromUrl() || DEFAULT_INPUT;
+  const inputUndo = useUndoRedo<SimulationInput>(initialInput);
   const input = inputUndo.value;
   const setInput = inputUndo.set;
   const { result: singleResult, error: singleError } = useSolver(input, ready);
+  useUrlState(input); // Sync input to URL hash for sharing
 
   // Multi-way state
   const [ways, setWays] = useState<WayInput[]>(DEFAULT_WAYS);
@@ -145,6 +150,7 @@ function App() {
             <DriverInputs params={input.driver} onChange={updateDriver} />
             <EnclosureInputs config={input.enclosure} driverVas={input.driver.vas_m3}
               driverFs={input.driver.fs_hz} driverQts={qts} onChange={updateEnclosure} />
+            <EnclosureSchematic config={input.enclosure} driverSd={input.driver.sd_m2} />
             <div className="section-card">
               <div className="section-title">Simulation</div>
               <NumericInput label="Drive" value={input.drive_voltage_rms} step={0.1} min={0.1} unit="V rms"
@@ -185,6 +191,12 @@ function App() {
                   disabled={!inputUndo.canUndo} title="Undo (Ctrl+Z)">Undo</button>
                 <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={inputUndo.redo}
                   disabled={!inputUndo.canRedo} title="Redo (Ctrl+Y)">Redo</button>
+                <button className="graf-btn graf-btn-sm graf-btn-outline"
+                  title="Copy shareable URL to clipboard — anyone with this link sees your exact design"
+                  onClick={() => {
+                    const url = encodeToUrl(input);
+                    navigator.clipboard.writeText(url);
+                  }}>Share</button>
               </div>
               {snapshots.map((s, i) => (
                 <div key={i} style={{ fontSize: 11, color: 'var(--graf-warm-500)' }}>

@@ -84,3 +84,27 @@ body {
   gap: var(--graf-spacing-xs, 4px);
   flex-wrap: wrap;
 }
+
+.derived-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 4px 0;
+  margin-top: 4px;
+  font-size: var(--graf-font-size-xs, 12px);
+  color: var(--graf-warm-600, #6b6560);
+  border-top: 1px solid var(--graf-border, #e8e4dc);
+}
+
+.derived-params span {
+  cursor: help;
+  border-bottom: 1px dotted var(--graf-warm-300);
+}
+
+.section-subtitle {
+  font-size: var(--graf-font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--graf-warm-500, #8a8580);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

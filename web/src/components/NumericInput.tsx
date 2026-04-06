@@ -5,12 +5,13 @@ interface NumericInputProps {
   min?: number;
   max?: number;
   unit?: string;
+  tooltip?: string;
   onChange: (value: number) => void;
 }
 
-export function NumericInput({ label, value, step = 1, min, max, unit, onChange }: NumericInputProps) {
+export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, onChange }: NumericInputProps) {
   return (
-    <div className="param-row">
+    <div className="param-row" title={tooltip}>
       <span className="param-label">{label}</span>
       <input
         type="number"

@@ -54,11 +54,44 @@ export interface TransmissionLineParams {
   num_folds: number;
 }
 
+export type HornProfile =
+  | { type: 'Conical' }
+  | { type: 'Exponential' }
+  | { type: 'Hyperbolic'; t_param: number }
+  | { type: 'Tractrix' };
+
+export interface HornSegment {
+  area_start_m2: number;
+  area_end_m2: number;
+  length_m: number;
+  profile: HornProfile;
+  cutoff_hz: number;
+}
+
+export type RearChamber =
+  | { type: 'Sealed'; volume_m3: number; depth_m: number; flow_resistivity_pa_s_m2: number; lining_thickness_m: number; ql: number }
+  | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; ql: number };
+
+export interface ThroatChamber {
+  volume_m3: number;
+  area_m2: number;
+}
+
+export interface HornParams {
+  segments: HornSegment[];
+  rear_chamber: RearChamber;
+  throat_chamber: ThroatChamber | null;
+  radiation_angle_sr: number;
+  num_tmm_segments: number;
+  stuffing_zones: StuffingZone[];
+}
+
 // Matches Rust #[serde(tag = "type")] enum
 export type EnclosureConfig =
   | { type: 'Sealed'; volume_m3: number; ql: number }
   | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; num_ports: number; port_flanged: boolean; ql: number }
-  | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean; driver_position: number; taper_profile: TaperProfile; stuffing_zones: StuffingZone[]; mouth_termination: MouthTermination; num_folds: number };
+  | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean; driver_position: number; taper_profile: TaperProfile; stuffing_zones: StuffingZone[]; mouth_termination: MouthTermination; num_folds: number }
+  | { type: 'Horn'; segments: HornSegment[]; rear_chamber: RearChamber; throat_chamber: ThroatChamber | null; radiation_angle_sr: number; num_tmm_segments: number; stuffing_zones: StuffingZone[] };
 
 export interface SimulationInput {
   driver: DriverParams;
@@ -79,4 +112,4 @@ export interface SimulationResult {
   port_velocity_ms: number[] | null;
 }
 
-export type EnclosureType = 'Sealed' | 'Vented' | 'TransmissionLine';
+export type EnclosureType = 'Sealed' | 'Vented' | 'TransmissionLine' | 'Horn';

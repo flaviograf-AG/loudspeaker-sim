@@ -158,6 +158,121 @@ pub struct TransmissionLineParams {
     pub num_folds: u32,
 }
 
+/// Horn flare profile for a single segment.
+/// The T-parameter system from Hornresp: T=0 catenoidal, T=1 exponential,
+/// T>1 sinh, T=99999 conical.
+/// Reference: Keele, D.B. "Optimum Horn Mouth Size" (AES, 1979)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum HornProfile {
+    /// Conical — linear area expansion, no cutoff frequency.
+    Conical,
+    /// Exponential — area grows as e^(mx). Has a theoretical cutoff frequency.
+    Exponential,
+    /// Hyperbolic — generalized family parameterized by T.
+    /// T=0: catenoidal, 0<T<1: cosh, T=1: exponential, T>1: sinh.
+    Hyperbolic { t_param: f64 },
+    /// Tractrix — smooth tangential curve, favored for midrange/tweeter horns.
+    Tractrix,
+}
+
+impl Default for HornProfile {
+    fn default() -> Self {
+        HornProfile::Exponential
+    }
+}
+
+/// A single horn segment (from area_start to area_end over a given length).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HornSegment {
+    /// Cross-sectional area at start of segment (m²)
+    pub area_start_m2: f64,
+    /// Cross-sectional area at end of segment (m²)
+    pub area_end_m2: f64,
+    /// Axial length of segment (m)
+    pub length_m: f64,
+    /// Flare profile for this segment
+    pub profile: HornProfile,
+    /// Flare cutoff frequency (Hz) — only used for exponential/hyperbolic profiles
+    #[serde(default)]
+    pub cutoff_hz: f64,
+}
+
+/// Rear chamber type — determines what sits behind the driver.
+/// Mirrors Hornresp's Chamber Type selector.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum RearChamber {
+    /// Sealed (lined) rear chamber with optional absorption.
+    Sealed {
+        volume_m3: f64,
+        depth_m: f64,
+        flow_resistivity_pa_s_m2: f64,
+        lining_thickness_m: f64,
+        ql: f64,
+    },
+    /// Vented (bass reflex) rear chamber with port.
+    Vented {
+        volume_m3: f64,
+        port_area_m2: f64,
+        port_length_m: f64,
+        ql: f64,
+    },
+}
+
+impl Default for RearChamber {
+    fn default() -> Self {
+        RearChamber::Sealed {
+            volume_m3: 5.0e-3,
+            depth_m: 0.1,
+            flow_resistivity_pa_s_m2: 0.0,
+            lining_thickness_m: 0.0,
+            ql: 7.0,
+        }
+    }
+}
+
+/// Throat chamber — small volume between driver cone and horn throat.
+/// Acts as an acoustic low-pass filter, smoothing the response.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ThroatChamber {
+    /// Throat chamber volume (m³)
+    pub volume_m3: f64,
+    /// Throat chamber average cross-sectional area (m²)
+    pub area_m2: f64,
+}
+
+/// Horn enclosure parameters — up to 4 segments with independent flare profiles.
+/// Models front-loaded horns, back-loaded horns, tapped horns.
+///
+/// Acoustic path: DRIVER → [Rear Chamber] → [Throat Chamber] → S1 →[L12]→ S2 →[L23]→ S3 →[L34]→ S4
+///
+/// Reference: Keele (1979), Hornresp v60 manual
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HornParams {
+    /// Horn segments (1 to 4). First segment throat = segments[0].area_start,
+    /// last segment mouth = segments[last].area_end.
+    pub segments: Vec<HornSegment>,
+    /// Rear chamber behind the driver
+    #[serde(default)]
+    pub rear_chamber: RearChamber,
+    /// Optional throat chamber between driver and horn throat
+    #[serde(default)]
+    pub throat_chamber: Option<ThroatChamber>,
+    /// Radiation solid angle (steradians). 2π = half-space (default), 4π = free-space.
+    #[serde(default = "default_ang")]
+    pub radiation_angle_sr: f64,
+    /// Number of TMM segments per horn segment for discretization
+    #[serde(default = "default_horn_segments")]
+    pub num_tmm_segments: u32,
+    /// Stuffing in the horn path
+    #[serde(default)]
+    pub stuffing_zones: Vec<StuffingZone>,
+}
+
+fn default_ang() -> f64 { 2.0 * std::f64::consts::PI }
+fn default_horn_segments() -> u32 { 30 }
+
 /// Enclosure configuration — tagged union for all enclosure types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -165,6 +280,7 @@ pub enum EnclosureConfig {
     Sealed(SealedBoxParams),
     Vented(VentedBoxParams),
     TransmissionLine(TransmissionLineParams),
+    Horn(HornParams),
 }
 
 /// Complete simulation input — everything needed to run a sweep.

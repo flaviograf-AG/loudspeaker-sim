@@ -2,6 +2,7 @@
 
 pub mod constants;
 pub mod driver;
+pub mod horn;
 pub mod sealed;
 pub mod sweep;
 pub mod transfer_matrix;
@@ -10,6 +11,7 @@ pub mod types;
 pub mod vented;
 
 use driver::derive_driver;
+use horn::horn_frequency_response;
 use sealed::sealed_frequency_response;
 use sweep::log_frequency_sweep;
 use transmission_line::tl_frequency_response;
@@ -46,6 +48,17 @@ fn validate_enclosure(enc: &EnclosureConfig) -> Result<(), String> {
             if t.area_driver_m2 <= 0.0 { return Err("Driver area must be positive".into()); }
             if t.area_mouth_m2 <= 0.0 { return Err("Mouth area must be positive".into()); }
         }
+        EnclosureConfig::Horn(h) => {
+            if h.segments.is_empty() { return Err("Horn must have at least one segment".into()); }
+            for (i, seg) in h.segments.iter().enumerate() {
+                if seg.area_start_m2 <= 0.0 || seg.area_end_m2 <= 0.0 {
+                    return Err(format!("Horn segment {} areas must be positive", i + 1));
+                }
+                if seg.length_m <= 0.0 {
+                    return Err(format!("Horn segment {} length must be positive", i + 1));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -71,6 +84,9 @@ pub fn solve_simulation(input: &SimulationInput) -> Result<SimulationResult, Str
         }
         EnclosureConfig::TransmissionLine(enc) => {
             tl_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
+        }
+        EnclosureConfig::Horn(enc) => {
+            horn_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
         }
     };
 

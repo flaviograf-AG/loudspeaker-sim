@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EnclosureConfig, EnclosureType, TaperProfile, StuffingZone } from '../types';
+import type { EnclosureConfig, EnclosureType, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
 import { NumericInput } from './NumericInput';
 
 const C0 = 343.21;
@@ -38,6 +38,7 @@ const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
   Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7 },
   TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
+  Horn: { type: 'Horn', segments: [{ area_start_m2: 132e-4, area_end_m2: 2000e-4, length_m: 0.60, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2 * Math.PI, num_tmm_segments: 30, stuffing_zones: [] },
 };
 
 
@@ -79,7 +80,7 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
     <div className="section-card">
       <div className="section-title">Enclosure</div>
       <div className="btn-row" style={{ marginBottom: 8 }}>
-        {(['Sealed', 'Vented', 'TransmissionLine'] as EnclosureType[]).map((t) => (
+        {(['Sealed', 'Vented', 'TransmissionLine', 'Horn'] as EnclosureType[]).map((t) => (
           <button key={t}
             className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
             onClick={() => switchType(t)}
@@ -258,6 +259,148 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
               </div>
             </>
           )}
+        </>
+      )}
+
+      {config.type === 'Horn' && (
+        <>
+          <div className="section-subtitle">Horn Segments ({config.segments.length})</div>
+          {config.segments.map((seg, i) => (
+            <div key={i} style={{ border: '1px solid var(--graf-warm-200)', borderRadius: 4, padding: '4px 6px', marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--graf-warm-400)', marginBottom: 2 }}>
+                Segment {i + 1}
+                {config.segments.length > 1 && (
+                  <button className="graf-btn graf-btn-sm" style={{ float: 'right', padding: '0 4px', fontSize: 10 }}
+                    onClick={() => {
+                      const segs = config.segments.filter((_, j) => j !== i);
+                      onChange({ ...config, segments: segs });
+                    }}>✕</button>
+                )}
+              </div>
+              <NumericInput label="S start" value={seg.area_start_m2 * 1e4} step={10} min={1} unit="cm²"
+                tooltip="Cross-sectional area at the start of this segment. Segment 1 start = horn throat."
+                onChange={(v) => {
+                  const segs = [...config.segments];
+                  segs[i] = { ...seg, area_start_m2: v / 1e4 };
+                  onChange({ ...config, segments: segs });
+                }} />
+              <NumericInput label="S end" value={seg.area_end_m2 * 1e4} step={10} min={1} unit="cm²"
+                tooltip="Cross-sectional area at the end of this segment. Last segment end = horn mouth."
+                onChange={(v) => {
+                  const segs = [...config.segments];
+                  segs[i] = { ...seg, area_end_m2: v / 1e4 };
+                  onChange({ ...config, segments: segs });
+                }} />
+              <NumericInput label="Length" value={seg.length_m * 100} step={5} min={1} unit="cm"
+                tooltip="Axial length of this horn segment."
+                onChange={(v) => {
+                  const segs = [...config.segments];
+                  segs[i] = { ...seg, length_m: v / 100 };
+                  onChange({ ...config, segments: segs });
+                }} />
+              <div className="param-row" title="Flare profile: Conical (linear area), Exponential (e^mx), Hyperbolic (T-parameter family), Tractrix (tangential curve).">
+                <span className="param-label">Profile</span>
+                <select className="graf-form-control" style={{ width: 120 }}
+                  value={seg.profile.type}
+                  onChange={(e) => {
+                    const segs = [...config.segments];
+                    const ptype = e.target.value as HornProfile['type'];
+                    const profile: HornProfile = ptype === 'Hyperbolic' ? { type: 'Hyperbolic', t_param: 0.5 } : { type: ptype } as HornProfile;
+                    segs[i] = { ...seg, profile };
+                    onChange({ ...config, segments: segs });
+                  }}
+                >
+                  <option value="Conical">Conical</option>
+                  <option value="Exponential">Exponential</option>
+                  <option value="Hyperbolic">Hyperbolic</option>
+                  <option value="Tractrix">Tractrix</option>
+                </select>
+              </div>
+              {seg.profile.type === 'Hyperbolic' && (
+                <NumericInput label="T param" value={seg.profile.t_param} step={0.1} min={0} max={99999}
+                  tooltip="Hyperbolic flare parameter. T=0: catenoidal, T=1: exponential, T>1: sinh family, T=99999: conical."
+                  onChange={(v) => {
+                    const segs = [...config.segments];
+                    segs[i] = { ...seg, profile: { type: 'Hyperbolic', t_param: v } };
+                    onChange({ ...config, segments: segs });
+                  }} />
+              )}
+              {(seg.profile.type === 'Exponential' || seg.profile.type === 'Hyperbolic') && (
+                <NumericInput label="Cutoff" value={seg.cutoff_hz} step={10} min={0} unit="Hz"
+                  tooltip="Flare cutoff frequency — below this, the horn ceases to load the driver effectively."
+                  onChange={(v) => {
+                    const segs = [...config.segments];
+                    segs[i] = { ...seg, cutoff_hz: v };
+                    onChange({ ...config, segments: segs });
+                  }} />
+              )}
+            </div>
+          ))}
+          {config.segments.length < 4 && (
+            <button className="graf-btn graf-btn-sm graf-btn-outline" style={{ marginBottom: 8 }}
+              title="Add another horn segment (up to 4)"
+              onClick={() => {
+                const last = config.segments[config.segments.length - 1];
+                const newSeg: HornSegment = {
+                  area_start_m2: last.area_end_m2,
+                  area_end_m2: last.area_end_m2 * 2,
+                  length_m: last.length_m,
+                  profile: { type: 'Conical' },
+                  cutoff_hz: 0,
+                };
+                onChange({ ...config, segments: [...config.segments, newSeg] });
+              }}>+ Segment</button>
+          )}
+
+          <div className="section-subtitle">Rear Chamber</div>
+          <div className="param-row" title="Rear chamber type: Sealed (closed with optional lining) or Vented (bass reflex with port).">
+            <span className="param-label">Type</span>
+            <select className="graf-form-control" style={{ width: 120 }}
+              value={config.rear_chamber.type}
+              onChange={(e) => {
+                if (e.target.value === 'Sealed') {
+                  onChange({ ...config, rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 } });
+                } else {
+                  onChange({ ...config, rear_chamber: { type: 'Vented', volume_m3: 10e-3, port_area_m2: 20e-4, port_length_m: 0.1, ql: 7 } });
+                }
+              }}
+            >
+              <option value="Sealed">Sealed</option>
+              <option value="Vented">Vented</option>
+            </select>
+          </div>
+          {config.rear_chamber.type === 'Sealed' && (() => {
+            const rc = config.rear_chamber;
+            return <>
+              <NumericInput label="Volume" value={rc.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
+                tooltip="Rear chamber volume behind the driver."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, volume_m3: v / 1000 } })} />
+              <NumericInput label="Ql" value={rc.ql} step={0.5} min={1}
+                tooltip="Rear chamber loss Q."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, ql: v } })} />
+            </>;
+          })()}
+          {config.rear_chamber.type === 'Vented' && (() => {
+            const rc = config.rear_chamber;
+            return <>
+              <NumericInput label="Volume" value={rc.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
+                tooltip="Rear chamber volume."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, volume_m3: v / 1000 } })} />
+              <NumericInput label="Port area" value={rc.port_area_m2 * 1e4} step={1} min={1} unit="cm²"
+                tooltip="Rear port cross-sectional area."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, port_area_m2: v / 1e4 } })} />
+              <NumericInput label="Port len." value={rc.port_length_m * 100} step={1} min={1} unit="cm"
+                tooltip="Rear port physical length."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, port_length_m: v / 100 } })} />
+              <NumericInput label="Ql" value={rc.ql} step={0.5} min={1}
+                tooltip="Rear chamber loss Q."
+                onChange={(v) => onChange({ ...config, rear_chamber: { ...rc, ql: v } })} />
+            </>;
+          })()}
+
+          <NumericInput label="TMM segs" value={config.num_tmm_segments} step={5} min={10} max={100}
+            tooltip="Number of TMM discretization segments across all horn segments. More = more accurate, slower. 30 typical."
+            onChange={(v) => onChange({ ...config, num_tmm_segments: Math.round(v) })} />
         </>
       )}
 

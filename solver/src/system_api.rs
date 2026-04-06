@@ -55,6 +55,11 @@ pub enum ActiveFilterJson {
     PEQ { freq_hz: f64, q: f64, gain_db: f64 },
     AllPass1 { freq_hz: f64 },
     AllPass2 { freq_hz: f64, q: f64 },
+    LR2LowPass { freq_hz: f64 },
+    LR2HighPass { freq_hz: f64 },
+    ShelfLow { freq_hz: f64, gain_db: f64 },
+    ShelfHigh { freq_hz: f64, gain_db: f64 },
+    LinkwitzTransform { fo: f64, qo: f64, fp: f64, qp: f64 },
     Gain { db: f64 },
     Invert,
 }
@@ -71,6 +76,11 @@ impl From<ActiveFilterJson> for ActiveFilter {
             ActiveFilterJson::PEQ { freq_hz, q, gain_db } => ActiveFilter::PEQ { freq_hz, q, gain_db },
             ActiveFilterJson::AllPass1 { freq_hz } => ActiveFilter::AllPass1 { freq_hz },
             ActiveFilterJson::AllPass2 { freq_hz, q } => ActiveFilter::AllPass2 { freq_hz, q },
+            ActiveFilterJson::LR2LowPass { freq_hz } => ActiveFilter::LR2LowPass { freq_hz },
+            ActiveFilterJson::LR2HighPass { freq_hz } => ActiveFilter::LR2HighPass { freq_hz },
+            ActiveFilterJson::ShelfLow { freq_hz, gain_db } => ActiveFilter::ShelfLow { freq_hz, gain_db },
+            ActiveFilterJson::ShelfHigh { freq_hz, gain_db } => ActiveFilter::ShelfHigh { freq_hz, gain_db },
+            ActiveFilterJson::LinkwitzTransform { fo, qo, fp, qp } => ActiveFilter::LinkwitzTransform { fo, qo, fp, qp },
             ActiveFilterJson::Gain { db } => ActiveFilter::Gain { db },
             ActiveFilterJson::Invert => ActiveFilter::Invert,
         }

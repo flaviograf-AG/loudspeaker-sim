@@ -167,6 +167,17 @@ pub enum ActiveFilter {
     AllPass1 { freq_hz: f64 },
     /// All-pass (2nd order): H(s) = (s² - s×ωc/Q + ωc²) / (s² + s×ωc/Q + ωc²)
     AllPass2 { freq_hz: f64, q: f64 },
+    /// Linkwitz-Riley 2nd order low-pass (Q=0.5, 12dB/oct)
+    LR2LowPass { freq_hz: f64 },
+    /// Linkwitz-Riley 2nd order high-pass
+    LR2HighPass { freq_hz: f64 },
+    /// Low shelf: boost/cut below freq_hz
+    ShelfLow { freq_hz: f64, gain_db: f64 },
+    /// High shelf: boost/cut above freq_hz
+    ShelfHigh { freq_hz: f64, gain_db: f64 },
+    /// Linkwitz Transform: reshape sealed-box resonance
+    /// fo/qo = current system Fc/Qtc, fp/qp = target
+    LinkwitzTransform { fo: f64, qo: f64, fp: f64, qp: f64 },
     /// Gain (dB)
     Gain { db: f64 },
     /// Polarity inversion (-1)
@@ -228,6 +239,38 @@ pub fn active_filter_response(filter: &ActiveFilter, freq_hz: f64) -> Complex<f6
             let wc = 2.0 * PI * fc;
             let wc2 = wc * wc;
             (s * s - s * wc / q + wc2) / (s * s + s * wc / q + wc2)
+        }
+        ActiveFilter::LR2LowPass { freq_hz: fc } => {
+            let wc = 2.0 * PI * fc;
+            let wc2 = wc * wc;
+            let q = 0.5; // LR2 = critically damped
+            wc2 / (s * s + s * wc / q + wc2)
+        }
+        ActiveFilter::LR2HighPass { freq_hz: fc } => {
+            let wc = 2.0 * PI * fc;
+            let wc2 = wc * wc;
+            let q = 0.5;
+            s * s / (s * s + s * wc / q + wc2)
+        }
+        ActiveFilter::ShelfLow { freq_hz: fc, gain_db } => {
+            // Low shelf: H(s) = (s + ωc×√A) / (s + ωc/√A)
+            let wc = 2.0 * PI * fc;
+            let a = 10.0_f64.powf(*gain_db / 40.0);
+            (s + wc * a) / (s + wc / a)
+        }
+        ActiveFilter::ShelfHigh { freq_hz: fc, gain_db } => {
+            // High shelf: H(s) = A × (s + ωc/√A) / (s + ωc×√A)
+            let wc = 2.0 * PI * fc;
+            let a = 10.0_f64.powf(*gain_db / 40.0);
+            let a_full = 10.0_f64.powf(*gain_db / 20.0);
+            Complex::new(a_full, 0.0) * (s + wc / a) / (s + wc * a)
+        }
+        ActiveFilter::LinkwitzTransform { fo, qo, fp, qp } => {
+            // Pole-zero remapping: cancel original resonance, insert new one
+            // H(s) = [(s² + s×ωo/Qo + ωo²) / (s² + s×ωp/Qp + ωp²)]
+            let wo = 2.0 * PI * fo;
+            let wp = 2.0 * PI * fp;
+            (s * s + s * wo / qo + wo * wo) / (s * s + s * wp / qp + wp * wp)
         }
         ActiveFilter::Gain { db } => {
             Complex::new(10.0_f64.powf(*db / 20.0), 0.0)

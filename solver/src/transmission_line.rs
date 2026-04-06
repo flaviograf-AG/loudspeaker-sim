@@ -278,6 +278,7 @@ pub fn tl_frequency_response(
         impedance_phase_deg,
         cone_displacement_mm: displacement_mm,
         group_delay_ms,
+        acoustic_phase_deg: pressure_phases.iter().map(|p| p.to_degrees()).collect(),
         port_velocity_ms: None,
     }
 }

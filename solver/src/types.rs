@@ -367,6 +367,8 @@ pub struct SimulationResult {
     pub cone_displacement_mm: Vec<f64>,
     /// Group delay (ms)
     pub group_delay_ms: Vec<f64>,
+    /// Acoustic pressure phase (degrees)
+    pub acoustic_phase_deg: Vec<f64>,
     /// Port air velocity (m/s) — None for sealed boxes
     pub port_velocity_ms: Option<Vec<f64>>,
 }

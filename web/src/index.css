@@ -1,0 +1,25 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #fafafa;
+  color: #333;
+}
+
+fieldset {
+  border-radius: 4px;
+}
+
+input[type="number"] {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+input[type="number"]:focus {
+  outline: 2px solid #2563eb;
+  border-color: #2563eb;
+}

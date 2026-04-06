@@ -62,7 +62,7 @@ A standalone Rust library compiled to WASM via `wasm-pack`. Zero JavaScript in t
 
 - **Vite** build toolchain (fast, WASM-friendly)
 - **React 19** with TypeScript
-- **Plotting:** uPlot (lightweight, fast for real-time updates) or Plotly.js (richer but heavier)
+- **Plotting:** Apache ECharts 6 + echarts-for-react (~184KB gzipped tree-shaken). Chosen for: log axes, dual Y-axis, polar plots, heatmaps, cross-chart tooltip linking via `echarts.connect()`. Contour plots (v0.3+ directivity) may need echarts-gl or Plotly supplement.
 - **UI:** Graf Design System (GDS) — `github.com/flaviograf-AG/graf-design-system`. Consistent with other Graf y Asociados products.
 - **State:** React context or Zustand — parameters flow in, results flow out
 

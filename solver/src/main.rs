@@ -53,10 +53,13 @@ fn main() {
             Ok(result) => {
                 let output = SystemResultJson {
                     frequencies_hz: result.frequencies_hz,
+                    min_impedance_ohm: result.min_impedance_ohm,
+                    min_impedance_freq_hz: result.min_impedance_freq_hz,
                     ways: result.ways.into_iter().map(|w| loudspeaker_solver::system_api::WayResultJson {
                         name: w.name,
                         spl_db: w.spl_db,
                         impedance_ohm: w.impedance_ohm,
+                        filter_gain_db: w.filter_gain_db,
                     }).collect(),
                     system_spl_db: result.system_spl_db,
                     system_group_delay_ms: result.system_group_delay_ms,

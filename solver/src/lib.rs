@@ -161,10 +161,13 @@ pub fn simulate_system(input_json: &str) -> Result<String, JsValue> {
     // Convert to JSON-friendly output
     let output = system_api::SystemResultJson {
         frequencies_hz: result.frequencies_hz,
+        min_impedance_ohm: result.min_impedance_ohm,
+        min_impedance_freq_hz: result.min_impedance_freq_hz,
         ways: result.ways.into_iter().map(|w| system_api::WayResultJson {
             name: w.name,
             spl_db: w.spl_db,
             impedance_ohm: w.impedance_ohm,
+            filter_gain_db: w.filter_gain_db,
         }).collect(),
         system_spl_db: result.system_spl_db,
         system_group_delay_ms: result.system_group_delay_ms,

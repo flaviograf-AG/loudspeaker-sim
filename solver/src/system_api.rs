@@ -127,12 +127,15 @@ pub struct WayResultJson {
     pub name: String,
     pub spl_db: Vec<f64>,
     pub impedance_ohm: Vec<f64>,
+    pub filter_gain_db: Vec<f64>,
 }
 
 /// JSON-serializable system result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemResultJson {
     pub frequencies_hz: Vec<f64>,
+    pub min_impedance_ohm: f64,
+    pub min_impedance_freq_hz: f64,
     pub ways: Vec<WayResultJson>,
     pub system_spl_db: Vec<f64>,
     pub system_group_delay_ms: Vec<f64>,

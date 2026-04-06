@@ -63,11 +63,16 @@ pub struct WayResult {
     pub spl_db: Vec<f64>,
     /// Electrical impedance of this way's driver + crossover
     pub impedance_ohm: Vec<f64>,
+    /// Filter transfer function magnitude (dB) — the crossover attenuation curve
+    pub filter_gain_db: Vec<f64>,
 }
 
 /// Result for the complete system.
 pub struct SystemResult {
     pub frequencies_hz: Vec<f64>,
+    /// Minimum system impedance (Ω) and the frequency where it occurs
+    pub min_impedance_ohm: f64,
+    pub min_impedance_freq_hz: f64,
     /// Per-way results
     pub ways: Vec<WayResult>,
     /// Combined system SPL (complex sum of all ways)
@@ -110,6 +115,7 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         let mut complex_pressure = Vec::with_capacity(n);
         let mut way_spl = Vec::with_capacity(n);
         let mut way_impedance = Vec::with_capacity(n);
+        let mut filter_gain_db = Vec::with_capacity(n);
 
         for (i, &f) in freqs.iter().enumerate() {
             let omega = TWO_PI * f;
@@ -152,6 +158,10 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
             let p_mag = 10.0_f64.powf(raw_result.spl_db[i] / 20.0) * 20e-6; // dB → Pa
             let p_raw = Complex::new(p_mag, 0.0); // magnitude only (minimum-phase approx)
 
+            // Filter transfer function (crossover attenuation in dB)
+            let h_total = h_passive * h_active * gain * polarity;
+            filter_gain_db.push(20.0 * h_total.norm().log10());
+
             // Combined: p_way = p_raw × H_passive × H_active × gain × polarity × delay
             let p_way = p_raw * h_passive * h_active * gain * polarity * phase_delay;
             complex_pressure.push(p_way);
@@ -169,6 +179,7 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
             complex_pressure,
             spl_db: way_spl,
             impedance_ohm: way_impedance,
+            filter_gain_db,
         });
     }
 
@@ -200,8 +211,20 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         if y_total > 0.0 { 1.0 / y_total } else { 1e6 }
     }).collect();
 
+    // Find minimum system impedance
+    let mut min_z = f64::MAX;
+    let mut min_z_freq = 0.0;
+    for (i, &z) in system_impedance.iter().enumerate() {
+        if z < min_z {
+            min_z = z;
+            min_z_freq = freqs[i];
+        }
+    }
+
     Ok(SystemResult {
         frequencies_hz: freqs,
+        min_impedance_ohm: min_z,
+        min_impedance_freq_hz: min_z_freq,
         ways: way_results,
         system_spl_db: system_spl,
         system_group_delay_ms: system_group_delay,

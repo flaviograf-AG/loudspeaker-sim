@@ -37,8 +37,30 @@ export function SystemPlotArea({ result }: Props) {
   const splMin = splValues.length > 0 ? Math.floor(Math.min(...splValues) / 10) * 10 : 40;
   const splMax = splValues.length > 0 ? Math.ceil(Math.max(...splValues) / 10) * 10 : 110;
 
+  // Per-way filter transfer function
+  const filterSeries = result.ways.map((w, i) => ({
+    label: w.name,
+    data: w.filter_gain_db,
+    color: WAY_COLORS[i % WAY_COLORS.length],
+  }));
+
+  // Min impedance warning
+  const minZWarning = result.min_impedance_ohm < 3.2;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* Min impedance warning */}
+      {minZWarning && (
+        <div style={{
+          background: '#fee', border: '1px solid #c0392b', borderRadius: 4,
+          padding: '4px 8px', fontSize: 12, color: '#c0392b',
+        }}>
+          Warning: minimum system impedance is {result.min_impedance_ohm.toFixed(1)}Ω
+          at {result.min_impedance_freq_hz.toFixed(0)}Hz — below safe threshold for most amplifiers (3.2Ω).
+          Consider adding series resistance or re-tuning the crossover.
+        </div>
+      )}
+
       <FrequencyPlot
         title="System SPL (dB) — per-way + combined"
         frequencies={result.frequencies_hz}
@@ -47,6 +69,17 @@ export function SystemPlotArea({ result }: Props) {
         yMin={splMin}
         yMax={splMax}
         height={350}
+        group={CHART_GROUP}
+      />
+
+      {/* Crossover filter transfer function */}
+      <FrequencyPlot
+        title="Filter Transfer Function (dB) — crossover attenuation per way"
+        frequencies={result.frequencies_hz}
+        series={filterSeries}
+        yLabel="dB"
+        yMin={-40}
+        yMax={6}
         group={CHART_GROUP}
       />
 

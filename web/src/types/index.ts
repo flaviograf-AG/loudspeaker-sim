@@ -205,10 +205,13 @@ export interface WayResult {
   name: string;
   spl_db: number[];
   impedance_ohm: number[];
+  filter_gain_db: number[];
 }
 
 export interface SystemResult {
   frequencies_hz: number[];
+  min_impedance_ohm: number;
+  min_impedance_freq_hz: number;
   ways: WayResult[];
   system_spl_db: number[];
   system_group_delay_ms: number[];

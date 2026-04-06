@@ -45,25 +45,6 @@ const FILTER_PRESETS: { label: string; filter: ActiveFilter }[] = [
   { label: 'Invert polarity', filter: { type: 'Invert' } },
 ];
 
-function fmtL(h: number): string { return h >= 1e-3 ? `${(h*1e3).toFixed(2)}mH` : `${(h*1e6).toFixed(0)}µH`; }
-function fmtC(f: number): string { return f >= 1e-6 ? `${(f*1e6).toFixed(1)}µF` : `${(f*1e9).toFixed(0)}nF`; }
-function fmtR(r: number): string { return `${r.toFixed(1)}Ω`; }
-
-function passiveLabel(pf: PassiveFilter): string {
-  switch (pf.type) {
-    case 'SeriesR': return `Ser ${fmtR(pf.ohms)}`;
-    case 'SeriesL': return `Ser ${fmtL(pf.henries)} (DCR ${fmtR(pf.dcr_ohms)})`;
-    case 'SeriesC': return `Ser ${fmtC(pf.farads)}`;
-    case 'ShuntR': return `Shnt ${fmtR(pf.ohms)}`;
-    case 'ShuntL': return `Shnt ${fmtL(pf.henries)}`;
-    case 'ShuntC': return `Shnt ${fmtC(pf.farads)}`;
-    case 'ZobelShunt': return `Zobel ${fmtR(pf.ohms)}+${fmtC(pf.farads)}`;
-    case 'LPad': return `L-Pad ${fmtR(pf.series_ohms)}/${fmtR(pf.shunt_ohms)}`;
-    case 'NotchShunt': return `Notch ${fmtR(pf.ohms)} ${fmtL(pf.henries)} ${fmtC(pf.farads)}`;
-    case 'NotchSeries': return `Ser.Notch ${fmtR(pf.ohms)} ${fmtL(pf.henries)} ${fmtC(pf.farads)}`;
-  }
-}
-
 function filterLabel(f: ActiveFilter): string {
   switch (f.type) {
     case 'LR4LowPass': return `LR4 LP ${f.freq_hz}Hz`;
@@ -206,16 +187,61 @@ export function MultiWayEditor({ ways, onChange }: Props) {
             No passive components. Use the wizard or add manually.
           </div>
         )}
-        {way.passive_filters.map((pf, i) => (
-          <div key={i} className="param-row" style={{ fontSize: 12 }}>
-            <span style={{ flex: 1 }}>{passiveLabel(pf)}</span>
-            <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 10 }}
-              onClick={() => {
-                const filters = way.passive_filters.filter((_, j) => j !== i);
-                updateWay(activeWay, { passive_filters: filters });
-              }}>✕</button>
-          </div>
-        ))}
+        {way.passive_filters.map((pf, i) => {
+          const updatePf = (updated: PassiveFilter) => {
+            const filters = [...way.passive_filters];
+            filters[i] = updated;
+            updateWay(activeWay, { passive_filters: filters });
+          };
+          const removePf = () => updateWay(activeWay, { passive_filters: way.passive_filters.filter((_, j) => j !== i) });
+
+          return (
+            <div key={i} style={{ border: '1px solid var(--graf-warm-200)', borderRadius: 4, padding: '3px 6px', marginBottom: 3, fontSize: 11 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong>{pf.type.replace('Series', 'Ser ').replace('Shunt', 'Shnt ').replace('Zobel', 'Zobel ').replace('NotchShunt', 'P.Notch').replace('NotchSeries', 'S.Notch')}</strong>
+                <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 9 }} onClick={removePf}>✕</button>
+              </div>
+              {'ohms' in pf && !('farads' in pf) && !('henries' in pf) && (
+                <div className="param-row"><span className="param-label">R</span>
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.ohms.toFixed(2))} step={0.1}
+                    onChange={(e) => updatePf({ ...pf, ohms: parseFloat(e.target.value) || pf.ohms } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
+              )}
+              {'henries' in pf && (
+                <div className="param-row"><span className="param-label">L</span>
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.henries * 1e3).toFixed(3))} step={0.01}
+                    onChange={(e) => updatePf({ ...pf, henries: (parseFloat(e.target.value) || 0) / 1e3 } as PassiveFilter)} /><span className="param-unit">mH</span></div>
+              )}
+              {'dcr_ohms' in pf && (
+                <div className="param-row"><span className="param-label">DCR</span>
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.dcr_ohms.toFixed(2))} step={0.1}
+                    onChange={(e) => updatePf({ ...pf, dcr_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
+              )}
+              {'farads' in pf && (
+                <div className="param-row"><span className="param-label">C</span>
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.farads * 1e6).toFixed(2))} step={0.1}
+                    onChange={(e) => updatePf({ ...pf, farads: (parseFloat(e.target.value) || 0) / 1e6 } as PassiveFilter)} /><span className="param-unit">µF</span></div>
+              )}
+              {'series_ohms' in pf && (
+                <>
+                  <div className="param-row"><span className="param-label">R ser</span>
+                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.series_ohms.toFixed(2))} step={0.1}
+                      onChange={(e) => updatePf({ ...pf, series_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
+                  <div className="param-row"><span className="param-label">R shnt</span>
+                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.shunt_ohms.toFixed(2))} step={0.1}
+                      onChange={(e) => updatePf({ ...pf, shunt_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
+                </>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Crossover frequency for wizard */}
+        <div className="param-row" title="Crossover frequency used by the topology wizard presets below">
+          <span className="param-label">Xover freq</span>
+          <input type="number" className="graf-form-control" id={`xover-${activeWay}`}
+            style={{ width: 70, fontSize: 11 }} defaultValue={3000} step={100} min={100} />
+          <span className="param-unit">Hz</span>
+        </div>
 
         {/* Passive wizard */}
         <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
@@ -225,11 +251,12 @@ export function MultiWayEditor({ ways, onChange }: Props) {
             if (!preset) return;
             const re = way.driver.re_ohm || 8;
             const le = way.driver.le_h || 0.5e-3;
+            const xoverInput = document.getElementById(`xover-${activeWay}`) as HTMLInputElement;
+            const xoverFreq = parseFloat(xoverInput?.value) || 3000;
 
             let newFilters: PassiveFilter[] = [];
             if (preset === 'bw2_lp') {
-              // 2nd-order Butterworth LP: series L + shunt C
-              const wc = 2 * Math.PI * 3000;
+              const wc = 2 * Math.PI * xoverFreq;
               const l = re * Math.SQRT2 / wc;
               const c = Math.SQRT2 / (wc * re);
               newFilters = [
@@ -237,7 +264,7 @@ export function MultiWayEditor({ ways, onChange }: Props) {
                 { type: 'ShuntC', farads: c },
               ];
             } else if (preset === 'bw2_hp') {
-              const wc = 2 * Math.PI * 3000;
+              const wc = 2 * Math.PI * xoverFreq;
               const c = 1 / (Math.SQRT2 * wc * re);
               const l = re / (Math.SQRT2 * wc);
               newFilters = [

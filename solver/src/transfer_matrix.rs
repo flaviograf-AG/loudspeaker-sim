@@ -69,10 +69,11 @@ pub fn identity_2x2() -> TransferMatrix2x2 {
 
 /// Compute complex wave number with stuffing absorption.
 ///
-/// k = ω/c₀ - j×α
+/// Full Bradbury model:
+///   k_c = (ω/c₀) × √(1 + Rf/(jωρ₀))
 ///
-/// Simplified Bradbury absorption model:
-///   α = Rf / (2 × ρ₀ × c₀)
+/// This modifies both the real part (effective sound speed reduction)
+/// and imaginary part (absorption) of the wave number.
 ///
 /// Reference: Bradbury, L.J.S. "The Use of Fibrous Materials in
 /// Loudspeaker Enclosures" (JAES, 1976), Eq. 12.
@@ -82,12 +83,42 @@ pub fn complex_wave_number(
     rho0: f64,
     flow_resistivity: f64,
 ) -> Complex<f64> {
-    let k_real = omega / c0;
-    let alpha = flow_resistivity / (2.0 * rho0 * c0);
-    Complex::new(k_real, -alpha)
+    let k0 = omega / c0;
+    if flow_resistivity <= 0.0 {
+        return Complex::new(k0, 0.0);
+    }
+    // k_c = k₀ × √(1 + Rf/(jωρ₀))
+    let j = Complex::new(0.0, 1.0);
+    let ratio = flow_resistivity / (j * omega * rho0);
+    let sqrt_term = (Complex::new(1.0, 0.0) + ratio).sqrt();
+    Complex::new(k0, 0.0) * sqrt_term
 }
 
-/// Characteristic acoustic impedance for a duct of given cross-section.
+/// Characteristic acoustic impedance for a duct with optional stuffing.
+///
+/// Full Bradbury model:
+///   Z_c = (ρ₀c₀/S) / √(1 + Rf/(jωρ₀))
+///
+/// For no stuffing (Rf=0), reduces to the real-valued ρ₀c₀/S.
+///
+/// Reference: Bradbury (1976)
+pub fn characteristic_impedance_stuffed(
+    omega: f64,
+    rho0: f64,
+    c0: f64,
+    area: f64,
+    flow_resistivity: f64,
+) -> Complex<f64> {
+    let z0 = rho0 * c0 / area;
+    if flow_resistivity <= 0.0 {
+        return Complex::new(z0, 0.0);
+    }
+    let j = Complex::new(0.0, 1.0);
+    let ratio = flow_resistivity / (j * omega * rho0);
+    Complex::new(z0, 0.0) / (Complex::new(1.0, 0.0) + ratio).sqrt()
+}
+
+/// Characteristic acoustic impedance for a duct (lossless).
 ///
 /// Z₀ = ρ₀ × c₀ / S
 pub fn characteristic_impedance(rho0: f64, c0: f64, area: f64) -> Complex<f64> {

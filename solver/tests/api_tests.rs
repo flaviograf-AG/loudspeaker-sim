@@ -24,7 +24,7 @@ fn sealed_simulation_end_to_end() {
         drive_voltage_rms: 2.83,
     };
 
-    let result = solve_simulation(&input);
+    let result = solve_simulation(&input).unwrap();
 
     assert_eq!(result.frequencies_hz.len(), 500);
     assert_eq!(result.spl_db.len(), 500);
@@ -64,7 +64,7 @@ fn vented_simulation_end_to_end() {
         drive_voltage_rms: 2.83,
     };
 
-    let result = solve_simulation(&input);
+    let result = solve_simulation(&input).unwrap();
     assert!(result.port_velocity_ms.is_some());
     assert_eq!(result.port_velocity_ms.as_ref().unwrap().len(), 500);
 }
@@ -98,7 +98,7 @@ fn tl_simulation_end_to_end() {
         drive_voltage_rms: 2.83,
     };
 
-    let result = solve_simulation(&input);
+    let result = solve_simulation(&input).unwrap();
     assert!(result.spl_db.iter().all(|v| v.is_finite()));
 }
 
@@ -132,7 +132,7 @@ fn json_round_trip() {
     assert_eq!(parsed.freq_points, 100);
 
     // Run simulation and serialize result
-    let result = solve_simulation(&parsed);
+    let result = solve_simulation(&parsed).unwrap();
     let result_json = serde_json::to_string(&result).expect("serialize result");
     assert!(result_json.contains("spl_db"));
 }

@@ -40,9 +40,12 @@ fn sealed_system_qtc() {
     };
     let params = sealed_system_params(&driver, &enclosure);
 
-    // Qtc = Qts × √(1 + α)
+    // Qtc = 1 / (1/Qtc_lossless + 1/Ql)
+    // where Qtc_lossless = Qts × √(1 + α)
+    // Reference: Small (1972), Eq. 12-13
     let qts = (0.42 * 3.5) / (0.42 + 3.5);
-    let expected_qtc = qts * 2.0_f64.sqrt();
+    let qtc_lossless = qts * 2.0_f64.sqrt();
+    let expected_qtc = 1.0 / (1.0 / qtc_lossless + 1.0 / 7.0);
     assert_relative_eq!(params.qtc, expected_qtc, epsilon = 0.01);
 }
 

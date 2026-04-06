@@ -26,3 +26,46 @@ pub fn log_frequency_sweep(f_start: f64, f_end: f64, n_points: usize) -> Vec<f64
 pub fn pressure_to_spl_db(p_rms: f64) -> f64 {
     20.0 * (p_rms / P_REF).log10()
 }
+
+/// Compute group delay from a vector of phase values (radians) and frequencies (Hz).
+///
+/// Group delay = -dφ/dω = -dφ/(2π×df)
+/// Uses central differences for interior points, forward/backward at endpoints.
+/// Handles phase wrapping by differentiating unwrapped phase.
+pub fn compute_group_delay_ms(frequencies_hz: &[f64], phases_rad: &[f64]) -> Vec<f64> {
+    let n = frequencies_hz.len();
+    if n < 2 {
+        return vec![0.0; n];
+    }
+
+    let mut gd = Vec::with_capacity(n);
+    let twopi = 2.0 * std::f64::consts::PI;
+
+    for i in 0..n {
+        let (df, dphi) = if i == 0 {
+            let df = frequencies_hz[1] - frequencies_hz[0];
+            let mut dp = phases_rad[1] - phases_rad[0];
+            while dp > std::f64::consts::PI { dp -= twopi; }
+            while dp < -std::f64::consts::PI { dp += twopi; }
+            (df, dp)
+        } else if i == n - 1 {
+            let df = frequencies_hz[n - 1] - frequencies_hz[n - 2];
+            let mut dp = phases_rad[n - 1] - phases_rad[n - 2];
+            while dp > std::f64::consts::PI { dp -= twopi; }
+            while dp < -std::f64::consts::PI { dp += twopi; }
+            (df, dp)
+        } else {
+            let df = frequencies_hz[i + 1] - frequencies_hz[i - 1];
+            let mut dp = phases_rad[i + 1] - phases_rad[i - 1];
+            while dp > std::f64::consts::PI { dp -= twopi; }
+            while dp < -std::f64::consts::PI { dp += twopi; }
+            (df, dp)
+        };
+
+        // τ_g = -dφ/dω = -dφ/(2π×df), convert to ms
+        let gd_s = -dphi / (twopi * df);
+        gd.push(gd_s * 1000.0);
+    }
+
+    gd
+}

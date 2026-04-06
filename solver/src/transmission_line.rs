@@ -18,9 +18,9 @@
 use num_complex::Complex;
 
 use crate::constants::{C_0, RHO_0, TWO_PI};
-use crate::sweep::pressure_to_spl_db;
+use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::transfer_matrix::{
-    cascade_2x2, characteristic_impedance, complex_wave_number, duct_transfer_matrix,
+    cascade_2x2, characteristic_impedance_stuffed, complex_wave_number, duct_transfer_matrix,
     identity_2x2, TransferMatrix2x2,
 };
 use crate::types::{
@@ -59,18 +59,37 @@ fn area_at_fraction(tl: &TransmissionLineParams, frac: f64) -> f64 {
     }
 }
 
+/// Estimate flow resistivity from stuffing density using Bradbury's empirical relation.
+/// Rf ≈ 1000 × density_kg_m3 (rough approximation for polyester fiberfill).
+/// Reference: Bradbury (1976), empirical data for glass wool / polyester.
+fn density_to_flow_resistivity(density_kg_m3: f64) -> f64 {
+    if density_kg_m3 <= 0.0 {
+        return 0.0;
+    }
+    // Typical relation: Rf ≈ 1000 × ρ for polyester fill
+    // (glass wool is ~3000×ρ, dacron ~800×ρ — 1000 is a reasonable default)
+    1000.0 * density_kg_m3
+}
+
 /// Get flow resistivity at a fractional position along the line.
 /// If stuffing zones are defined, look up the zone; otherwise use the global value.
+/// When flow_resistivity is 0 but density > 0, derives from density.
 fn flow_resistivity_at(tl: &TransmissionLineParams, frac: f64) -> f64 {
-    if tl.stuffing_zones.is_empty() {
-        return tl.flow_resistivity_pa_s_m2;
-    }
-    for zone in &tl.stuffing_zones {
-        if frac >= zone.start_pct && frac < zone.end_pct {
-            return zone.flow_resistivity_pa_s_m2;
+    if !tl.stuffing_zones.is_empty() {
+        for zone in &tl.stuffing_zones {
+            if frac >= zone.start_pct && frac < zone.end_pct {
+                let fr = zone.flow_resistivity_pa_s_m2;
+                return if fr > 0.0 { fr } else { density_to_flow_resistivity(zone.density_kg_m3) };
+            }
         }
+        return 0.0; // No zone covers this position → lossless
     }
-    0.0 // No zone covers this position → lossless
+    // Global stuffing
+    if tl.flow_resistivity_pa_s_m2 > 0.0 {
+        tl.flow_resistivity_pa_s_m2
+    } else {
+        density_to_flow_resistivity(tl.stuffing_density_kg_m3)
+    }
 }
 
 /// Build a 2×2 series impedance matrix for a fold discontinuity.
@@ -106,7 +125,7 @@ fn build_section_matrix(
         let area = area_at_fraction(tl, seg_frac);
         let fr = flow_resistivity_at(tl, seg_frac);
         let k = complex_wave_number(omega, C_0, RHO_0, fr);
-        let z0 = characteristic_impedance(RHO_0, C_0, area);
+        let z0 = characteristic_impedance_stuffed(omega, RHO_0, C_0, area, fr);
         let t_seg = duct_transfer_matrix(k, z0, seg_length);
         t_total = cascade_2x2(&t_total, &t_seg);
 
@@ -166,7 +185,7 @@ pub fn tl_frequency_response(
     let mut impedance_ohm = Vec::with_capacity(n);
     let mut impedance_phase_deg = Vec::with_capacity(n);
     let mut displacement_mm = Vec::with_capacity(n);
-    let mut group_delay_ms = Vec::with_capacity(n);
+    let mut pressure_phases = Vec::with_capacity(n);
 
     for &f in frequencies_hz {
         let omega = TWO_PI * f;
@@ -189,40 +208,41 @@ pub fn tl_frequency_response(
             Complex::new(1e12, 0.0) // Closed end
         };
 
-        // === Build transfer matrices ===
-        let z_line = if dp > 0.0 && n_dead > 0 {
-            // Dead-end section: wall to driver
-            let t_dead =
-                build_section_matrix(tl, 0.0, dp, n_dead, omega, &fold_positions);
-            // Dead-end termination: closed wall (infinite impedance)
+        // === Build transfer matrices (computed once, reused for Z and U) ===
+        let s = j * omega;
+        let sd2 = p.sd_m2 * p.sd_m2;
+
+        let (z_line, u_mouth_from_driver) = if dp > 0.0 && n_dead > 0 {
+            let t_dead = build_section_matrix(tl, 0.0, dp, n_dead, omega, &fold_positions);
+            let t_open = build_section_matrix(tl, dp, 1.0, n_open, omega, &fold_positions);
             let z_wall = Complex::new(1e12, 0.0);
+
             let z_dead = (t_dead[0][0] * z_wall + t_dead[0][1])
                 / (t_dead[1][0] * z_wall + t_dead[1][1]);
-
-            // Open section: driver to mouth
-            let t_open =
-                build_section_matrix(tl, dp, 1.0, n_open, omega, &fold_positions);
             let z_open = (t_open[0][0] * z_rad + t_open[0][1])
                 / (t_open[1][0] * z_rad + t_open[1][1]);
 
-            // Driver sees both in parallel
-            (z_dead * z_open) / (z_dead + z_open)
+            let z_par = (z_dead * z_open) / (z_dead + z_open);
+
+            // Mouth transfer: U_mouth/U_driver_open, where
+            // U_driver_open = U_driver × Z_dead / (Z_dead + Z_open)
+            // U_mouth = U_driver_open / (C×Z_rad + D) of open section
+            let mouth_denom = t_open[1][0] * z_rad + t_open[1][1];
+            let open_fraction = z_dead / (z_dead + z_open);
+            // Combined: U_mouth = U_driver × open_fraction / mouth_denom
+            let transfer = open_fraction / mouth_denom;
+
+            (z_par, transfer)
         } else {
-            // No offset: single chain from driver (frac=0) to mouth (frac=1)
-            let t_total =
-                build_section_matrix(tl, 0.0, 1.0, n_seg_total, omega, &fold_positions);
-            let a = t_total[0][0];
-            let b = t_total[0][1];
-            let c_mat = t_total[1][0];
-            let d = t_total[1][1];
-            (a * z_rad + b) / (c_mat * z_rad + d)
+            let t_total = build_section_matrix(tl, 0.0, 1.0, n_seg_total, omega, &fold_positions);
+            let z = (t_total[0][0] * z_rad + t_total[0][1])
+                / (t_total[1][0] * z_rad + t_total[1][1]);
+            let transfer = Complex::new(1.0, 0.0) / (t_total[1][0] * z_rad + t_total[1][1]);
+            (z, transfer)
         };
 
-        // === Convert to mechanical domain and solve circuit ===
-        let sd2 = p.sd_m2 * p.sd_m2;
+        // === Electrical impedance and cone velocity ===
         let z_mech_line = sd2 * z_line;
-
-        let s = j * omega;
         let z_mech_total = s * driver.mms + driver.rms + 1.0 / (s * driver.cms) + z_mech_line;
         let z_mot = driver.bl * driver.bl / z_mech_total;
         let z_in = p.re_ohm + s * p.le_h + z_mot;
@@ -236,38 +256,20 @@ pub fn tl_frequency_response(
         let x_cone = v_cone / (j * omega);
         displacement_mm.push(x_cone.norm() * 1000.0);
 
-        // === Volume velocity at mouth ===
+        // === Volume velocity at mouth (using cached transfer) ===
         let u_driver = p.sd_m2 * v_cone;
-
-        let u_mouth = if dp > 0.0 && n_dead > 0 {
-            // With offset: mouth output from open section only
-            let t_open =
-                build_section_matrix(tl, dp, 1.0, n_open, omega, &fold_positions);
-            // Fraction of driver volume velocity going into open section
-            let t_dead =
-                build_section_matrix(tl, 0.0, dp, n_dead, omega, &fold_positions);
-            let z_wall = Complex::new(1e12, 0.0);
-            let z_dead = (t_dead[0][0] * z_wall + t_dead[0][1])
-                / (t_dead[1][0] * z_wall + t_dead[1][1]);
-            let z_open = (t_open[0][0] * z_rad + t_open[0][1])
-                / (t_open[1][0] * z_rad + t_open[1][1]);
-            // Current divider: U_open = U_driver × Z_dead / (Z_dead + Z_open)
-            let u_open = u_driver * z_dead / (z_dead + z_open);
-            u_open / (t_open[1][0] * z_rad + t_open[1][1])
-        } else {
-            let t_total =
-                build_section_matrix(tl, 0.0, 1.0, n_seg_total, omega, &fold_positions);
-            u_driver / (t_total[1][0] * z_rad + t_total[1][1])
-        };
+        let u_mouth = u_driver * u_mouth_from_driver;
 
         // Radiated sound: driver front + mouth
         let p_driver = RHO_0 * omega * u_driver / (2.0 * std::f64::consts::PI);
         let p_mouth = RHO_0 * omega * u_mouth / (2.0 * std::f64::consts::PI);
         let p_total = p_driver + p_mouth;
         spl_db.push(pressure_to_spl_db(p_total.norm()));
-
-        group_delay_ms.push(-p_total.arg() / omega * 1000.0);
+        pressure_phases.push(p_total.arg());
     }
+
+    // Group delay: -dφ/dω via numerical differentiation
+    let group_delay_ms = compute_group_delay_ms(frequencies_hz, &pressure_phases);
 
     SimulationResult {
         frequencies_hz: frequencies_hz.to_vec(),

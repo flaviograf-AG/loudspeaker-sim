@@ -59,13 +59,24 @@ fn complex_wave_number_lossless() {
 
 #[test]
 fn complex_wave_number_with_stuffing() {
+    // Full Bradbury model: k_c = k₀ × √(1 + Rf/(jωρ₀))
     let omega = 2.0 * std::f64::consts::PI * 1000.0;
-    let rf = 5000.0; // Pa·s/m²
-    let k = complex_wave_number(omega, 343.21, 1.2041, rf);
-    assert_relative_eq!(k.re, omega / 343.21, epsilon = 1e-10);
-    // α = Rf / (2 × ρ₀ × c₀)
-    let expected_alpha = rf / (2.0 * 1.2041 * 343.21);
-    assert_relative_eq!(k.im, -expected_alpha, epsilon = 1e-6);
+    let rf = 5000.0;
+    let rho0 = 1.2041;
+    let c0 = 343.21;
+    let k = complex_wave_number(omega, c0, rho0, rf);
+
+    // Stuffing should increase real part (slow sound) and add negative imaginary (absorption)
+    let k0 = omega / c0;
+    assert!(k.re > k0, "Stuffing should increase effective k (slow down sound)");
+    assert!(k.im < 0.0, "Imaginary part should be negative (absorption)");
+
+    // Verify against analytical Bradbury formula
+    let j = Complex::new(0.0, 1.0);
+    let ratio = rf / (j * omega * rho0);
+    let expected = Complex::new(k0, 0.0) * (Complex::new(1.0, 0.0) + ratio).sqrt();
+    assert_relative_eq!(k.re, expected.re, epsilon = 1e-6);
+    assert_relative_eq!(k.im, expected.im, epsilon = 1e-6);
 }
 
 #[test]

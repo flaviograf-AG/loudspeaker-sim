@@ -10,7 +10,7 @@
 use num_complex::Complex;
 
 use crate::constants::{C_0, RHO_0, TWO_PI};
-use crate::sweep::pressure_to_spl_db;
+use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::types::{DerivedDriver, SimulationResult, VentedBoxParams};
 
 /// Compute effective port length including end corrections.
@@ -76,7 +76,7 @@ pub fn vented_frequency_response(
     let mut impedance_ohm = Vec::with_capacity(n);
     let mut impedance_phase_deg = Vec::with_capacity(n);
     let mut displacement_mm = Vec::with_capacity(n);
-    let mut group_delay_ms = Vec::with_capacity(n);
+    let mut pressure_phases = Vec::with_capacity(n);
     let mut port_velocity = Vec::with_capacity(n);
 
     for &f in frequencies_hz {
@@ -85,10 +85,23 @@ pub fn vented_frequency_response(
 
         // Box compliance impedance
         let z_cab = 1.0 / (s * cab);
+        // Box loss resistance: Rab = 1/(ωb × Cab × Ql), evaluated at box resonance
+        // This is a constant (frequency-independent) acoustic resistance.
+        // Reference: Small (1973), Eq. 8
+        let fb = port_resonance_hz(enclosure);
+        let omega_b = TWO_PI * fb;
+        let rab = if enclosure.ql > 0.0 && enclosure.ql < 1e6 {
+            // Ql = ωb × Cab × Rab → Rab = Ql / (ωb × Cab)
+            // High Ql = high resistance = low loss
+            Complex::new(enclosure.ql / (omega_b * cab), 0.0)
+        } else {
+            Complex::new(1e12, 0.0) // No loss
+        };
+        let z_cab_with_loss = (z_cab * rab) / (z_cab + rab); // Cab ∥ Rab
         // Port impedance (acoustic mass)
         let z_port = s * map;
-        // Box load: Cab parallel with port
-        let z_ab = (z_cab * z_port) / (z_cab + z_port);
+        // Box load: (Cab ∥ Rab) parallel with port
+        let z_ab = (z_cab_with_loss * z_port) / (z_cab_with_loss + z_port);
 
         // Driver acoustic impedance including box load
         let z_driver_acoustic = s * mas + ras + 1.0 / (s * cas) + z_ab;
@@ -120,10 +133,11 @@ pub fn vented_frequency_response(
         let u_total = u_driver + u_port;
         let p_acoustic = RHO_0 * omega * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
-
-        // Group delay from pressure phase
-        group_delay_ms.push(-p_acoustic.arg() / omega * 1000.0);
+        pressure_phases.push(p_acoustic.arg());
     }
+
+    // Group delay: -dφ/dω via numerical differentiation
+    let group_delay_ms = compute_group_delay_ms(frequencies_hz, &pressure_phases);
 
     SimulationResult {
         frequencies_hz: frequencies_hz.to_vec(),

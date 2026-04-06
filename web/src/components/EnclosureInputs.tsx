@@ -107,6 +107,11 @@ export function EnclosureInputs({ config, onChange }: Props) {
           </div>
           <NumericInput label="Ports" value={config.num_ports} step={1} min={1} max={4}
             onChange={(v) => onChange({ ...config, num_ports: Math.round(v) })} />
+          <div className="param-row">
+            <span className="param-label">Flanged</span>
+            <input type="checkbox" checked={config.port_flanged}
+              onChange={(e) => onChange({ ...config, port_flanged: e.target.checked })} />
+          </div>
           <NumericInput label="Ql" value={config.ql} step={0.5} min={1}
             onChange={(v) => onChange({ ...config, ql: v })} />
         </>
@@ -136,6 +141,12 @@ export function EnclosureInputs({ config, onChange }: Props) {
               <option value="Exponential">Exponential</option>
               <option value="Conical">Conical</option>
             </select>
+          </div>
+
+          <div className="param-row">
+            <span className="param-label">Open end</span>
+            <input type="checkbox" checked={config.open_end}
+              onChange={(e) => onChange({ ...config, open_end: e.target.checked })} />
           </div>
 
           <NumericInput label="Folds" value={config.num_folds} step={1} min={0} max={8}

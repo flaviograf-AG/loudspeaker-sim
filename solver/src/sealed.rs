@@ -1,7 +1,8 @@
 //! Sealed (closed) box loudspeaker model.
 //!
 //! A sealed box adds acoustic compliance in parallel with the driver's mechanical
-//! compliance, raising the system resonance and Q factor.
+//! compliance, raising the system resonance and Q factor. Box losses (Ql) reduce
+//! the effective system Q.
 //!
 //! Reference: Small, R.H. "Closed-Box Loudspeaker Systems — Part I: Analysis"
 //! JAES Vol. 20, No. 10 (1972), Equations 1–20.
@@ -9,14 +10,14 @@
 use num_complex::Complex;
 
 use crate::constants::{RHO_0, TWO_PI};
-use crate::sweep::pressure_to_spl_db;
+use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::types::{DerivedDriver, SealedBoxParams, SimulationResult};
 
 /// Computed system-level parameters for a sealed box.
 pub struct SealedSystemParams {
     /// System resonance frequency (Hz)
     pub fc_hz: f64,
-    /// System total Q factor
+    /// System total Q factor (including box losses)
     pub qtc: f64,
     /// Compliance ratio α = Vas / Vb
     pub alpha: f64,
@@ -26,13 +27,25 @@ pub struct SealedSystemParams {
 ///
 /// Small (1972), Eq. 11: Fc = Fs × √(1 + Vas/Vb)
 /// Small (1972), Eq. 12: Qtc = Qts × √(1 + Vas/Vb)
+/// Box losses: 1/Qtc_total = 1/Qtc + 1/Ql  (Small 1972, Eq. 13)
 pub fn sealed_system_params(driver: &DerivedDriver, enclosure: &SealedBoxParams) -> SealedSystemParams {
     let alpha = driver.params.vas_m3 / enclosure.volume_m3;
     let sqrt_factor = (1.0 + alpha).sqrt();
 
+    let qtc_lossless = driver.qts * sqrt_factor;
+
+    // Apply box losses via Ql
+    // 1/Qtc_total = 1/Qtc + 1/Ql
+    // Reference: Small (1972), Eq. 13
+    let qtc = if enclosure.ql > 0.0 && enclosure.ql < 1e6 {
+        1.0 / (1.0 / qtc_lossless + 1.0 / enclosure.ql)
+    } else {
+        qtc_lossless
+    };
+
     SealedSystemParams {
         fc_hz: driver.params.fs_hz * sqrt_factor,
-        qtc: driver.qts * sqrt_factor,
+        qtc,
         alpha,
     }
 }
@@ -41,6 +54,11 @@ pub fn sealed_system_params(driver: &DerivedDriver, enclosure: &SealedBoxParams)
 ///
 /// Uses the electromechanical circuit model to compute impedance, SPL,
 /// and displacement at each frequency point.
+///
+/// Box losses (Ql) are modeled as a resistance in parallel with the box
+/// compliance in the mechanical circuit:
+///   R_loss = Mms × ωc / Ql_effective
+/// where Ql_effective captures only the box absorption losses.
 ///
 /// SPL is computed at 1m in half-space (2π steradians) for ka << 1.
 /// Reference: Beranek (1986), Ch. 4; Small (1972), Eq. 15–17.
@@ -51,7 +69,6 @@ pub fn sealed_frequency_response(
     drive_voltage_rms: f64,
 ) -> SimulationResult {
     let sys = sealed_system_params(driver, enclosure);
-    let omega_c = TWO_PI * sys.fc_hz;
     let p = &driver.params;
 
     let n = frequencies_hz.len();
@@ -59,21 +76,35 @@ pub fn sealed_frequency_response(
     let mut impedance_ohm = Vec::with_capacity(n);
     let mut impedance_phase_deg = Vec::with_capacity(n);
     let mut displacement_mm = Vec::with_capacity(n);
-    let mut group_delay_ms = Vec::with_capacity(n);
+    let mut pressure_phases = Vec::with_capacity(n);
 
     let j = Complex::new(0.0, 1.0);
 
-    // Total compliance: Cms in series with box compliance
-    // Cms_total = Cms / (1 + α)
+    // Combined compliance: driver + box in series (mechanical domain)
     let cms_total = driver.cms / (1.0 + sys.alpha);
+    let omega_c = TWO_PI * sys.fc_hz;
+
+    // Box loss resistance (mechanical domain).
+    // Ql models absorption in the box lining. In the equivalent circuit,
+    // this is a resistance in parallel with Cms_box. In the Cms_total
+    // formulation, the equivalent series loss resistance is:
+    //   R_ql = Mms × ωc / Ql
+    // This adds damping beyond the driver's own Rms.
+    // Reference: Small (1972), Eq. 13
+    let r_ql = if enclosure.ql > 0.0 && enclosure.ql < 1e6 {
+        driver.mms * omega_c / enclosure.ql
+    } else {
+        0.0
+    };
+    let rms_total = driver.rms + r_ql;
 
     for &f in frequencies_hz {
         let omega = TWO_PI * f;
         let s = j * omega;
 
         // === Electrical impedance ===
-        // Zin = Re + s×Le + Bl² / (s×Mms + Rms + 1/(s×Cms_total))
-        let z_mech = s * driver.mms + driver.rms + 1.0 / (s * cms_total);
+        // Zin = Re + sLe + Bl² / (sMms + Rms_total + 1/(sCms_total))
+        let z_mech = s * driver.mms + rms_total + 1.0 / (s * cms_total);
         let z_mot = driver.bl * driver.bl / z_mech;
         let z_in = p.re_ohm + s * p.le_h + z_mot;
 
@@ -95,11 +126,11 @@ pub fn sealed_frequency_response(
         let p_acoustic = RHO_0 * omega * p.sd_m2 * v_cone
             / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
-
-        // === Group delay from transfer function ===
-        let ratio = s * s / (s * s + s * omega_c / sys.qtc + omega_c * omega_c);
-        group_delay_ms.push(-ratio.arg() / omega * 1000.0);
+        pressure_phases.push(p_acoustic.arg());
     }
+
+    // Group delay: -dφ/dω computed via numerical differentiation
+    let group_delay_ms = compute_group_delay_ms(frequencies_hz, &pressure_phases);
 
     SimulationResult {
         frequencies_hz: frequencies_hz.to_vec(),

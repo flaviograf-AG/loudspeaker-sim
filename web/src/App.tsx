@@ -110,10 +110,12 @@ function App() {
           <button
             className={`graf-btn graf-btn-sm ${mode === 'single' ? 'graf-btn-primary' : 'graf-btn-outline'}`}
             onClick={() => setMode('single')}
+            title="Single Driver mode — design one driver in one enclosure. Full SPL, impedance, displacement, group delay, phase plots."
           >Single Driver</button>
           <button
             className={`graf-btn graf-btn-sm ${mode === 'multiway' ? 'graf-btn-primary' : 'graf-btn-outline'}`}
             onClick={() => setMode('multiway')}
+            title="Multi-Way mode — design a complete speaker system with multiple drivers, crossover filters, and time alignment. System SPL is the complex sum of all ways."
           >Multi-Way</button>
         </div>
 

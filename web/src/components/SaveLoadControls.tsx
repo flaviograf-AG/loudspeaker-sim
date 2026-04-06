@@ -59,14 +59,18 @@ export function SaveLoadControls({ input, onLoad }: Props) {
     <div className="section-card">
       <div className="section-title">Designs</div>
       <div className="btn-row">
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleSave}>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleSave}
+          title="Save current design to browser localStorage with a name">
           <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: -3 }}>save</span> Save
         </button>
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={() => setShowList(!showList)}>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={() => setShowList(!showList)}
+          title="Load a previously saved design from browser localStorage">
           <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: -3 }}>folder_open</span> Load ({designs.length})
         </button>
-        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleExport}>Export</button>
-        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleImport}>Import</button>
+        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleExport}
+          title="Export current design as a JSON file — share with others or back up">Export</button>
+        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleImport}
+          title="Import a design from a JSON file — load a shared design or backup">Import</button>
       </div>
       {showList && designs.length > 0 && (
         <ul style={{ fontSize: 12, margin: '8px 0 0', paddingLeft: 16, listStyle: 'none' }}>

@@ -44,9 +44,12 @@ export function ExportControls({ result }: Props) {
     <div className="section-card">
       <div className="section-title">Export</div>
       <div className="btn-row">
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleFrd}>FRD (SPL)</button>
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleZma}>ZMA (Z)</button>
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleCsv}>CSV (all)</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleFrd}
+          title="FRD — Frequency Response Data file (freq, SPL dB, phase deg). Standard format for XSim, VituixCAD, REW, ARTA.">FRD (SPL)</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleZma}
+          title="ZMA — Impedance data file (freq, |Z| ohms, phase deg). Standard format for XSim, VituixCAD, DATS.">ZMA (Z)</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleCsv}
+          title="CSV — All simulation data in one spreadsheet-ready file. Includes SPL, phase, impedance, displacement, group delay.">CSV (all)</button>
       </div>
     </div>
   );

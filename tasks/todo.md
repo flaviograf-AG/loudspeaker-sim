@@ -31,14 +31,34 @@
 - [ ] **Room gain simulation** — simple half-space to room boundary model
 - [ ] **FRD/ZMA import + overlay** — import measured data and overlay on simulated plots for comparison
 
-## Priority 4: Crossover design (v0.2 major feature)
+## Priority 4: Multi-way crossover design (v0.2 major feature)
 
+**Target use case:** 3-way speaker with woofer in TL + midrange in sealed/vented + tweeter, each with passive crossover filters, showing combined system response.
+
+### 4a. Multi-driver project model
+- [ ] **Project-level data model** — a "Speaker Project" contains N driver+enclosure "ways", each producing its own SimulationResult. Currently the app handles only one driver at a time. Need:
+  - `SpeakerProject { ways: Vec<Way> }` where `Way = { driver, enclosure, crossover, position }`
+  - UI to add/remove ways (tabs or accordion)
+  - Each way runs its own simulation independently
+
+### 4b. Crossover engine (Rust solver)
 - [ ] **Modified Nodal Analysis (MNA) engine** — Rust solver for passive crossover networks
   - R, L, C components in series/parallel
   - Driver impedance as load (from ZMA or simulated)
   - Solve for voltage transfer function at each frequency
-- [ ] **Crossover UI** — schematic editor or component list for building filter networks
-- [ ] **Multi-way system** — combine multiple driver+enclosure+crossover into a single system response
+  - Common topologies: 1st–4th order LP/HP/BP (Butterworth, Linkwitz-Riley, Bessel)
+  - Zobel network (impedance equalization)
+  - L-pad (level matching between drivers)
+- [ ] **Crossover-filtered response** — multiply each driver's SPL by its crossover transfer function to get the filtered per-way response
+
+### 4c. System summation
+- [ ] **Acoustic summation** — sum all ways' complex pressure (magnitude + phase) at each frequency to get total system SPL. Phase matters — this is what makes crossover design hard.
+- [ ] **Time alignment / driver offset** — account for physical distance differences between drivers (e.g., tweeter recessed vs. woofer flush)
+- [ ] **System impedance** — parallel combination of all ways' impedance through their crossover networks
+
+### 4d. UI
+- [ ] **Crossover UI** — per-way filter component list (topology selector + component values)
+- [ ] **System view** — overlay all per-way filtered responses + total system response on one plot
 - [ ] **Crossover optimizer** — target response curve, optimize component values
 
 ## Priority 5: Polish

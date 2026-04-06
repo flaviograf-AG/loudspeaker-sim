@@ -122,15 +122,28 @@ pub fn vented_frequency_response(
         displacement_mm.push(x_cone.norm() * 1000.0);
 
         // Volume velocities
+        // u_driver: cone volume velocity (positive = outward from baffle into room)
         let u_driver = p.sd_m2 * v_cone;
+        // Box pressure from acoustic load: the cone's back face drives volume
+        // velocity into the box, so box pressure = u_driver × z_ab.
         let p_box = u_driver * z_ab;
-        let u_port = p_box / z_port;
-        let v_port = u_port / total_port_area;
+        // Port volume velocity (circuit convention: flow out of box cavity)
+        let u_port_circuit = p_box / z_port;
+        let v_port = u_port_circuit / total_port_area;
         port_velocity.push(v_port.norm());
 
         // Radiated sound: driver front + port
-        // p = ρ₀ × ω × (Ud + Up) / (2π)  at r = 1m
-        let u_total = u_driver + u_port;
+        // p = ρ₀ × ω × (Ud_front + Up_room) / (2π)  at r = 1m
+        //
+        // Sign convention: when the driver cone moves outward (+u_driver into room),
+        // it reduces box cavity pressure, causing air to flow INTO the box through
+        // the port. From the room's perspective, this port flow is inward (negative).
+        // Therefore the port's far-field contribution is −u_port_circuit.
+        //
+        // Equivalently: below Fb the port "leaks" the back wave, canceling the front
+        // wave (24 dB/octave rolloff). Above Fb the port adds constructively.
+        // Reference: Small (1973), Eq. 21; Dickason (2006), Ch. 6.
+        let u_total = u_driver - u_port_circuit;
         let p_acoustic = RHO_0 * omega * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
         pressure_phases.push(p_acoustic.arg());

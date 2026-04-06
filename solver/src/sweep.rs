@@ -69,3 +69,52 @@ pub fn compute_group_delay_ms(frequencies_hz: &[f64], phases_rad: &[f64]) -> Vec
 
     gd
 }
+
+/// Compute impulse response from complex pressure via inverse DFT.
+/// Returns time samples at the given sample rate.
+/// The input is assumed to be single-sided (positive frequencies only).
+pub fn impulse_response(
+    frequencies_hz: &[f64],
+    pressure_phases: &[f64],
+    spl_db: &[f64],
+    sample_rate: f64,
+) -> (Vec<f64>, Vec<f64>) {
+    let n_freq = frequencies_hz.len();
+    let n_fft = 2 * n_freq; // mirror for full spectrum
+    let dt = 1.0 / sample_rate;
+
+    // Build complex spectrum (positive side)
+    let mut spectrum_re = vec![0.0; n_fft];
+    let mut spectrum_im = vec![0.0; n_fft];
+
+    for i in 0..n_freq {
+        let mag = 10.0_f64.powf(spl_db[i] / 20.0) * P_REF;
+        let phase = pressure_phases[i];
+        spectrum_re[i] = mag * phase.cos();
+        spectrum_im[i] = mag * phase.sin();
+        // Mirror (conjugate symmetry for real output)
+        if i > 0 && i < n_fft - i {
+            spectrum_re[n_fft - i] = spectrum_re[i];
+            spectrum_im[n_fft - i] = -spectrum_im[i];
+        }
+    }
+
+    // Simple DFT (not FFT — acceptable for 500-1000 points)
+    let mut ir = Vec::with_capacity(n_fft);
+    let mut time = Vec::with_capacity(n_fft);
+    let twopi_n = 2.0 * std::f64::consts::PI / n_fft as f64;
+
+    // Only compute first 256 samples (enough for visualization)
+    let n_out = n_fft.min(512);
+    for k in 0..n_out {
+        let mut sum = 0.0;
+        for n in 0..n_fft {
+            let angle = twopi_n * (k as f64) * (n as f64);
+            sum += spectrum_re[n] * angle.cos() - spectrum_im[n] * angle.sin();
+        }
+        ir.push(sum / n_fft as f64);
+        time.push(k as f64 * dt * 1000.0); // ms
+    }
+
+    (time, ir)
+}

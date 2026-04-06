@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useUndoRedo } from './hooks/useUndoRedo';
 import { initSolver } from './solver/wasm-bridge';
 import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
@@ -65,8 +66,13 @@ function App() {
   // Overlay (imported FRD/ZMA)
   const [overlay, setOverlay] = useState<OverlayData>({ frd: null, zma: null });
 
-  // Single-way state
-  const [input, setInput] = useState<SimulationInput>(DEFAULT_INPUT);
+  // Comparison snapshots
+  const [snapshots, setSnapshots] = useState<{ name: string; spl: number[]; freqs: number[] }[]>([]);
+
+  // Single-way state with undo/redo (Ctrl+Z / Ctrl+Y)
+  const inputUndo = useUndoRedo<SimulationInput>(DEFAULT_INPUT);
+  const input = inputUndo.value;
+  const setInput = inputUndo.set;
   const { result: singleResult, error: singleError } = useSolver(input, ready);
 
   // Multi-way state
@@ -85,8 +91,8 @@ function App() {
       .catch((e) => setInitError(String(e)));
   }, []);
 
-  const updateDriver = (driver: DriverParams) => setInput((prev) => ({ ...prev, driver }));
-  const updateEnclosure = (enclosure: EnclosureConfig) => setInput((prev) => ({ ...prev, enclosure }));
+  const updateDriver = (driver: DriverParams) => setInput({ ...input, driver });
+  const updateEnclosure = (enclosure: EnclosureConfig) => setInput({ ...input, enclosure });
   const qts = (input.driver.qes * input.driver.qms) / (input.driver.qes + input.driver.qms);
   const error = mode === 'single' ? singleError : systemError;
 
@@ -143,20 +149,51 @@ function App() {
               <div className="section-title">Simulation</div>
               <NumericInput label="Drive" value={input.drive_voltage_rms} step={0.1} min={0.1} unit="V rms"
                 tooltip="Amplifier drive voltage (RMS). 2.83V = 1W into 8Ω."
-                onChange={(v) => setInput((prev) => ({ ...prev, drive_voltage_rms: v }))} />
+                onChange={(v) => setInput({ ...input, drive_voltage_rms: v })} />
               <NumericInput label="F start" value={input.freq_start_hz} step={1} min={1} unit="Hz"
                 tooltip="Sweep start frequency."
-                onChange={(v) => setInput((prev) => ({ ...prev, freq_start_hz: v }))} />
+                onChange={(v) => setInput({ ...input, freq_start_hz: v })} />
               <NumericInput label="F end" value={input.freq_end_hz} step={1000} min={100} unit="Hz"
                 tooltip="Sweep end frequency."
-                onChange={(v) => setInput((prev) => ({ ...prev, freq_end_hz: v }))} />
+                onChange={(v) => setInput({ ...input, freq_end_hz: v })} />
               <NumericInput label="Points" value={input.freq_points} step={100} min={50} max={2000}
                 tooltip="Frequency points."
-                onChange={(v) => setInput((prev) => ({ ...prev, freq_points: Math.round(v) }))} />
+                onChange={(v) => setInput({ ...input, freq_points: Math.round(v) })} />
             </div>
             <SaveLoadControls input={input} onLoad={setInput} />
             <ExportControls result={singleResult} />
             <ImportOverlay overlay={overlay} onChange={setOverlay} />
+
+            {/* Comparison snapshots + undo/redo */}
+            <div className="section-card">
+              <div className="section-title">Compare</div>
+              <div className="btn-row">
+                <button className="graf-btn graf-btn-sm graf-btn-outline"
+                  title="Save current SPL curve as a comparison snapshot overlay"
+                  onClick={() => {
+                    if (singleResult) {
+                      const name = `Snap ${snapshots.length + 1}`;
+                      setSnapshots(prev => [...prev, { name, spl: [...singleResult.spl_db], freqs: [...singleResult.frequencies_hz] }]);
+                    }
+                  }}>Snapshot</button>
+                {snapshots.length > 0 && (
+                  <button className="graf-btn graf-btn-sm" style={{ color: 'var(--graf-danger)' }}
+                    title="Clear all comparison snapshots"
+                    onClick={() => setSnapshots([])}>Clear</button>
+                )}
+                <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={inputUndo.undo}
+                  disabled={!inputUndo.canUndo} title="Undo (Ctrl+Z)">Undo</button>
+                <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={inputUndo.redo}
+                  disabled={!inputUndo.canRedo} title="Redo (Ctrl+Y)">Redo</button>
+              </div>
+              {snapshots.map((s, i) => (
+                <div key={i} style={{ fontSize: 11, color: 'var(--graf-warm-500)' }}>
+                  {s.name}
+                  <button className="graf-btn graf-btn-sm" style={{ padding: '0 3px', fontSize: 9, marginLeft: 4 }}
+                    onClick={() => setSnapshots(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+            </div>
           </>
         )}
 
@@ -194,7 +231,7 @@ function App() {
       </aside>
 
       <main className="app-main">
-        {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} overlay={overlay} />}
+        {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} overlay={overlay} snapshots={snapshots} />}
         {mode === 'multiway' && <SystemPlotArea result={systemResult} />}
       </main>
     </div>

@@ -21,6 +21,7 @@ interface PlotAreaProps {
   result: SimulationResult | null;
   xmaxMm?: number;
   overlay?: OverlayData;
+  snapshots?: { name: string; spl: number[]; freqs: number[] }[];
 }
 
 // Linear interpolation of overlay data onto the simulation frequency grid
@@ -39,7 +40,9 @@ function interpolateOverlay(overlayFreqs: number[], overlayValues: number[], sim
   });
 }
 
-export function PlotArea({ result, xmaxMm, overlay }: PlotAreaProps) {
+const SNAP_COLORS = ['#95a5a6', '#7f8c8d', '#bdc3c7', '#9b59b6', '#1abc9c', '#f39c12'];
+
+export function PlotArea({ result, xmaxMm, overlay, snapshots }: PlotAreaProps) {
   if (!result) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--graf-warm-400)' }}>
@@ -73,6 +76,12 @@ export function PlotArea({ result, xmaxMm, overlay }: PlotAreaProps) {
         frequencies={result.frequencies_hz}
         series={[
           { label: 'SPL', data: result.spl_db, color: CHART_COLORS.spl },
+          ...(snapshots || []).map((s, i) => ({
+            label: s.name,
+            data: interpolateOverlay(s.freqs, s.spl, result.frequencies_hz),
+            color: SNAP_COLORS[i % SNAP_COLORS.length],
+            dash: true,
+          })),
           ...(overlay?.frd ? [{
             label: 'Imported FRD',
             data: interpolateOverlay(overlay.frd.frequencies, overlay.frd.spl_db, result.frequencies_hz),

@@ -84,7 +84,7 @@ fn sealed_alignment_then_simulate_matches_target_qtc() {
     let input = loudspeaker_solver::types::SimulationInput {
         driver: loudspeaker_solver::types::DriverParams {
             fs_hz: FS, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5,
-            vas_m3: VAS, sd_m2: 132.0e-4, xmax_m: 6.0e-3,
+            vas_m3: VAS, sd_m2: 132.0e-4, xmax_m: 6.0e-3, ke: 0.0,
         },
         enclosure: loudspeaker_solver::types::EnclosureConfig::Sealed(
             loudspeaker_solver::types::SealedBoxParams {

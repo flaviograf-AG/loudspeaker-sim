@@ -22,6 +22,11 @@ pub struct DriverParams {
     pub sd_m2: f64,
     /// Maximum linear excursion (m) — user enters mm, convert before storing
     pub xmax_m: f64,
+    /// Semi-inductance coefficient (H·s^0.5) — optional extended impedance model.
+    /// When > 0, replaces simple sLe with Ke×s^0.5 for more accurate HF impedance.
+    /// Reference: Thorborg et al. "Improved Loudspeaker Motor Impedance Model" (JAES, 2010)
+    #[serde(default)]
+    pub ke: f64,
 }
 
 /// Derived electromechanical parameters (computed from DriverParams).
@@ -193,6 +198,11 @@ pub enum HornProfile {
     Hyperbolic { t_param: f64 },
     /// Tractrix — smooth tangential curve, favored for midrange/tweeter horns.
     Tractrix,
+    /// Parabolic — S(x) = S1 × (1 + x/L × (√(S2/S1) - 1))²
+    Parabolic,
+    /// Le Cléac'h — optimized for minimal internal reflections and phase coherence.
+    /// Near-zero reflections inside the horn body.
+    LeCleach,
 }
 
 impl Default for HornProfile {

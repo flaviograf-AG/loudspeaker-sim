@@ -11,7 +11,7 @@ fn test_driver() -> DriverParams {
         qms: 3.5,
         vas_m3: 18.0e-3,
         sd_m2: 132.0e-4,
-        xmax_m: 6.0e-3,
+        xmax_m: 6.0e-3, ke: 0.0,
     }
 }
 

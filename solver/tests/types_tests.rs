@@ -10,7 +10,7 @@ fn sample_driver() -> DriverParams {
         qms: 4.67,
         vas_m3: 19.8e-3,     // 19.8 L → m³
         sd_m2: 136.0e-4,     // 136 cm² → m²
-        xmax_m: 6.6e-3,      // 6.6 mm → m
+        xmax_m: 6.6e-3, ke: 0.0,
     }
 }
 

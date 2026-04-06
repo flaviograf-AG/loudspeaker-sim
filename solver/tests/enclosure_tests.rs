@@ -6,7 +6,7 @@ use loudspeaker_solver::types::*;
 fn test_driver() -> DriverParams {
     DriverParams {
         fs_hz: 37.0, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5,
-        vas_m3: 18.0e-3, sd_m2: 132.0e-4, xmax_m: 6.0e-3,
+        vas_m3: 18.0e-3, sd_m2: 132.0e-4, xmax_m: 6.0e-3, ke: 0.0,
     }
 }
 

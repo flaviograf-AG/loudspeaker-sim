@@ -12,7 +12,7 @@ fn sealed_simulation_end_to_end() {
             qms: 3.5,
             vas_m3: 18.0e-3,
             sd_m2: 132.0e-4,
-            xmax_m: 6.0e-3,
+            xmax_m: 6.0e-3, ke: 0.0,
         },
         enclosure: EnclosureConfig::Sealed(SealedBoxParams {
             volume_m3: 18.0e-3,
@@ -48,7 +48,7 @@ fn vented_simulation_end_to_end() {
             qms: 3.5,
             vas_m3: 18.0e-3,
             sd_m2: 132.0e-4,
-            xmax_m: 6.0e-3,
+            xmax_m: 6.0e-3, ke: 0.0,
         },
         enclosure: EnclosureConfig::Vented(VentedBoxParams {
             volume_m3: 25.0e-3,
@@ -80,7 +80,7 @@ fn tl_simulation_end_to_end() {
             qms: 3.5,
             vas_m3: 18.0e-3,
             sd_m2: 132.0e-4,
-            xmax_m: 6.0e-3,
+            xmax_m: 6.0e-3, ke: 0.0,
         },
         enclosure: EnclosureConfig::TransmissionLine(TransmissionLineParams {
             length_m: 2.32,
@@ -113,7 +113,7 @@ fn json_round_trip() {
             qms: 3.5,
             vas_m3: 18.0e-3,
             sd_m2: 132.0e-4,
-            xmax_m: 6.0e-3,
+            xmax_m: 6.0e-3, ke: 0.0,
         },
         enclosure: EnclosureConfig::Sealed(SealedBoxParams {
             volume_m3: 18.0e-3,

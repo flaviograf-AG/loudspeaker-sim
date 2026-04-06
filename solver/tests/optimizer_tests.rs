@@ -12,7 +12,7 @@ fn test_2way_project(xover_freq: f64, tweeter_gain: f64) -> SpeakerProject {
                 name: "Woofer".into(),
                 driver: DriverParams {
                     fs_hz: 37.0, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5,
-                    vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3,
+                    vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3, ke: 0.0,
                 },
                 enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 18e-3, ql: 7.0 }),
                 passive_filters: vec![],
@@ -23,7 +23,7 @@ fn test_2way_project(xover_freq: f64, tweeter_gain: f64) -> SpeakerProject {
                 name: "Tweeter".into(),
                 driver: DriverParams {
                     fs_hz: 800.0, re_ohm: 5.5, le_h: 0.05e-3, qes: 0.5, qms: 2.0,
-                    vas_m3: 0.5e-3, sd_m2: 8e-4, xmax_m: 1e-3,
+                    vas_m3: 0.5e-3, sd_m2: 8e-4, xmax_m: 1e-3, ke: 0.0,
                 },
                 enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 0.5e-3, ql: 7.0 }),
                 passive_filters: vec![],

@@ -15,6 +15,7 @@
 
 use num_complex::Complex;
 
+use crate::driver::driver_electrical_impedance;
 use crate::constants::{C_0, RHO_0, TWO_PI};
 use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::transfer_matrix::{
@@ -69,17 +70,30 @@ fn segment_area_at(seg: &HornSegment, frac: f64) -> f64 {
             s_exp * (1.0 - w) + s_con * w
         }
         HornProfile::Tractrix => {
-            // Tractrix: the curve whose tangent always has constant length.
-            // Area: S(x) = S1 × (R² - (R-x)²) / (R² - R²) ... simplified
-            // Use the standard tractrix area expansion:
-            //   r(x) = R × sin(arccos(1 - x/R))  where R = mouth radius
-            // For implementation, interpolate between radii:
+            // Tractrix: faster expansion near the mouth
             let r1 = (s1 / std::f64::consts::PI).sqrt();
             let r2 = (s2 / std::f64::consts::PI).sqrt();
-            // Tractrix expansion: faster near the mouth
-            // Approximate via: r(x) = r1 + (r2-r1) × sin(π/2 × frac)
             let r = r1 + (r2 - r1) * (std::f64::consts::FRAC_PI_2 * frac).sin();
             std::f64::consts::PI * r * r
+        }
+        HornProfile::Parabolic => {
+            // Parabolic: S(x) = S1 × (1 + x/L × (√(S2/S1) - 1))²
+            // Slow expansion near throat, accelerating toward mouth.
+            if s1 <= 0.0 || s2 <= 0.0 { return s1; }
+            let ratio = (s2 / s1).sqrt();
+            let r = 1.0 + frac * (ratio - 1.0);
+            s1 * r * r
+        }
+        HornProfile::LeCleach => {
+            // Le Cléac'h: optimized phase-coherent profile.
+            // S(x) = S1 × cosh²(x × acosh(√(S2/S1)) / L)
+            // This produces equidistant wavefronts inside the horn,
+            // minimizing internal reflections.
+            // Reference: Le Cléac'h, J. "Nouvelle famille de pavillons" (2003)
+            if s1 <= 0.0 || s2 <= 0.0 { return s1; }
+            let theta = (s2 / s1).sqrt().acosh();
+            let ch = (frac * theta).cosh();
+            s1 * ch * ch
         }
     }
 }
@@ -230,7 +244,7 @@ pub fn horn_frequency_response(
             + z_front_mech + z_rear_mech;
 
         let z_mot = driver.bl * driver.bl / z_mech_total;
-        let z_in = p.re_ohm + s_var * p.le_h + z_mot;
+        let z_in = driver_electrical_impedance(p, s_var) + z_mot;
 
         impedance_ohm.push(z_in.norm());
         impedance_phase_deg.push(z_in.arg().to_degrees());

@@ -6,8 +6,31 @@
 //! Reference: Small, R.H. "Direct-Radiator Loudspeaker System Analysis"
 //! JAES Vol. 20, No. 5 (1972), Equations 1–14.
 
+use num_complex::Complex;
+
 use crate::constants::{C_0, RHO_0, TWO_PI};
 use crate::types::{DerivedDriver, DriverParams};
+
+/// Compute driver electrical impedance (Re + voice coil reactance).
+/// Uses Ke semi-inductance model when ke > 0, otherwise simple sLe.
+///
+/// Simple model: Ze = Re + s×Le
+/// Semi-inductance: Ze = Re + Ke × s^0.5  (Thorborg et al., JAES 2010)
+///
+/// The s^0.5 term models the frequency-dependent skin effect in the
+/// voice coil, which causes impedance to rise as √f rather than f.
+pub fn driver_electrical_impedance(p: &DriverParams, s: Complex<f64>) -> Complex<f64> {
+    let z_coil = if p.ke > 0.0 {
+        // Semi-inductance: Ke × s^0.5
+        // s^0.5 = exp(0.5 × ln(s))
+        let s_half = (s.ln() * 0.5).exp();
+        p.ke * s_half
+    } else {
+        // Simple inductance: s × Le
+        s * p.le_h
+    };
+    Complex::new(p.re_ohm, 0.0) + z_coil
+}
 
 /// Derive canonical electromechanical parameters from Thiele-Small inputs.
 pub fn derive_driver(p: &DriverParams) -> DerivedDriver {

@@ -9,6 +9,7 @@
 
 use num_complex::Complex;
 
+use crate::driver::driver_electrical_impedance;
 use crate::constants::{C_0, RHO_0, TWO_PI};
 use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::types::{DerivedDriver, SimulationResult, VentedBoxParams};
@@ -117,7 +118,7 @@ pub fn vented_frequency_response(
         // Convert to electrical domain
         let z_mech_total = sd2 * z_driver_acoustic;
         let z_mot = driver.bl * driver.bl / z_mech_total;
-        let z_in = p.re_ohm + s * p.le_h + z_mot;
+        let z_in = driver_electrical_impedance(p, s) + z_mot;
 
         impedance_ohm.push(z_in.norm());
         impedance_phase_deg.push(z_in.arg().to_degrees());

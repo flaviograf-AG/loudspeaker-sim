@@ -20,7 +20,7 @@ fn test_driver() -> DerivedDriver {
         qms: 8.0,
         vas_m3: 120.0e-3,
         sd_m2: 480.0e-4,   // 12" PA driver
-        xmax_m: 5.0e-3,
+        xmax_m: 5.0e-3, ke: 0.0,
     })
 }
 

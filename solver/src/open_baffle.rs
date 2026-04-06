@@ -12,6 +12,7 @@
 
 use num_complex::Complex;
 
+use crate::driver::driver_electrical_impedance;
 use crate::constants::{RHO_0, TWO_PI};
 use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::types::{DerivedDriver, OpenBaffleParams, SimulationResult};
@@ -50,7 +51,7 @@ pub fn open_baffle_frequency_response(
         // Only the driver's own compliance provides restoring force
         let z_mech = s * driver.mms + driver.rms + 1.0 / (s * driver.cms);
         let z_mot = driver.bl * driver.bl / z_mech;
-        let z_in = p.re_ohm + s * p.le_h + z_mot;
+        let z_in = driver_electrical_impedance(p, s) + z_mot;
 
         impedance_ohm.push(z_in.norm());
         impedance_phase_deg.push(z_in.arg().to_degrees());

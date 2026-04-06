@@ -13,7 +13,7 @@ fn reference_driver() -> DriverParams {
         qms: 3.5,
         vas_m3: 18.0e-3, // 18 L
         sd_m2: 132.0e-4, // 132 cm²
-        xmax_m: 6.0e-3,  // 6 mm
+        xmax_m: 6.0e-3, ke: 0.0,
     }
 }
 

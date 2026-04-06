@@ -49,15 +49,13 @@ export function SystemPlotArea({ result }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {/* Min impedance warning */}
+      {/* Min impedance warning — non-blocking inline notice */}
       {minZWarning && (
         <div style={{
-          background: '#fee', border: '1px solid #c0392b', borderRadius: 4,
-          padding: '4px 8px', fontSize: 12, color: '#c0392b',
+          background: '#fee', border: '1px solid #e0a0a0', borderRadius: 4,
+          padding: '3px 8px', fontSize: 11, color: '#c0392b', marginBottom: 4,
         }}>
-          Warning: minimum system impedance is {result.min_impedance_ohm.toFixed(1)}Ω
-          at {result.min_impedance_freq_hz.toFixed(0)}Hz — below safe threshold for most amplifiers (3.2Ω).
-          Consider adding series resistance or re-tuning the crossover.
+          Min |Z| = {result.min_impedance_ohm.toFixed(1)}Ω at {result.min_impedance_freq_hz.toFixed(0)}Hz (below 3.2Ω safe limit)
         </div>
       )}
 

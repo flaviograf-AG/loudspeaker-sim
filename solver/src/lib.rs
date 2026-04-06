@@ -7,6 +7,7 @@ pub mod crossover;
 pub mod driver;
 pub mod horn;
 pub mod open_baffle;
+pub mod optimizer;
 pub mod passive_radiator;
 pub mod sealed;
 pub mod sweep;

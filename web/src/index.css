@@ -20,17 +20,11 @@ body {
   min-width: 260px;
   max-width: 500px;
   padding: var(--graf-spacing-md, 16px);
-  overflow-y: auto;
+  overflow: auto;
   border-right: 1px solid var(--graf-border, #e8e4dc);
   background: var(--graf-surface, #fff);
   flex-shrink: 0;
   resize: horizontal;
-  overflow-x: hidden;
-}
-
-.app-sidebar::-webkit-resizer {
-  background: var(--graf-warm-300, #ccc);
-  border-radius: 2px;
 }
 
 .app-main {

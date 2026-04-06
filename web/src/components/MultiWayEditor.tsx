@@ -254,51 +254,95 @@ export function MultiWayEditor({ ways, onChange }: Props) {
             const xoverInput = document.getElementById(`xover-${activeWay}`) as HTMLInputElement;
             const xoverFreq = parseFloat(xoverInput?.value) || 3000;
 
+            const wc = 2 * Math.PI * xoverFreq;
             let newFilters: PassiveFilter[] = [];
-            if (preset === 'bw2_lp') {
-              const wc = 2 * Math.PI * xoverFreq;
+
+            // --- 1st order ---
+            if (preset === '1st_lp') {
+              newFilters = [{ type: 'SeriesL', henries: re / wc, dcr_ohms: 0.3 }];
+            } else if (preset === '1st_hp') {
+              newFilters = [{ type: 'SeriesC', farads: 1 / (wc * re) }];
+
+            // --- 2nd order Butterworth ---
+            } else if (preset === 'bw2_lp') {
+              newFilters = [
+                { type: 'SeriesL', henries: re * Math.SQRT2 / wc, dcr_ohms: 0.3 },
+                { type: 'ShuntC', farads: Math.SQRT2 / (wc * re) },
+              ];
+            } else if (preset === 'bw2_hp') {
+              newFilters = [
+                { type: 'SeriesC', farads: 1 / (Math.SQRT2 * wc * re) },
+                { type: 'ShuntL', henries: re / (Math.SQRT2 * wc), dcr_ohms: 0.3 },
+              ];
+
+            // --- 2nd order Linkwitz-Riley (= 2nd order BW with Q=0.5) ---
+            } else if (preset === 'lr2_lp') {
+              newFilters = [
+                { type: 'SeriesL', henries: re * 2.0 / wc, dcr_ohms: 0.3 },
+                { type: 'ShuntC', farads: 2.0 / (wc * re) },
+              ];
+            } else if (preset === 'lr2_hp') {
+              newFilters = [
+                { type: 'SeriesC', farads: 1 / (2.0 * wc * re) },
+                { type: 'ShuntL', henries: re / (2.0 * wc), dcr_ohms: 0.3 },
+              ];
+
+            // --- 3rd order Butterworth ---
+            } else if (preset === 'bw3_lp') {
+              // L1-C2-L3: normalized values 1.0, 2.0, 1.0
+              newFilters = [
+                { type: 'SeriesL', henries: re / wc, dcr_ohms: 0.3 },
+                { type: 'ShuntC', farads: 2.0 / (wc * re) },
+                { type: 'SeriesL', henries: re / wc, dcr_ohms: 0.3 },
+              ];
+            } else if (preset === 'bw3_hp') {
+              newFilters = [
+                { type: 'SeriesC', farads: 1 / (wc * re) },
+                { type: 'ShuntL', henries: re / (2.0 * wc), dcr_ohms: 0.3 },
+                { type: 'SeriesC', farads: 1 / (wc * re) },
+              ];
+
+            // --- 4th order Linkwitz-Riley (two cascaded BW2) ---
+            } else if (preset === 'lr4_lp') {
               const l = re * Math.SQRT2 / wc;
               const c = Math.SQRT2 / (wc * re);
               newFilters = [
                 { type: 'SeriesL', henries: l, dcr_ohms: 0.3 },
                 { type: 'ShuntC', farads: c },
+                { type: 'SeriesL', henries: l, dcr_ohms: 0.3 },
+                { type: 'ShuntC', farads: c },
               ];
-            } else if (preset === 'bw2_hp') {
-              const wc = 2 * Math.PI * xoverFreq;
+            } else if (preset === 'lr4_hp') {
               const c = 1 / (Math.SQRT2 * wc * re);
               const l = re / (Math.SQRT2 * wc);
               newFilters = [
                 { type: 'SeriesC', farads: c },
                 { type: 'ShuntL', henries: l, dcr_ohms: 0.3 },
+                { type: 'SeriesC', farads: c },
+                { type: 'ShuntL', henries: l, dcr_ohms: 0.3 },
               ];
+
+            // --- Utility networks ---
             } else if (preset === 'zobel') {
               newFilters = [{ type: 'ZobelShunt', ohms: re, farads: le / (re * re) }];
             } else if (preset === 'lpad_3db') {
               const ratio = Math.pow(10, 3 / 20);
-              newFilters = [{
-                type: 'LPad',
-                series_ohms: re * (ratio - 1) / ratio,
-                shunt_ohms: re * ratio / (ratio - 1),
-              }];
+              newFilters = [{ type: 'LPad', series_ohms: re * (ratio - 1) / ratio, shunt_ohms: re * ratio / (ratio - 1) }];
+            } else if (preset === 'lpad_6db') {
+              const ratio = Math.pow(10, 6 / 20);
+              newFilters = [{ type: 'LPad', series_ohms: re * (ratio - 1) / ratio, shunt_ohms: re * ratio / (ratio - 1) }];
             } else if (preset === 'notch') {
-              const fc = 1000;
-              const wc = 2 * Math.PI * fc;
-              newFilters = [{
-                type: 'NotchShunt',
-                ohms: 8, henries: 8 / wc, farads: 1 / (wc * 8),
-              }];
-            } else if (preset === 'series_r') {
-              newFilters = [{ type: 'SeriesR', ohms: 2.2 }];
-            } else if (preset === 'series_l') {
-              newFilters = [{ type: 'SeriesL', henries: 0.5e-3, dcr_ohms: 0.3 }];
-            } else if (preset === 'series_c') {
-              newFilters = [{ type: 'SeriesC', farads: 10e-6 }];
-            } else if (preset === 'shunt_r') {
-              newFilters = [{ type: 'ShuntR', ohms: 10 }];
-            } else if (preset === 'shunt_l') {
-              newFilters = [{ type: 'ShuntL', henries: 1e-3, dcr_ohms: 0.3 }];
-            } else if (preset === 'shunt_c') {
-              newFilters = [{ type: 'ShuntC', farads: 4.7e-6 }];
+              newFilters = [{ type: 'NotchShunt', ohms: 8, henries: 8 / wc, farads: 1 / (wc * 8) }];
+            } else if (preset === 'series_notch') {
+              newFilters = [{ type: 'NotchSeries', ohms: 1, henries: 1 / wc, farads: 1 / (wc * 1) }];
+
+            // --- Individual components ---
+            } else if (preset === 'series_r') { newFilters = [{ type: 'SeriesR', ohms: 2.2 }];
+            } else if (preset === 'series_l') { newFilters = [{ type: 'SeriesL', henries: 0.5e-3, dcr_ohms: 0.3 }];
+            } else if (preset === 'series_c') { newFilters = [{ type: 'SeriesC', farads: 10e-6 }];
+            } else if (preset === 'shunt_r') { newFilters = [{ type: 'ShuntR', ohms: 10 }];
+            } else if (preset === 'shunt_l') { newFilters = [{ type: 'ShuntL', henries: 1e-3, dcr_ohms: 0.3 }];
+            } else if (preset === 'shunt_c') { newFilters = [{ type: 'ShuntC', farads: 4.7e-6 }];
             }
 
             if (newFilters.length > 0) {
@@ -307,12 +351,30 @@ export function MultiWayEditor({ ways, onChange }: Props) {
             e.target.value = '';
           }}>
           <option value="" disabled>+ Add component / topology...</option>
-          <optgroup label="Standard Topologies">
-            <option value="bw2_lp">BW2 Low-Pass (L + C, 3kHz)</option>
-            <option value="bw2_hp">BW2 High-Pass (C + L, 3kHz)</option>
-            <option value="zobel">Zobel (impedance EQ)</option>
-            <option value="lpad_3db">L-Pad (-3dB attenuation)</option>
-            <option value="notch">Parallel Notch (1kHz)</option>
+          <optgroup label="1st Order (6 dB/oct)">
+            <option value="1st_lp">1st-order LP (series L)</option>
+            <option value="1st_hp">1st-order HP (series C)</option>
+          </optgroup>
+          <optgroup label="2nd Order (12 dB/oct)">
+            <option value="bw2_lp">Butterworth LP (L + C)</option>
+            <option value="bw2_hp">Butterworth HP (C + L)</option>
+            <option value="lr2_lp">Linkwitz-Riley LP (L + C)</option>
+            <option value="lr2_hp">Linkwitz-Riley HP (C + L)</option>
+          </optgroup>
+          <optgroup label="3rd Order (18 dB/oct)">
+            <option value="bw3_lp">Butterworth LP (L + C + L)</option>
+            <option value="bw3_hp">Butterworth HP (C + L + C)</option>
+          </optgroup>
+          <optgroup label="4th Order (24 dB/oct)">
+            <option value="lr4_lp">Linkwitz-Riley LP (L+C+L+C)</option>
+            <option value="lr4_hp">Linkwitz-Riley HP (C+L+C+L)</option>
+          </optgroup>
+          <optgroup label="Utility Networks">
+            <option value="zobel">Zobel (impedance EQ for Le)</option>
+            <option value="lpad_3db">L-Pad (-3 dB)</option>
+            <option value="lpad_6db">L-Pad (-6 dB)</option>
+            <option value="notch">Parallel Notch (suppress peak)</option>
+            <option value="series_notch">Series Notch (block band)</option>
           </optgroup>
           <optgroup label="Individual Components">
             <option value="series_r">Series Resistor</option>

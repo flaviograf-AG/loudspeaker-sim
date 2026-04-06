@@ -1,85 +1,76 @@
-# Loudspeaker Simulator
+# LS Graf Simulator
 
-Browser-based loudspeaker enclosure simulator with sealed, vented, and transmission line models. Runs entirely client-side — no server, no accounts, no install.
+**Browser-based loudspeaker design & crossover simulation tool.**
 
-**Live:** [ls.graf.me.uk](https://ls.graf.me.uk)
+Live at **[ls.graf.me.uk](https://ls.graf.me.uk)**
+
+[![LS Graf Simulator](https://ls.graf.me.uk/ls-blueprint.png)](https://ls.graf.me.uk)
 
 ## Features
 
-- **Three enclosure types:** Sealed (closed box), Vented (bass reflex), Transmission Line (quarter-wave)
-- **Real-time plots:** SPL, impedance, cone displacement, port velocity — update instantly as you change parameters
-- **Driver presets:** 5 built-in generic drivers (6.5" woofer to 12" PA)
-- **Save/Load:** localStorage persistence + JSON import/export
-- **Standard file export:** FRD (SPL), ZMA (impedance), CSV (all data) — compatible with Hornresp, XSim, VituixCAD, REW
+### Enclosure Modeling (7 types)
+- **Sealed** — with Ql box losses and alignment presets (Butterworth/Bessel/Chebyshev)
+- **Vented** — Helmholtz resonator with port velocity, slot ports, alignment presets (B4/QB3/SC4/EBS)
+- **Transmission Line** — TMM chain with driver offset, 3 taper profiles, per-zone stuffing, fold losses
+- **Horn** — multi-segment (up to 4), 6 flare profiles (Conical/Exp/Hyperbolic/Tractrix/Parabolic/Le Cléac'h)
+- **Bandpass** — 4th-order sealed rear + vented front
+- **Passive Radiator** — sealed box with mass-spring radiator
+- **Open Baffle** — dipole with baffle step diffraction
+
+### Crossover Design
+- **Passive crossover** — 15 standard topologies (1st-4th order LP/HP, Zobel, L-pad, notch)
+- **Active filters** — 16 types (LR4, Butterworth, Bessel, PEQ, shelving, Linkwitz Transform, all-pass)
+- **Multi-way system** — N-way with per-way gain, delay, polarity, Z-offset
+- **Complex acoustic summation** — phase-correct inter-driver summing
+- **Nelder-Mead optimizer** — auto-tunes filter frequencies and gains
+- **Biquad DSP export** — miniDSP-compatible coefficients
+- **SVG circuit schematic** — live crossover circuit diagram
+
+### Analysis & Visualization
+- SPL frequency response (auto-scaled)
+- Impedance magnitude + phase (dual Y-axis)
+- Cone displacement with Xmax limit line
+- Port air velocity
+- Group delay
+- Acoustic phase
+- Filter transfer function (crossover attenuation per way)
+- Minimum impedance warning (<3.2 Ohm)
+- Cross-chart tooltip linking
+- Enclosure cross-section schematic (SVG)
+
+### Driver Database
+- **571 real drivers** from 30+ manufacturers
+- Searchable by vendor and model name
+- Covers woofers, tweeters, midrange, full-range, coaxial, compression
+- Sources: QSpeakers (GPL), manufacturer datasheets, web scraping
+
+### Workflow Features
+- Undo/Redo (Ctrl+Z/Y, 50-step history)
+- Comparison snapshots (overlay before/after)
+- FRD/ZMA file import with plot overlay
+- FRD/ZMA/CSV export with real acoustic phase
+- JSON design save/load + import/export
+- URL state encoding (shareable design links)
+- CLI binary for automation/LLM integration
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────┐
-│                  Browser                    │
-│                                            │
-│  ┌──────────────┐   ┌──────────────────┐  │
-│  │  React 19    │──▶│  Rust/WASM       │  │
-│  │  + ECharts   │◀──│  Solver (140KB)  │  │
-│  │  + GDS       │   │                  │  │
-│  └──────────────┘   └──────────────────┘  │
-│                                            │
-│  Static files served from ls.graf.me.uk    │
-└────────────────────────────────────────────┘
+solver/          Rust crate compiled to WASM (16 modules, 85+ tests)
+web/             React 19 + Vite + TypeScript frontend
 ```
 
-- **Solver:** Rust crate compiled to WebAssembly via wasm-pack. All acoustic simulation math — T/S parameter derivation, electromechanical circuit models, transfer matrix method.
-- **Frontend:** React 19 + Vite + TypeScript. Apache ECharts for log-axis frequency response plots. Graf Design System for UI styling.
-- **API:** Single WASM entry point: `simulate(json_string) → json_string`. ~50ms per 500-point sweep.
-
-## Development
-
-### Prerequisites
-
-- Rust toolchain (`rustup`) with `wasm32-unknown-unknown` target
-- `wasm-pack`
-- Node.js 22+ (via fnm)
-
-### Build
+## Build
 
 ```bash
-# Build WASM solver
 cd solver && wasm-pack build --target web --release
-
-# Install frontend deps + build
 cd web && npm install && npm run build
-
-# Run tests (45 tests)
-cd solver && cargo test
 ```
 
-### Dev Server
+## References
 
-```bash
-# Build WASM first (dev mode for speed)
-cd solver && wasm-pack build --target web --dev
-
-# Start Vite dev server
-cd web && npm run dev
-```
-
-## Academic References
-
-All equations are cited in the source code. Key references:
-
-- Small, R.H. — "Direct-Radiator Loudspeaker System Analysis" (JAES, 1972)
-- Small, R.H. — "Closed-Box Loudspeaker Systems" (JAES, 1972)
-- Small, R.H. — "Vented-Box Loudspeaker Systems" (JAES, 1973)
-- Beranek, L.L. — "Acoustics" (1954, revised 1986)
-- Bradbury, L.J.S. — "The Use of Fibrous Materials in Loudspeaker Enclosures" (JAES, 1976)
-- Leach, W.M. — "Electroacoustics and Audio Amplifier Design"
-
-Full list in [`docs/REFERENCES.md`](docs/REFERENCES.md).
+Small (1972-1973), Beranek (1954), Bailey (1965), King (2005-2020), Bradbury (1976), Keele (1979), Thorborg (2010), Bristow-Johnson (Audio EQ Cookbook).
 
 ## License
 
-Proprietary. Clean-room implementation — no code copied from Hornresp, XSim, or any other source.
-
----
-
-Built by [Graf y Asociados](https://alfredograf.com)
+MIT

@@ -4,10 +4,10 @@
 Browser-based loudspeaker enclosure + crossover simulator. Combines Hornresp (enclosure modeling) and XSim (crossover design) functionality in a single web app. Live at **https://ls.graf.me.uk**.
 
 ## Architecture
-- `solver/` — Rust crate compiled to WASM (wasm-pack). All acoustic simulation math lives here. 8 modules, 45 tests.
+- `solver/` — Rust crate compiled to WASM (wasm-pack). 16 modules, 85+ tests. Also builds as a CLI binary.
 - `web/` — React 19 + Vite + TypeScript frontend. ECharts for plots, GDS for styling.
 - Static deploy to ls.graf.me.uk (OVH VPS, Nginx, Cloudflare proxy). Zero server dependencies.
-- WASM API: single `simulate(json_string) → json_string` entry point.
+- WASM API: `simulate(json)` for single-driver, `simulate_system(json)` for multi-way, `optimize_system(json)` for crossover optimization.
 
 ## Build Commands
 ```bash
@@ -20,8 +20,11 @@ cd solver && wasm-pack build --target web --dev
 # React frontend
 cd web && npm run build
 
+# CLI binary
+cd solver && cargo build --release --bin loudspeaker-solver
+
 # Development
-cd solver && cargo test                    # run solver tests (45 tests)
+cd solver && cargo test                    # run solver tests (85+ tests)
 cd solver && cargo test -- --nocapture     # with output
 cd web && npm run dev                      # Vite dev server (needs WASM built first)
 cd web && npx tsc --noEmit                 # TypeScript check only
@@ -35,29 +38,45 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 - **WASM target:** `wasm32-unknown-unknown` (installed via rustup)
 - **fnm** manages Node.js — run `eval "$(fnm env)"` before npm commands in bash
 
-## Solver Modules
+## Solver Modules (16)
 | Module | Purpose |
 |--------|---------|
 | `constants.rs` | Physical constants (Beranek) |
-| `types.rs` | DriverParams, EnclosureConfig, SimulationInput/Result |
-| `driver.rs` | T/S parameter derivation (Small 1972) |
-| `sweep.rs` | Log frequency sweep, SPL conversion |
-| `sealed.rs` | Sealed box model (2nd-order HP) |
-| `vented.rs` | Vented box model (Helmholtz resonator, 4th-order) |
-| `transfer_matrix.rs` | TMM primitives (duct segments, cascade) |
-| `transmission_line.rs` | TL model (TMM chain, taper, stuffing) |
+| `types.rs` | DriverParams, EnclosureConfig (7 variants), SimulationInput/Result |
+| `driver.rs` | T/S parameter derivation (Small 1972), Ke semi-inductance model |
+| `sweep.rs` | Log frequency sweep, SPL conversion, group delay, impulse response |
+| `sealed.rs` | Sealed box model with Ql losses |
+| `vented.rs` | Vented box model (Helmholtz, port velocity, slot ports) |
+| `transfer_matrix.rs` | TMM primitives (full Bradbury complex k and Z) |
+| `transmission_line.rs` | TL model (TMM chain, taper, stuffing zones, folds, driver offset) |
+| `horn.rs` | Horn model (6 profiles, multi-segment, throat/rear chamber) |
+| `bandpass.rs` | 4th-order bandpass (sealed rear + vented front) |
+| `passive_radiator.rs` | Sealed + mass-spring passive radiator |
+| `open_baffle.rs` | Dipole with baffle step diffraction |
+| `crossover.rs` | Passive ABCD ladder (10 block types), active filters (16 types), biquad export, E-series rounding |
+| `system.rs` | Multi-way complex acoustic summation with filter transfer function |
+| `alignments.rs` | Sealed (BW/Bessel/Cheby) + Vented (B4/QB3/SC4/EBS) presets |
+| `optimizer.rs` | Nelder-Mead simplex for crossover auto-tuning |
 
 ## Frontend Components
 | Component | Purpose |
 |-----------|---------|
-| `FrequencyPlot.tsx` | ECharts log-axis frequency response plot |
-| `PlotArea.tsx` | Composes SPL + impedance + displacement + port velocity plots |
-| `DriverInputs.tsx` | T/S parameter inputs with user-friendly units |
-| `EnclosureInputs.tsx` | Sealed/Vented/TL selector + per-type inputs |
-| `PresetSelector.tsx` | 5 built-in driver presets |
-| `SaveLoadControls.tsx` | localStorage persistence + JSON import/export |
-| `ExportControls.tsx` | FRD/ZMA/CSV file export |
-| `useSolver.ts` | Debounced solver hook (50ms) |
+| `App.tsx` | Root — mode toggle (Single/Multi-Way), undo/redo, URL state |
+| `FrequencyPlot.tsx` | ECharts log-axis chart with dual Y-axis, cross-chart linking |
+| `PlotArea.tsx` | SPL + impedance + displacement + port velocity + group delay + phase |
+| `SystemPlotArea.tsx` | System SPL + filter transfer + impedance + group delay, min-Z warning |
+| `DriverInputs.tsx` | T/S parameter inputs with derived readouts (Qts, Bl, sensitivity) |
+| `EnclosureInputs.tsx` | 7 enclosure types, alignment presets, computed readouts |
+| `PresetSelector.tsx` | 571-driver searchable database |
+| `MultiWayEditor.tsx` | Way tabs, active/passive filter editors, crossover frequency wizard |
+| `CrossoverSchematic.tsx` | SVG circuit diagram for passive crossover |
+| `EnclosureSchematic.tsx` | SVG cross-section for all enclosure types |
+| `SchematicPanel.tsx` | Collapsible bottom panel for schematics |
+| `OptimizerPanel.tsx` | Nelder-Mead optimizer UI with target SPL |
+| `BiquadExport.tsx` | miniDSP-compatible DSP coefficient export |
+| `ImportOverlay.tsx` | FRD/ZMA file import + plot overlay |
+| `SaveLoadControls.tsx` | localStorage + JSON import/export |
+| `ExportControls.tsx` | FRD/ZMA/CSV export with real acoustic phase |
 
 ## IP Rules
 - Clean-room Rust implementation
@@ -70,21 +89,28 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 ## Key Design Decisions
 - Rust/WASM for solver performance and IP separation
 - All computation client-side (no server)
-- ECharts 6 for plots (chosen over uPlot/Plotly for: log axes, dual Y-axis, polar plots, heatmaps, cross-chart tooltip linking)
+- ECharts 6 for plots (log axes, dual Y-axis, cross-chart tooltip linking)
 - Graf Design System (GDS) v4.2 for styling — CSS-only, use `graf-*` classes
-- Logarithmic frequency sweep, 500 points 10Hz–20kHz
-- Transfer Matrix Method for transmission lines
-- Modified Nodal Analysis for crossover networks (v0.2+)
-- JSON `#[serde(tag = "type")]` for EnclosureConfig enum serialization
+- Transfer Matrix Method for transmission lines and horns
+- ABCD matrix cascade for passive crossover networks
+- Nelder-Mead simplex for crossover optimization
+- JSON `#[serde(tag = "type")]` for enum serialization
+- URL hash state encoding for shareable design links
 
 ## Testing
-- `cargo test` in solver/ — 45 tests across 9 test files
-- Oracle tests planned: compare output against Hornresp v60 reference data
-- Every formula has a test proving it matches published values or physical expectations
+- `cargo test` in solver/ — 85+ tests across 16 test files
+- Cross-validated against QSpeakers C++ solver (vented port phase fix verified)
+- Analytical validation tests (sealed Fc/Qtc, vented dual peaks, port velocity)
+- Alignment presets verified against simulation output
+- Optimizer tests: cost reduction from 229→3 in 41 iterations
 
 ## Design Docs
 - Design: `docs/plans/2026-04-05-loudspeaker-sim-design.md`
 - Plan: `docs/plans/2026-04-05-loudspeaker-sim-v01-plan.md`
+- Revised roadmap: `docs/plans/2026-04-06-revised-roadmap.md`
+- Gap-closing plan: `docs/plans/2026-04-06-gap-closing-plan.md`
+- Feature audits: `docs/feature-audit-hornresp-xsim.md`, `docs/qspeakers-comparison.md`
+- LLM variable inventory: `docs/LLM-VARIABLE-INVENTORY.md`
 - References: `docs/REFERENCES.md`
 
 ## Deployment

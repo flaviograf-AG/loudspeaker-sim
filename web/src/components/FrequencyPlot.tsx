@@ -1,11 +1,14 @@
 import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts/core';
 import type { EChartsOption } from 'echarts';
+import { useEffect, useRef } from 'react';
 
 interface SeriesConfig {
   label: string;
   data: number[];
   color: string;
   dash?: boolean;
+  yAxisIndex?: number;
 }
 
 interface FrequencyPlotProps {
@@ -16,6 +19,12 @@ interface FrequencyPlotProps {
   yMin?: number;
   yMax?: number;
   height?: number;
+  /** Second Y-axis label (right side). Enables dual Y-axis when set. */
+  y2Label?: string;
+  y2Min?: number;
+  y2Max?: number;
+  /** Chart group name for cross-chart tooltip linking via echarts.connect() */
+  group?: string;
 }
 
 export function FrequencyPlot({
@@ -26,7 +35,52 @@ export function FrequencyPlot({
   yMin,
   yMax,
   height = 250,
+  y2Label,
+  y2Min,
+  y2Max,
+  group,
 }: FrequencyPlotProps) {
+  const chartRef = useRef<ReactECharts>(null);
+
+  // Connect charts in the same group for cross-chart tooltip linking
+  useEffect(() => {
+    if (group && chartRef.current) {
+      const instance = chartRef.current.getEchartsInstance();
+      instance.group = group;
+      echarts.connect(group);
+    }
+  }, [group]);
+
+  const hasDualAxis = !!y2Label;
+
+  const yAxisConfig: EChartsOption['yAxis'] = hasDualAxis
+    ? [
+        {
+          type: 'value',
+          name: yLabel,
+          nameLocation: 'middle',
+          nameGap: 45,
+          min: yMin,
+          max: yMax,
+        },
+        {
+          type: 'value',
+          name: y2Label,
+          nameLocation: 'middle',
+          nameGap: 45,
+          min: y2Min,
+          max: y2Max,
+        },
+      ]
+    : {
+        type: 'value',
+        name: yLabel,
+        nameLocation: 'middle',
+        nameGap: 45,
+        min: yMin,
+        max: yMax,
+      };
+
   const option: EChartsOption = {
     title: {
       text: title,
@@ -48,7 +102,7 @@ export function FrequencyPlot({
         return `${freqStr}<br/>${lines.join('<br/>')}`;
       },
     },
-    grid: { left: 60, right: 20, top: 35, bottom: 35 },
+    grid: { left: 60, right: hasDualAxis ? 60 : 20, top: 35, bottom: 35 },
     xAxis: {
       type: 'log',
       name: 'Hz',
@@ -60,18 +114,12 @@ export function FrequencyPlot({
           value >= 1000 ? `${value / 1000}k` : String(Math.round(value)),
       },
     },
-    yAxis: {
-      type: 'value',
-      name: yLabel,
-      nameLocation: 'middle',
-      nameGap: 45,
-      min: yMin,
-      max: yMax,
-    },
+    yAxis: yAxisConfig,
     series: series.map((s) => ({
       name: s.label,
       type: 'line' as const,
       showSymbol: false,
+      yAxisIndex: s.yAxisIndex ?? 0,
       lineStyle: {
         width: 2,
         type: s.dash ? ('dashed' as const) : ('solid' as const),
@@ -84,6 +132,7 @@ export function FrequencyPlot({
 
   return (
     <ReactECharts
+      ref={chartRef}
       option={option}
       style={{ height, width: '100%' }}
       notMerge

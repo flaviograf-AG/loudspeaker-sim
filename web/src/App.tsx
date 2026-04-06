@@ -35,7 +35,7 @@ function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [input, setInput] = useState<SimulationInput>(DEFAULT_INPUT);
-  const { result, error: solveError } = useSolver(input);
+  const { result, error: solveError } = useSolver(input, ready);
 
   useEffect(() => {
     initSolver()

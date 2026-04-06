@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { runSimulation } from '../solver/wasm-bridge';
 import type { SimulationInput, SimulationResult } from '../types';
 
-export function useSolver(input: SimulationInput, debounceMs = 50) {
+export function useSolver(input: SimulationInput, ready: boolean, debounceMs = 50) {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef(input);
@@ -19,9 +19,10 @@ export function useSolver(input: SimulationInput, debounceMs = 50) {
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     const timeout = setTimeout(solve, debounceMs);
     return () => clearTimeout(timeout);
-  }, [input, solve, debounceMs]);
+  }, [input, ready, solve, debounceMs]);
 
   return { result, error };
 }

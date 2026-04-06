@@ -4,6 +4,9 @@ import { useSolver } from './hooks/useSolver';
 import { PlotArea } from './components/PlotArea';
 import { DriverInputs } from './components/DriverInputs';
 import { EnclosureInputs } from './components/EnclosureInputs';
+import { PresetSelector } from './components/PresetSelector';
+import { SaveLoadControls } from './components/SaveLoadControls';
+import { ExportControls } from './components/ExportControls';
 import type { SimulationInput, DriverParams, EnclosureConfig } from './types';
 
 const DEFAULT_INPUT: SimulationInput = {
@@ -50,8 +53,11 @@ function App() {
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
       <aside style={{ width: 280, padding: 12, overflowY: 'auto', borderRight: '1px solid #ddd', flexShrink: 0 }}>
         <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>Loudspeaker Simulator</h2>
+        <PresetSelector onSelect={updateDriver} />
         <DriverInputs params={input.driver} onChange={updateDriver} />
         <EnclosureInputs config={input.enclosure} onChange={updateEnclosure} />
+        <SaveLoadControls input={input} onLoad={setInput} />
+        <ExportControls result={result} />
         {solveError && <div style={{ color: 'red', fontSize: 12, marginTop: 8 }}>{solveError}</div>}
       </aside>
       <main style={{ flex: 1, padding: 12, overflowY: 'auto' }}>

@@ -36,7 +36,7 @@ fn validate_driver(d: &types::DriverParams) -> Result<(), String> {
     if d.re_ohm <= 0.0 { return Err("Re must be positive".into()); }
     if d.qes <= 0.0 { return Err("Qes must be positive".into()); }
     if d.qms <= 0.0 { return Err("Qms must be positive".into()); }
-    if d.vas_m3 <= 0.0 { return Err("Vas must be positive".into()); }
+    if d.vas_m3 < 0.0 { return Err("Vas must be non-negative".into()); }
     if d.sd_m2 <= 0.0 { return Err("Sd must be positive".into()); }
     if d.le_h < 0.0 { return Err("Le must be non-negative".into()); }
     if d.xmax_m < 0.0 { return Err("Xmax must be non-negative".into()); }

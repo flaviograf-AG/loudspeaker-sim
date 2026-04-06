@@ -42,8 +42,10 @@ pub fn derive_driver(p: &DriverParams) -> DerivedDriver {
 
     // Cms: mechanical compliance (m/N)
     // Derived from Vas = ρ₀ × c₀² × Sd² × Cms
+    // For tweeters with unknown Vas, use a small default to avoid div-by-zero
     // Small (1972), Eq. 3
-    let cms = p.vas_m3 / (RHO_0 * C_0 * C_0 * p.sd_m2 * p.sd_m2);
+    let vas = if p.vas_m3 > 0.0 { p.vas_m3 } else { 1e-5 }; // 0.01L fallback for tweeters
+    let cms = vas / (RHO_0 * C_0 * C_0 * p.sd_m2 * p.sd_m2);
 
     // Mms: moving mass (kg)
     // From resonance: ωs = 1/√(Mms × Cms) → Mms = 1/(ωs² × Cms)

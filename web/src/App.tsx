@@ -14,7 +14,7 @@ import { SaveLoadControls } from './components/SaveLoadControls';
 import { ExportControls } from './components/ExportControls';
 import { NumericInput } from './components/NumericInput';
 import { ImportOverlay, type OverlayData } from './components/ImportOverlay';
-import { EnclosureSchematic } from './components/EnclosureSchematic';
+import { SchematicPanel } from './components/SchematicPanel';
 import { BiquadExport } from './components/BiquadExport';
 import { OptimizerPanel } from './components/OptimizerPanel';
 import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput } from './types';
@@ -150,7 +150,6 @@ function App() {
             <DriverInputs params={input.driver} onChange={updateDriver} />
             <EnclosureInputs config={input.enclosure} driverVas={input.driver.vas_m3}
               driverFs={input.driver.fs_hz} driverQts={qts} onChange={updateEnclosure} />
-            <EnclosureSchematic config={input.enclosure} driverSd={input.driver.sd_m2} />
             <div className="section-card">
               <div className="section-title">Simulation</div>
               <NumericInput label="Drive" value={input.drive_voltage_rms} step={0.1} min={0.1} unit="V rms"
@@ -242,9 +241,22 @@ function App() {
         )}
       </aside>
 
-      <main className="app-main">
-        {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} overlay={overlay} snapshots={snapshots} />}
-        {mode === 'multiway' && <SystemPlotArea result={systemResult} />}
+      <main className="app-main" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} overlay={overlay} snapshots={snapshots} />}
+          {mode === 'multiway' && <SystemPlotArea result={systemResult} />}
+        </div>
+        {mode === 'single' && (
+          <SchematicPanel enclosureConfig={input.enclosure} driverSd={input.driver.sd_m2} />
+        )}
+        {mode === 'multiway' && ways[0] && (
+          <SchematicPanel
+            enclosureConfig={ways[0].enclosure}
+            driverSd={ways[0].driver.sd_m2}
+            passiveFilters={ways[0].passive_filters.length > 0 ? ways[0].passive_filters : undefined}
+            driverRe={ways[0].driver.re_ohm}
+          />
+        )}
       </main>
     </div>
   );

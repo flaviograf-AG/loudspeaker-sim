@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { WayInput, DriverParams, EnclosureConfig, ActiveFilter, PassiveFilter } from '../types';
-import { CrossoverSchematic } from './CrossoverSchematic';
 import { DriverInputs } from './DriverInputs';
 import { EnclosureInputs } from './EnclosureInputs';
 import { PresetSelector } from './PresetSelector';
@@ -401,10 +400,7 @@ export function MultiWayEditor({ ways, onChange }: Props) {
         </select>
       </div>
 
-      {/* Circuit schematic */}
-      {way.passive_filters.length > 0 && (
-        <CrossoverSchematic filters={way.passive_filters} driverRe={way.driver.re_ohm} />
-      )}
+      {/* Circuit schematic moved to bottom SchematicPanel */}
     </>
   );
 }

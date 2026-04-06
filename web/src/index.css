@@ -42,8 +42,11 @@ body {
 
 .app-main {
   flex: 1;
+  overflow: hidden;
+}
+
+.app-main > div:first-child {
   padding: var(--graf-spacing-md, 16px);
-  overflow-y: auto;
 }
 
 /* Form overrides for compact sidebar */

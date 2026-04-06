@@ -332,3 +332,177 @@ pub mod presets {
         (c, l, c, l)
     }
 }
+
+/// Digital biquad coefficients: H(z) = (b0 + b1*z^-1 + b2*z^-2) / (1 + a1*z^-1 + a2*z^-2)
+#[derive(Debug, Clone)]
+pub struct BiquadCoeffs {
+    pub b0: f64,
+    pub b1: f64,
+    pub b2: f64,
+    pub a1: f64,
+    pub a2: f64,
+}
+
+/// Convert an active filter to digital biquad coefficients via bilinear transform.
+/// Uses the standard Audio EQ Cookbook (Robert Bristow-Johnson) formulations.
+///
+/// Reference: Bristow-Johnson, "Cookbook formulae for audio EQ biquad filter coefficients"
+pub fn filter_to_biquad(filter: &ActiveFilter, sample_rate: f64) -> Vec<BiquadCoeffs> {
+    let fs = sample_rate;
+
+    match filter {
+        ActiveFilter::LowPass1 { freq_hz } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / 2.0;
+            let cos_w0 = w0.cos();
+            let b0 = (1.0 - cos_w0) / 2.0;
+            let b1 = 1.0 - cos_w0;
+            let b2 = (1.0 - cos_w0) / 2.0;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::HighPass1 { freq_hz } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / 2.0;
+            let cos_w0 = w0.cos();
+            let b0 = (1.0 + cos_w0) / 2.0;
+            let b1 = -(1.0 + cos_w0);
+            let b2 = (1.0 + cos_w0) / 2.0;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::LowPass2 { freq_hz, q } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / (2.0 * q);
+            let cos_w0 = w0.cos();
+            let b0 = (1.0 - cos_w0) / 2.0;
+            let b1 = 1.0 - cos_w0;
+            let b2 = (1.0 - cos_w0) / 2.0;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::HighPass2 { freq_hz, q } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / (2.0 * q);
+            let cos_w0 = w0.cos();
+            let b0 = (1.0 + cos_w0) / 2.0;
+            let b1 = -(1.0 + cos_w0);
+            let b2 = (1.0 + cos_w0) / 2.0;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::LR4LowPass { freq_hz } => {
+            // Two cascaded BW2 LP (Q=0.7071)
+            let bq = filter_to_biquad(&ActiveFilter::LowPass2 { freq_hz: *freq_hz, q: std::f64::consts::FRAC_1_SQRT_2 }, fs);
+            vec![bq[0].clone(), bq[0].clone()]
+        }
+        ActiveFilter::LR4HighPass { freq_hz } => {
+            let bq = filter_to_biquad(&ActiveFilter::HighPass2 { freq_hz: *freq_hz, q: std::f64::consts::FRAC_1_SQRT_2 }, fs);
+            vec![bq[0].clone(), bq[0].clone()]
+        }
+        ActiveFilter::PEQ { freq_hz, q, gain_db } => {
+            let a = 10.0_f64.powf(*gain_db / 40.0);
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / (2.0 * q);
+            let cos_w0 = w0.cos();
+            let b0 = 1.0 + alpha * a;
+            let b1 = -2.0 * cos_w0;
+            let b2 = 1.0 - alpha * a;
+            let a0 = 1.0 + alpha / a;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha / a;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::AllPass1 { freq_hz } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / 2.0;
+            let cos_w0 = w0.cos();
+            let b0 = 1.0 - alpha;
+            let b1 = -2.0 * cos_w0;
+            let b2 = 1.0 + alpha;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::AllPass2 { freq_hz, q } => {
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / (2.0 * q);
+            let cos_w0 = w0.cos();
+            let b0 = 1.0 - alpha;
+            let b1 = -2.0 * cos_w0;
+            let b2 = 1.0 + alpha;
+            let a0 = 1.0 + alpha;
+            let a1 = -2.0 * cos_w0;
+            let a2 = 1.0 - alpha;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::ShelfLow { freq_hz, gain_db } => {
+            let a = 10.0_f64.powf(*gain_db / 40.0);
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / 2.0 * ((a + 1.0/a) * (1.0/1.0 - 1.0) + 2.0).sqrt();
+            let cos_w0 = w0.cos();
+            let sq = 2.0 * a.sqrt() * alpha;
+            let b0 = a * ((a + 1.0) - (a - 1.0) * cos_w0 + sq);
+            let b1 = 2.0 * a * ((a - 1.0) - (a + 1.0) * cos_w0);
+            let b2 = a * ((a + 1.0) - (a - 1.0) * cos_w0 - sq);
+            let a0 = (a + 1.0) + (a - 1.0) * cos_w0 + sq;
+            let a1 = -2.0 * ((a - 1.0) + (a + 1.0) * cos_w0);
+            let a2 = (a + 1.0) + (a - 1.0) * cos_w0 - sq;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::ShelfHigh { freq_hz, gain_db } => {
+            let a = 10.0_f64.powf(*gain_db / 40.0);
+            let w0 = 2.0 * PI * freq_hz / fs;
+            let alpha = w0.sin() / 2.0 * ((a + 1.0/a) * (1.0/1.0 - 1.0) + 2.0).sqrt();
+            let cos_w0 = w0.cos();
+            let sq = 2.0 * a.sqrt() * alpha;
+            let b0 = a * ((a + 1.0) + (a - 1.0) * cos_w0 + sq);
+            let b1 = -2.0 * a * ((a - 1.0) + (a + 1.0) * cos_w0);
+            let b2 = a * ((a + 1.0) + (a - 1.0) * cos_w0 - sq);
+            let a0 = (a + 1.0) - (a - 1.0) * cos_w0 + sq;
+            let a1 = 2.0 * ((a - 1.0) - (a + 1.0) * cos_w0);
+            let a2 = (a + 1.0) - (a - 1.0) * cos_w0 - sq;
+            vec![BiquadCoeffs { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 }]
+        }
+        ActiveFilter::LR2LowPass { freq_hz } => {
+            filter_to_biquad(&ActiveFilter::LowPass2 { freq_hz: *freq_hz, q: 0.5 }, fs)
+        }
+        ActiveFilter::LR2HighPass { freq_hz } => {
+            filter_to_biquad(&ActiveFilter::HighPass2 { freq_hz: *freq_hz, q: 0.5 }, fs)
+        }
+        ActiveFilter::LinkwitzTransform { fo, qo, fp, qp } => {
+            // Two biquads: one to cancel original resonance, one to insert new
+            let w0o = 2.0 * PI * fo / fs;
+            let w0p = 2.0 * PI * fp / fs;
+            let alpha_o = w0o.sin() / (2.0 * qo);
+            let alpha_p = w0p.sin() / (2.0 * qp);
+            let cos_o = w0o.cos();
+            let cos_p = w0p.cos();
+            // Numerator: zeros at original resonance
+            let n_b0 = 1.0 + alpha_o;
+            let n_b1 = -2.0 * cos_o;
+            let n_b2 = 1.0 - alpha_o;
+            // Denominator: poles at new resonance
+            let n_a0 = 1.0 + alpha_p;
+            let n_a1 = -2.0 * cos_p;
+            let n_a2 = 1.0 - alpha_p;
+            vec![BiquadCoeffs { b0: n_b0/n_a0, b1: n_b1/n_a0, b2: n_b2/n_a0, a1: n_a1/n_a0, a2: n_a2/n_a0 }]
+        }
+        ActiveFilter::Gain { db } => {
+            let g = 10.0_f64.powf(*db / 20.0);
+            vec![BiquadCoeffs { b0: g, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }]
+        }
+        ActiveFilter::Invert => {
+            vec![BiquadCoeffs { b0: -1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }]
+        }
+    }
+}

@@ -95,9 +95,11 @@ export function FrequencyPlot({
         const p = params as { value: [number, number]; seriesName: string; color: string }[];
         if (!Array.isArray(p) || p.length === 0) return '';
         const freq = p[0].value[0];
-        const freqStr = freq >= 1000 ? `${(freq / 1000).toFixed(2)}kHz` : `${freq.toFixed(1)}Hz`;
+        const freqStr = freq >= 1000
+          ? `${parseFloat((freq / 1000).toFixed(2))}kHz`
+          : `${parseFloat(freq.toFixed(1))}Hz`;
         const lines = p.map(
-          (s) => `<span style="color:${s.color}">●</span> ${s.seriesName}: ${s.value[1].toFixed(2)}`
+          (s) => `<span style="color:${s.color}">●</span> ${s.seriesName}: ${parseFloat(s.value[1].toFixed(2))}`
         );
         return `${freqStr}<br/>${lines.join('<br/>')}`;
       },
@@ -111,7 +113,9 @@ export function FrequencyPlot({
       max: frequencies[frequencies.length - 1],
       axisLabel: {
         formatter: (value: number) =>
-          value >= 1000 ? `${value / 1000}k` : String(Math.round(value)),
+          value >= 1000
+            ? `${parseFloat((value / 1000).toPrecision(4))}k`
+            : String(Math.round(value)),
       },
     },
     yAxis: yAxisConfig,

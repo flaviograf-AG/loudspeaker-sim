@@ -12,6 +12,7 @@ import { SaveLoadControls } from './components/SaveLoadControls';
 import { ExportControls } from './components/ExportControls';
 import { NumericInput } from './components/NumericInput';
 import { ImportOverlay, type OverlayData } from './components/ImportOverlay';
+import { BiquadExport } from './components/BiquadExport';
 import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput } from './types';
 
 const DEFAULT_INPUT: SimulationInput = {
@@ -159,6 +160,12 @@ function App() {
               <NumericInput label="Points" value={sysParams.freq_points} step={100} min={50} max={2000}
                 tooltip="Frequency points."
                 onChange={(v) => setSysParams(p => ({ ...p, freq_points: Math.round(v) }))} />
+            </div>
+            <div className="section-card">
+              <div className="section-title">Export</div>
+              <div className="btn-row">
+                <BiquadExport ways={ways} />
+              </div>
             </div>
           </>
         )}

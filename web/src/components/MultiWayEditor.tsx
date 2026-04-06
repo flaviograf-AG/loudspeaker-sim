@@ -1,0 +1,185 @@
+import { useState } from 'react';
+import type { WayInput, DriverParams, EnclosureConfig, ActiveFilter } from '../types';
+import { DriverInputs } from './DriverInputs';
+import { EnclosureInputs } from './EnclosureInputs';
+import { PresetSelector } from './PresetSelector';
+import { NumericInput } from './NumericInput';
+
+interface Props {
+  ways: WayInput[];
+  onChange: (ways: WayInput[]) => void;
+}
+
+const DEFAULT_WOOFER: WayInput = {
+  name: 'Woofer',
+  driver: { fs_hz: 37, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5, vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3 },
+  enclosure: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
+  passive_filters: [],
+  active_filters: [{ type: 'LR4LowPass', freq_hz: 2500 }],
+  gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true,
+};
+
+const DEFAULT_TWEETER: WayInput = {
+  name: 'Tweeter',
+  driver: { fs_hz: 800, re_ohm: 5.5, le_h: 0.05e-3, qes: 0.5, qms: 2.0, vas_m3: 0.5e-3, sd_m2: 8e-4, xmax_m: 1e-3 },
+  enclosure: { type: 'Sealed', volume_m3: 0.5e-3, ql: 7 },
+  passive_filters: [],
+  active_filters: [{ type: 'LR4HighPass', freq_hz: 2500 }],
+  gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true,
+};
+
+const FILTER_PRESETS: { label: string; filter: ActiveFilter }[] = [
+  { label: 'LR4 LP 2.5kHz', filter: { type: 'LR4LowPass', freq_hz: 2500 } },
+  { label: 'LR4 HP 2.5kHz', filter: { type: 'LR4HighPass', freq_hz: 2500 } },
+  { label: 'BW2 LP 3kHz', filter: { type: 'LowPass2', freq_hz: 3000, q: 0.707 } },
+  { label: 'BW2 HP 3kHz', filter: { type: 'HighPass2', freq_hz: 3000, q: 0.707 } },
+  { label: 'LP1 1kHz', filter: { type: 'LowPass1', freq_hz: 1000 } },
+  { label: 'HP1 1kHz', filter: { type: 'HighPass1', freq_hz: 1000 } },
+  { label: 'PEQ +3dB @1kHz', filter: { type: 'PEQ', freq_hz: 1000, q: 2, gain_db: 3 } },
+  { label: 'PEQ -3dB @1kHz', filter: { type: 'PEQ', freq_hz: 1000, q: 2, gain_db: -3 } },
+  { label: 'All-pass 2kHz', filter: { type: 'AllPass1', freq_hz: 2000 } },
+  { label: 'Invert polarity', filter: { type: 'Invert' } },
+];
+
+function filterLabel(f: ActiveFilter): string {
+  switch (f.type) {
+    case 'LR4LowPass': return `LR4 LP ${f.freq_hz}Hz`;
+    case 'LR4HighPass': return `LR4 HP ${f.freq_hz}Hz`;
+    case 'LowPass1': return `LP1 ${f.freq_hz}Hz`;
+    case 'HighPass1': return `HP1 ${f.freq_hz}Hz`;
+    case 'LowPass2': return `LP2 ${f.freq_hz}Hz Q${f.q}`;
+    case 'HighPass2': return `HP2 ${f.freq_hz}Hz Q${f.q}`;
+    case 'PEQ': return `PEQ ${f.freq_hz}Hz ${f.gain_db>0?'+':''}${f.gain_db}dB`;
+    case 'AllPass1': return `AP1 ${f.freq_hz}Hz`;
+    case 'AllPass2': return `AP2 ${f.freq_hz}Hz`;
+    case 'Gain': return `${f.db>0?'+':''}${f.db}dB`;
+    case 'Invert': return 'Invert';
+  }
+}
+
+export function MultiWayEditor({ ways, onChange }: Props) {
+  const [activeWay, setActiveWay] = useState(0);
+
+  const updateWay = (idx: number, updates: Partial<WayInput>) => {
+    const newWays = [...ways];
+    newWays[idx] = { ...newWays[idx], ...updates };
+    onChange(newWays);
+  };
+
+  const addWay = () => {
+    const newWay = ways.length === 0 ? { ...DEFAULT_WOOFER }
+      : ways.length === 1 ? { ...DEFAULT_TWEETER }
+      : { ...DEFAULT_WOOFER, name: `Way ${ways.length + 1}`, active_filters: [] };
+    onChange([...ways, newWay]);
+    setActiveWay(ways.length);
+  };
+
+  const removeWay = (idx: number) => {
+    if (ways.length <= 1) return;
+    const newWays = ways.filter((_, i) => i !== idx);
+    onChange(newWays);
+    if (activeWay >= newWays.length) setActiveWay(newWays.length - 1);
+  };
+
+  const way = ways[activeWay];
+  if (!way) return <button className="graf-btn graf-btn-primary" onClick={addWay}>+ Add Way</button>;
+
+  const qts = (way.driver.qes * way.driver.qms) / (way.driver.qes + way.driver.qms);
+
+  return (
+    <>
+      {/* Way tabs */}
+      <div className="btn-row" style={{ marginBottom: 8 }}>
+        {ways.map((w, i) => (
+          <button key={i}
+            className={`graf-btn graf-btn-sm ${i === activeWay ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+            style={{ position: 'relative' }}
+            onClick={() => setActiveWay(i)}
+            title={`${w.name}${w.enabled ? '' : ' (disabled)'}`}
+          >
+            {w.name}{!w.enabled && ' ⊘'}
+          </button>
+        ))}
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={addWay} title="Add a new way">+</button>
+      </div>
+
+      {/* Way controls */}
+      <div className="section-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <input type="text" className="graf-form-control" style={{ width: 100, fontSize: 13, fontWeight: 600 }}
+            value={way.name} onChange={(e) => updateWay(activeWay, { name: e.target.value })} />
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={way.enabled}
+                onChange={(e) => updateWay(activeWay, { enabled: e.target.checked })} /> On
+            </label>
+            <label title="Invert polarity (180° phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={way.inverted}
+                onChange={(e) => updateWay(activeWay, { inverted: e.target.checked })} /> Inv
+            </label>
+            {ways.length > 1 && (
+              <button className="graf-btn graf-btn-sm" style={{ padding: '0 6px', color: 'var(--graf-danger)' }}
+                onClick={() => removeWay(activeWay)} title="Remove this way">✕</button>
+            )}
+          </div>
+        </div>
+
+        <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
+          tooltip="Per-way level adjustment. Use to match sensitivity between drivers."
+          onChange={(v) => updateWay(activeWay, { gain_db: v })} />
+        <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="µs"
+          tooltip="Per-way time delay for alignment. 29 µs ≈ 1 cm acoustic path difference."
+          onChange={(v) => updateWay(activeWay, { delay_s: v / 1e6 })} />
+        <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
+          tooltip="Physical depth offset from reference plane. Positive = recessed. Adds acoustic path delay."
+          onChange={(v) => updateWay(activeWay, { z_offset_m: v / 100 })} />
+      </div>
+
+      {/* Active filters */}
+      <div className="section-card">
+        <div className="section-title">Active Filters</div>
+        {way.active_filters.map((f, i) => (
+          <div key={i} className="param-row" style={{ fontSize: 12 }}>
+            <span style={{ flex: 1 }}>{filterLabel(f)}</span>
+            {'freq_hz' in f && (
+              <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }}
+                value={f.freq_hz} step={100} min={10}
+                onChange={(e) => {
+                  const filters = [...way.active_filters];
+                  filters[i] = { ...f, freq_hz: parseFloat(e.target.value) || f.freq_hz } as ActiveFilter;
+                  updateWay(activeWay, { active_filters: filters });
+                }} />
+            )}
+            <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 10 }}
+              onClick={() => {
+                const filters = way.active_filters.filter((_, j) => j !== i);
+                updateWay(activeWay, { active_filters: filters });
+              }}>✕</button>
+          </div>
+        ))}
+        <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
+          value="" onChange={(e) => {
+            const idx = parseInt(e.target.value);
+            if (!isNaN(idx)) {
+              updateWay(activeWay, { active_filters: [...way.active_filters, { ...FILTER_PRESETS[idx].filter }] });
+            }
+            e.target.value = '';
+          }}>
+          <option value="" disabled>+ Add filter...</option>
+          {FILTER_PRESETS.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
+        </select>
+      </div>
+
+      {/* Driver + Enclosure for this way */}
+      <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+      <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+      <EnclosureInputs
+        config={way.enclosure}
+        driverVas={way.driver.vas_m3}
+        driverFs={way.driver.fs_hz}
+        driverQts={qts}
+        onChange={(enc: EnclosureConfig) => updateWay(activeWay, { enclosure: enc })}
+      />
+    </>
+  );
+}

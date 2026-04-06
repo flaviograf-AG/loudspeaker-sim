@@ -7,6 +7,7 @@ export interface DriverParams {
   vas_m3: number;
   sd_m2: number;
   xmax_m: number;
+  ke?: number;
 }
 
 export interface SealedBoxParams {

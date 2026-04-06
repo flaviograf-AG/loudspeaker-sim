@@ -141,3 +141,65 @@ export interface SimulationResult {
 }
 
 export type EnclosureType = 'Sealed' | 'Vented' | 'TransmissionLine' | 'Horn' | 'Bandpass' | 'PassiveRadiator' | 'OpenBaffle';
+
+// Multi-way system types (matches Rust system_api.rs)
+
+export type PassiveFilter =
+  | { type: 'SeriesR'; ohms: number }
+  | { type: 'SeriesL'; henries: number; dcr_ohms: number }
+  | { type: 'SeriesC'; farads: number }
+  | { type: 'ShuntR'; ohms: number }
+  | { type: 'ShuntL'; henries: number; dcr_ohms: number }
+  | { type: 'ShuntC'; farads: number }
+  | { type: 'ZobelShunt'; ohms: number; farads: number }
+  | { type: 'LPad'; series_ohms: number; shunt_ohms: number }
+  | { type: 'NotchShunt'; ohms: number; henries: number; farads: number }
+  | { type: 'NotchSeries'; ohms: number; henries: number; farads: number };
+
+export type ActiveFilter =
+  | { type: 'LowPass1'; freq_hz: number }
+  | { type: 'HighPass1'; freq_hz: number }
+  | { type: 'LowPass2'; freq_hz: number; q: number }
+  | { type: 'HighPass2'; freq_hz: number; q: number }
+  | { type: 'LR4LowPass'; freq_hz: number }
+  | { type: 'LR4HighPass'; freq_hz: number }
+  | { type: 'PEQ'; freq_hz: number; q: number; gain_db: number }
+  | { type: 'AllPass1'; freq_hz: number }
+  | { type: 'AllPass2'; freq_hz: number; q: number }
+  | { type: 'Gain'; db: number }
+  | { type: 'Invert' };
+
+export interface WayInput {
+  name: string;
+  driver: DriverParams;
+  enclosure: EnclosureConfig;
+  passive_filters: PassiveFilter[];
+  active_filters: ActiveFilter[];
+  gain_db: number;
+  delay_s: number;
+  inverted: boolean;
+  z_offset_m: number;
+  enabled: boolean;
+}
+
+export interface SystemInput {
+  ways: WayInput[];
+  freq_start_hz: number;
+  freq_end_hz: number;
+  freq_points: number;
+  drive_voltage_rms: number;
+}
+
+export interface WayResult {
+  name: string;
+  spl_db: number[];
+  impedance_ohm: number[];
+}
+
+export interface SystemResult {
+  frequencies_hz: number[];
+  ways: WayResult[];
+  system_spl_db: number[];
+  system_group_delay_ms: number[];
+  system_impedance_ohm: number[];
+}

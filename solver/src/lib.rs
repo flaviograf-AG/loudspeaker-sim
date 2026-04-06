@@ -10,6 +10,7 @@ pub mod passive_radiator;
 pub mod sealed;
 pub mod sweep;
 pub mod system;
+pub mod system_api;
 pub mod transfer_matrix;
 pub mod transmission_line;
 pub mod types;
@@ -142,5 +143,32 @@ pub fn simulate(input_json: &str) -> Result<String, JsValue> {
         .map_err(|e| JsValue::from_str(&e))?;
 
     serde_json::to_string(&result)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+/// WASM entry point for multi-way system simulation.
+#[wasm_bindgen]
+pub fn simulate_system(input_json: &str) -> Result<String, JsValue> {
+    let input: system_api::SystemInputJson = serde_json::from_str(input_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid system input: {}", e)))?;
+
+    let project = input.to_project();
+    let result = system::solve_system(&project)
+        .map_err(|e| JsValue::from_str(&e))?;
+
+    // Convert to JSON-friendly output
+    let output = system_api::SystemResultJson {
+        frequencies_hz: result.frequencies_hz,
+        ways: result.ways.into_iter().map(|w| system_api::WayResultJson {
+            name: w.name,
+            spl_db: w.spl_db,
+            impedance_ohm: w.impedance_ohm,
+        }).collect(),
+        system_spl_db: result.system_spl_db,
+        system_group_delay_ms: result.system_group_delay_ms,
+        system_impedance_ohm: result.system_impedance_ohm,
+    };
+
+    serde_json::to_string(&output)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }

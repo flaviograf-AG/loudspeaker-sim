@@ -24,7 +24,7 @@ export function ExportControls({ result }: Props) {
     downloadFile(writeFrd({
       frequencies: result.frequencies_hz,
       spl_db: result.spl_db,
-      phase_deg: result.frequencies_hz.map(() => 0),
+      phase_deg: result.acoustic_phase_deg,
     }), 'simulation.frd', 'text/plain');
   };
 

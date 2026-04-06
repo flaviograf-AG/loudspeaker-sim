@@ -14,6 +14,10 @@ export interface SealedBoxParams {
   ql: number;
 }
 
+export type PortShape =
+  | { type: 'Circular' }
+  | { type: 'Slot'; width_m: number; height_m: number };
+
 export interface VentedBoxParams {
   volume_m3: number;
   port_area_m2: number;
@@ -21,6 +25,7 @@ export interface VentedBoxParams {
   num_ports: number;
   port_flanged: boolean;
   ql: number;
+  port_shape: PortShape;
 }
 
 export type TaperProfile =
@@ -114,7 +119,7 @@ export interface OpenBaffleParams {
 // Matches Rust #[serde(tag = "type")] enum
 export type EnclosureConfig =
   | { type: 'Sealed'; volume_m3: number; ql: number }
-  | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; num_ports: number; port_flanged: boolean; ql: number }
+  | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; num_ports: number; port_flanged: boolean; ql: number; port_shape: PortShape }
   | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean; driver_position: number; taper_profile: TaperProfile; stuffing_zones: StuffingZone[]; mouth_termination: MouthTermination; num_folds: number }
   | { type: 'Horn'; segments: HornSegment[]; rear_chamber: RearChamber; throat_chamber: ThroatChamber | null; radiation_angle_sr: number; num_tmm_segments: number; stuffing_zones: StuffingZone[] }
   | { type: 'Bandpass'; rear_volume_m3: number; front_volume_m3: number; port_area_m2: number; port_length_m: number; port_flanged: boolean; rear_ql: number; front_ql: number }

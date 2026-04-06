@@ -13,18 +13,31 @@ body {
 .app-layout {
   display: flex;
   height: 100vh;
+  position: relative;
 }
 
 .app-sidebar {
-  width: 300px;
   min-width: 260px;
   max-width: 500px;
   padding: var(--graf-spacing-md, 16px);
-  overflow: auto;
-  border-right: 1px solid var(--graf-border, #e8e4dc);
+  overflow-y: auto;
   background: var(--graf-surface, #fff);
   flex-shrink: 0;
-  resize: horizontal;
+}
+
+.sidebar-drag-handle {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: var(--graf-border, #e8e4dc);
+  z-index: 20;
+}
+
+.sidebar-drag-handle:hover,
+.sidebar-drag-handle:active {
+  background: var(--graf-primary, #00809E);
 }
 
 .app-main {

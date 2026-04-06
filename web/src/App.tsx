@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { initSolver } from './solver/wasm-bridge';
 import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
@@ -48,6 +48,19 @@ function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>('single');
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const dragging = useRef(false);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (ev: MouseEvent) => {
+      if (dragging.current) setSidebarWidth(Math.min(500, Math.max(260, ev.clientX)));
+    };
+    const onUp = () => { dragging.current = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
 
   // Overlay (imported FRD/ZMA)
   const [overlay, setOverlay] = useState<OverlayData>({ frd: null, zma: null });
@@ -99,7 +112,8 @@ function App() {
 
   return (
     <div className="app-layout">
-      <aside className="app-sidebar">
+      <div className="sidebar-drag-handle" style={{ left: sidebarWidth - 3 }} onMouseDown={onDragStart} />
+      <aside className="app-sidebar" style={{ width: sidebarWidth }}>
         <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
           <img src="/favicon/favicon.svg" alt="LS" width={28} height={28} />
           Loudspeaker Sim

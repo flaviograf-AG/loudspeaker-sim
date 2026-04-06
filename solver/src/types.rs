@@ -51,6 +51,22 @@ pub struct SealedBoxParams {
     pub ql: f64,
 }
 
+/// Port shape — circular or rectangular slot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PortShape {
+    /// Circular port (default). Area = π×r².
+    Circular,
+    /// Rectangular slot port. Area = width × height.
+    Slot { width_m: f64, height_m: f64 },
+}
+
+impl Default for PortShape {
+    fn default() -> Self {
+        PortShape::Circular
+    }
+}
+
 /// Vented box (bass reflex) enclosure parameters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VentedBoxParams {
@@ -66,6 +82,9 @@ pub struct VentedBoxParams {
     pub port_flanged: bool,
     /// Box loss factor Ql
     pub ql: f64,
+    /// Port shape — circular or rectangular slot
+    #[serde(default)]
+    pub port_shape: PortShape,
 }
 
 /// Taper profile for transmission line cross-section variation.

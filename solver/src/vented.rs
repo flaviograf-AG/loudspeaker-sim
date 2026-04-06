@@ -15,17 +15,25 @@ use crate::types::{DerivedDriver, SimulationResult, VentedBoxParams};
 
 /// Compute effective port length including end corrections.
 ///
-/// Flanged end correction: 0.85 × radius per end
-/// Unflanged end correction: 0.6 × radius per end
-/// Reference: Kinsler & Frey, "Fundamentals of Acoustics" (1982), Table 9.1
+/// Circular: Flanged 0.85×r, Unflanged 0.6×r per end.
+/// Slot: Francis Brooke correction based on slot aspect ratio.
+/// Reference: Kinsler & Frey (1982), Table 9.1; Brooke (2001)
 pub fn effective_port_length(enc: &VentedBoxParams) -> f64 {
-    let port_diameter = (4.0 * enc.port_area_m2 / std::f64::consts::PI).sqrt();
-    let radius = port_diameter / 2.0;
+    use crate::types::PortShape;
 
-    let correction = if enc.port_flanged {
-        0.85 * radius
-    } else {
-        0.6 * radius
+    let correction = match &enc.port_shape {
+        PortShape::Circular => {
+            let port_diameter = (4.0 * enc.port_area_m2 / std::f64::consts::PI).sqrt();
+            let radius = port_diameter / 2.0;
+            if enc.port_flanged { 0.85 * radius } else { 0.6 * radius }
+        }
+        PortShape::Slot { width_m, height_m } => {
+            // Francis Brooke slot port end correction:
+            // For a rectangular slot, the effective radius is based on the
+            // shorter dimension. Correction ≈ 0.5 × min(w,h) per end for flanged.
+            let min_dim = width_m.min(*height_m);
+            if enc.port_flanged { 0.5 * min_dim } else { 0.35 * min_dim }
+        }
     };
 
     // Both ends get a correction (inner + outer)

@@ -68,7 +68,7 @@ fn vented_box_params_fields() {
         port_length_m: 0.15,
         num_ports: 1,
         port_flanged: true,
-        ql: 7.0,
+        ql: 7.0, port_shape: PortShape::Circular,
     };
     assert_eq!(b.num_ports, 1);
     assert!(b.port_flanged);

@@ -36,7 +36,7 @@ interface Props {
 
 const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
-  Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7 },
+  Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7, port_shape: { type: 'Circular' } },
   TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
   Horn: { type: 'Horn', segments: [{ area_start_m2: 132e-4, area_end_m2: 2000e-4, length_m: 0.60, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2 * Math.PI, num_tmm_segments: 30, stuffing_zones: [] },
   Bandpass: { type: 'Bandpass', rear_volume_m3: 15e-3, front_volume_m3: 20e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
@@ -193,7 +193,42 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
           <NumericInput label="Ports" value={config.num_ports} step={1} min={1} max={4}
             tooltip="Number of identical ports — multiple ports reduce per-port air velocity and turbulence noise."
             onChange={(v) => onChange({ ...config, num_ports: Math.round(v) })} />
-          <div className="param-row" title="Flanged port has both ends terminated by a surface (inside box wall + flush with outside). Affects end correction: flanged adds 0.85×radius, unflanged adds 0.6×radius per end.">
+          <div className="param-row" title="Port shape: Circular (round tube) or Slot (rectangular opening). Slot ports fit flush against a wall and allow shorter port lengths.">
+            <span className="param-label">Port shape</span>
+            <select className="graf-form-control" style={{ width: 100 }}
+              value={config.port_shape.type}
+              onChange={(e) => {
+                if (e.target.value === 'Circular') {
+                  onChange({ ...config, port_shape: { type: 'Circular' } });
+                } else {
+                  // Slot: derive width/height from area (default 10:1 aspect ratio)
+                  const h = Math.sqrt(config.port_area_m2 / 10);
+                  onChange({ ...config, port_shape: { type: 'Slot', width_m: 10 * h, height_m: h } });
+                }
+              }}>
+              <option value="Circular">Circular</option>
+              <option value="Slot">Slot</option>
+            </select>
+          </div>
+          {config.port_shape.type === 'Slot' && (
+            <>
+              <NumericInput label="Slot W" value={config.port_shape.width_m * 100} step={1} min={1} unit="cm"
+                tooltip="Slot port width — typically spans most of the baffle width."
+                onChange={(v) => {
+                  const w = v / 100;
+                  const h = config.port_shape.type === 'Slot' ? config.port_shape.height_m : 0.02;
+                  onChange({ ...config, port_area_m2: w * h, port_shape: { type: 'Slot', width_m: w, height_m: h } });
+                }} />
+              <NumericInput label="Slot H" value={config.port_shape.type === 'Slot' ? config.port_shape.height_m * 100 : 2} step={0.5} min={0.5} unit="cm"
+                tooltip="Slot port height (gap) — typically 1-5 cm. Smaller gap = more port velocity."
+                onChange={(v) => {
+                  const h = v / 100;
+                  const w = config.port_shape.type === 'Slot' ? config.port_shape.width_m : 0.2;
+                  onChange({ ...config, port_area_m2: w * h, port_shape: { type: 'Slot', width_m: w, height_m: h } });
+                }} />
+            </>
+          )}
+          <div className="param-row" title="Flanged port has both ends terminated by a surface. Affects end correction calculation.">
             <span className="param-label">Flanged</span>
             <input type="checkbox" checked={config.port_flanged}
               onChange={(e) => onChange({ ...config, port_flanged: e.target.checked })} />

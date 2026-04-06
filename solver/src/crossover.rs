@@ -506,3 +506,34 @@ pub fn filter_to_biquad(filter: &ActiveFilter, sample_rate: f64) -> Vec<BiquadCo
         }
     }
 }
+
+/// E-series standard component values.
+pub mod e_series {
+    const E12: [f64; 12] = [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];
+    const E24: [f64; 24] = [1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0,
+                             3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1];
+
+    /// Round a value to the nearest E12 standard value.
+    pub fn round_e12(value: f64) -> f64 { round_to_series(value, &E12) }
+
+    /// Round a value to the nearest E24 standard value.
+    pub fn round_e24(value: f64) -> f64 { round_to_series(value, &E24) }
+
+    fn round_to_series(value: f64, series: &[f64]) -> f64 {
+        if value <= 0.0 { return 0.0; }
+        let decade = 10.0_f64.powf(value.log10().floor());
+        let mantissa = value / decade;
+        let mut best = series[0];
+        let mut best_ratio = (mantissa / best - 1.0).abs();
+        for &s in series {
+            let ratio = (mantissa / s - 1.0).abs();
+            if ratio < best_ratio { best = s; best_ratio = ratio; }
+        }
+        // Also check first value of next decade
+        let next = series[0] * 10.0;
+        if (mantissa / next * 10.0 - 1.0).abs() < best_ratio {
+            return next * decade / 10.0;
+        }
+        best * decade
+    }
+}

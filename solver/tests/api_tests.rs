@@ -56,7 +56,7 @@ fn vented_simulation_end_to_end() {
             port_length_m: 0.15,
             num_ports: 1,
             port_flanged: true,
-            ql: 7.0,
+            ql: 7.0, port_shape: PortShape::Circular,
         }),
         freq_start_hz: 20.0,
         freq_end_hz: 20000.0,

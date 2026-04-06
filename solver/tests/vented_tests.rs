@@ -1,5 +1,5 @@
 use loudspeaker_solver::driver::derive_driver;
-use loudspeaker_solver::types::{DriverParams, VentedBoxParams};
+use loudspeaker_solver::types::{DriverParams, PortShape, VentedBoxParams};
 use loudspeaker_solver::vented::*;
 
 fn test_driver() -> DriverParams {
@@ -22,7 +22,7 @@ fn test_enclosure() -> VentedBoxParams {
         port_length_m: 0.15,   // 15 cm
         num_ports: 1,
         port_flanged: true,
-        ql: 7.0,
+        ql: 7.0, port_shape: PortShape::Circular,
     }
 }
 

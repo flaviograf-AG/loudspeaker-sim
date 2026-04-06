@@ -20,6 +20,8 @@ Every equation in the solver has a comment citing its source. This document coll
 | Bradbury, L.J.S. | "The Use of Fibrous Materials in Loudspeaker Enclosures" (JAES) | 1976 | `transfer_matrix.rs` — stuffing absorption model (Eq. 12) |
 | Leach, W.M. | "Electroacoustics and Audio Amplifier Design" | — | `transfer_matrix.rs` — transfer matrix formulation (Eq. 8.25–8.30) |
 | Kinsler & Frey | "Fundamentals of Acoustics" | 1982 | `vented.rs` — port end corrections (Table 9.1) |
+| Marshall, Perry S. | "Transmission Line Derivation" | — | `transmission_line.rs` — TL theory derivation, driver position effects, stuffing models. PDF in `docs/references/` |
+| transmissionlinespeakers.com | "Designing a Transmission Line with SpicyTL" | — | TL design methodology — driver offset, taper profiles, stuffing zones. https://transmissionlinespeakers.com/en/designing-a-transmission-line-with-spicytl/ |
 
 ## File Formats
 

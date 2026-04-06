@@ -5,21 +5,82 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #fafafa;
-  color: #333;
+  background: var(--graf-body-bg, #faf9f7);
+  color: var(--graf-body-color, #2d2a26);
 }
 
-fieldset {
-  border-radius: 4px;
+/* App layout */
+.app-layout {
+  display: flex;
+  height: 100vh;
 }
 
-input[type="number"] {
-  border: 1px solid #ccc;
-  border-radius: 3px;
+.app-sidebar {
+  width: 300px;
+  padding: var(--graf-spacing-md, 16px);
+  overflow-y: auto;
+  border-right: 1px solid var(--graf-border, #e8e4dc);
+  background: var(--graf-surface, #fff);
+  flex-shrink: 0;
 }
 
-input[type="number"]:focus {
-  outline: 2px solid #2563eb;
-  border-color: #2563eb;
+.app-main {
+  flex: 1;
+  padding: var(--graf-spacing-md, 16px);
+  overflow-y: auto;
+}
+
+/* Form overrides for compact sidebar */
+.app-sidebar .graf-form-group {
+  margin-bottom: var(--graf-spacing-xs, 4px);
+}
+
+.app-sidebar .graf-form-label {
+  font-size: var(--graf-font-size-xs, 12px);
+  min-width: 80px;
+}
+
+.app-sidebar .graf-form-control {
+  padding: 4px 8px;
+  font-size: var(--graf-font-size-sm, 14px);
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: var(--graf-spacing-sm, 8px);
+  margin-bottom: var(--graf-spacing-xs, 4px);
+}
+
+.param-label {
+  flex: 0 0 85px;
+  font-size: var(--graf-font-size-xs, 12px);
+  text-align: right;
+  color: var(--graf-warm-600, #6b6560);
+}
+
+.param-unit {
+  font-size: var(--graf-font-size-xs, 12px);
+  color: var(--graf-warm-500, #8a8580);
+}
+
+.section-card {
+  border: 1px solid var(--graf-border, #e8e4dc);
+  border-radius: var(--graf-border-radius, 8px);
+  padding: var(--graf-spacing-sm, 8px) var(--graf-spacing-md, 16px);
+  margin-bottom: var(--graf-spacing-sm, 8px);
+  background: var(--graf-surface, #fff);
+}
+
+.section-title {
+  font-size: var(--graf-font-size-sm, 14px);
+  font-weight: 600;
+  color: var(--graf-primary, #00809E);
+  margin-bottom: var(--graf-spacing-xs, 4px);
+}
+
+.btn-row {
+  display: flex;
+  gap: var(--graf-spacing-xs, 4px);
+  flex-wrap: wrap;
 }

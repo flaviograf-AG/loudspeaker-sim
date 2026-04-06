@@ -55,34 +55,34 @@ export function SaveLoadControls({ input, onLoad }: Props) {
     fileInput.click();
   };
 
-  const btnStyle: React.CSSProperties = {
-    fontSize: 12, padding: '3px 8px', cursor: 'pointer', marginRight: 4,
-  };
-
   return (
-    <fieldset style={{ border: '1px solid #ccc', padding: 8, marginBottom: 8 }}>
-      <legend>Save / Load</legend>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        <button style={btnStyle} onClick={handleSave}>Save</button>
-        <button style={btnStyle} onClick={() => setShowList(!showList)}>
-          Load ({designs.length})
+    <div className="section-card">
+      <div className="section-title">Designs</div>
+      <div className="btn-row">
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleSave}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: -3 }}>save</span> Save
         </button>
-        <button style={btnStyle} onClick={handleExport}>Export JSON</button>
-        <button style={btnStyle} onClick={handleImport}>Import JSON</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={() => setShowList(!showList)}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: -3 }}>folder_open</span> Load ({designs.length})
+        </button>
+        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleExport}>Export</button>
+        <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleImport}>Import</button>
       </div>
       {showList && designs.length > 0 && (
-        <ul style={{ fontSize: 12, margin: '6px 0 0', paddingLeft: 16 }}>
+        <ul style={{ fontSize: 12, margin: '8px 0 0', paddingLeft: 16, listStyle: 'none' }}>
           {designs.map((d, i) => (
-            <li key={i} style={{ marginBottom: 4 }}>
-              <button style={{ ...btnStyle, fontWeight: 'bold' }} onClick={() => { onLoad(d.input); setShowList(false); }}>
+            <li key={i} style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button className="graf-btn graf-btn-sm graf-btn-primary" onClick={() => { onLoad(d.input); setShowList(false); }}>
                 {d.name}
               </button>
-              <span style={{ color: '#999' }}>{new Date(d.timestamp).toLocaleDateString()}</span>
-              <button style={{ ...btnStyle, color: 'red', marginLeft: 4 }} onClick={() => handleDelete(i)}>×</button>
+              <span className="param-unit">{new Date(d.timestamp).toLocaleDateString()}</span>
+              <button className="graf-btn graf-btn-sm graf-btn-ghost" style={{ color: 'var(--graf-danger)' }} onClick={() => handleDelete(i)}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+              </button>
             </li>
           ))}
         </ul>
       )}
-    </fieldset>
+    </div>
   );
 }

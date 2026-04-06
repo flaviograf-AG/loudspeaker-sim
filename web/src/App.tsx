@@ -46,21 +46,43 @@ function App() {
   const updateDriver = (driver: DriverParams) => setInput((prev) => ({ ...prev, driver }));
   const updateEnclosure = (enclosure: EnclosureConfig) => setInput((prev) => ({ ...prev, enclosure }));
 
-  if (initError) return <div style={{ color: 'red', padding: 20 }}>Failed to load solver: {initError}</div>;
-  if (!ready) return <div style={{ padding: 20 }}>Loading WASM solver...</div>;
+  if (initError) {
+    return (
+      <div className="graf-container" style={{ padding: 40 }}>
+        <div className="graf-card graf-card-accent" style={{ borderColor: 'var(--graf-danger)' }}>
+          <div className="graf-card-body">
+            <p style={{ color: 'var(--graf-danger)' }}>Failed to load solver: {initError}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="graf-container" style={{ padding: 40, textAlign: 'center' }}>
+        <p className="graf-lead">Loading WASM solver...</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <aside style={{ width: 280, padding: 12, overflowY: 'auto', borderRight: '1px solid #ddd', flexShrink: 0 }}>
-        <h2 style={{ fontSize: 16, margin: '0 0 8px' }}>Loudspeaker Simulator</h2>
+    <div className="app-layout">
+      <aside className="app-sidebar">
+        <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', marginBottom: 12 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, verticalAlign: -4 }}>speaker</span>
+          {' '}Loudspeaker Sim
+        </h1>
         <PresetSelector onSelect={updateDriver} />
         <DriverInputs params={input.driver} onChange={updateDriver} />
         <EnclosureInputs config={input.enclosure} onChange={updateEnclosure} />
         <SaveLoadControls input={input} onLoad={setInput} />
         <ExportControls result={result} />
-        {solveError && <div style={{ color: 'red', fontSize: 12, marginTop: 8 }}>{solveError}</div>}
+        {solveError && (
+          <div style={{ color: 'var(--graf-danger)', fontSize: 12, marginTop: 8 }}>{solveError}</div>
+        )}
       </aside>
-      <main style={{ flex: 1, padding: 12, overflowY: 'auto' }}>
+      <main className="app-main">
         <PlotArea result={result} xmaxMm={input.driver.xmax_m * 1000} />
       </main>
     </div>

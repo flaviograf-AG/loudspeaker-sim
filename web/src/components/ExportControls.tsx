@@ -20,26 +20,20 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 export function ExportControls({ result }: Props) {
   if (!result) return null;
 
-  const btnStyle: React.CSSProperties = {
-    fontSize: 12, padding: '3px 8px', cursor: 'pointer',
-  };
-
   const handleFrd = () => {
-    const data = writeFrd({
+    downloadFile(writeFrd({
       frequencies: result.frequencies_hz,
       spl_db: result.spl_db,
-      phase_deg: result.frequencies_hz.map(() => 0), // phase not tracked in v0.1
-    });
-    downloadFile(data, 'simulation.frd', 'text/plain');
+      phase_deg: result.frequencies_hz.map(() => 0),
+    }), 'simulation.frd', 'text/plain');
   };
 
   const handleZma = () => {
-    const data = writeZma({
+    downloadFile(writeZma({
       frequencies: result.frequencies_hz,
       impedance_ohm: result.impedance_ohm,
       phase_deg: result.impedance_phase_deg,
-    });
-    downloadFile(data, 'simulation.zma', 'text/plain');
+    }), 'simulation.zma', 'text/plain');
   };
 
   const handleCsv = () => {
@@ -47,13 +41,13 @@ export function ExportControls({ result }: Props) {
   };
 
   return (
-    <fieldset style={{ border: '1px solid #ccc', padding: 8, marginBottom: 8 }}>
-      <legend>Export</legend>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button style={btnStyle} onClick={handleFrd}>FRD (SPL)</button>
-        <button style={btnStyle} onClick={handleZma}>ZMA (Z)</button>
-        <button style={btnStyle} onClick={handleCsv}>CSV (all)</button>
+    <div className="section-card">
+      <div className="section-title">Export</div>
+      <div className="btn-row">
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleFrd}>FRD (SPL)</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleZma}>ZMA (Z)</button>
+        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleCsv}>CSV (all)</button>
       </div>
-    </fieldset>
+    </div>
   );
 }

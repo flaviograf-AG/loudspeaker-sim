@@ -20,14 +20,17 @@ export function EnclosureInputs({ config, onChange }: Props) {
   };
 
   return (
-    <fieldset style={{ border: '1px solid #ccc', padding: 8, marginBottom: 8 }}>
-      <legend>Enclosure</legend>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+    <div className="section-card">
+      <div className="section-title">Enclosure</div>
+      <div className="btn-row" style={{ marginBottom: 8 }}>
         {(['Sealed', 'Vented', 'TransmissionLine'] as EnclosureType[]).map((t) => (
-          <label key={t} style={{ fontSize: 13, cursor: 'pointer' }}>
-            <input type="radio" name="encType" checked={encType === t} onChange={() => switchType(t)} />
-            {' '}{t === 'TransmissionLine' ? 'T-Line' : t}
-          </label>
+          <button
+            key={t}
+            className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+            onClick={() => switchType(t)}
+          >
+            {t === 'TransmissionLine' ? 'T-Line' : t}
+          </button>
         ))}
       </div>
 
@@ -71,6 +74,6 @@ export function EnclosureInputs({ config, onChange }: Props) {
             onChange={(v) => onChange({ ...config, flow_resistivity_pa_s_m2: v })} />
         </>
       )}
-    </fieldset>
+    </div>
   );
 }

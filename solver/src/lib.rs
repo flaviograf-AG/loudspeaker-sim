@@ -1,8 +1,11 @@
 #![warn(clippy::all)]
 
+pub mod bandpass;
 pub mod constants;
 pub mod driver;
 pub mod horn;
+pub mod open_baffle;
+pub mod passive_radiator;
 pub mod sealed;
 pub mod sweep;
 pub mod transfer_matrix;
@@ -10,8 +13,11 @@ pub mod transmission_line;
 pub mod types;
 pub mod vented;
 
+use bandpass::bandpass_frequency_response;
 use driver::derive_driver;
 use horn::horn_frequency_response;
+use open_baffle::open_baffle_frequency_response;
+use passive_radiator::passive_radiator_frequency_response;
 use sealed::sealed_frequency_response;
 use sweep::log_frequency_sweep;
 use transmission_line::tl_frequency_response;
@@ -59,6 +65,22 @@ fn validate_enclosure(enc: &EnclosureConfig) -> Result<(), String> {
                 }
             }
         }
+        EnclosureConfig::Bandpass(b) => {
+            if b.rear_volume_m3 <= 0.0 { return Err("Rear volume must be positive".into()); }
+            if b.front_volume_m3 <= 0.0 { return Err("Front volume must be positive".into()); }
+            if b.port_area_m2 <= 0.0 { return Err("Port area must be positive".into()); }
+            if b.port_length_m <= 0.0 { return Err("Port length must be positive".into()); }
+        }
+        EnclosureConfig::PassiveRadiator(pr) => {
+            if pr.volume_m3 <= 0.0 { return Err("Box volume must be positive".into()); }
+            if pr.pr_sd_m2 <= 0.0 { return Err("PR area must be positive".into()); }
+            if pr.pr_mms_kg <= 0.0 { return Err("PR mass must be positive".into()); }
+            if pr.pr_cms <= 0.0 { return Err("PR compliance must be positive".into()); }
+        }
+        EnclosureConfig::OpenBaffle(ob) => {
+            if ob.width_m <= 0.0 { return Err("Baffle width must be positive".into()); }
+            if ob.height_m <= 0.0 { return Err("Baffle height must be positive".into()); }
+        }
     }
     Ok(())
 }
@@ -87,6 +109,15 @@ pub fn solve_simulation(input: &SimulationInput) -> Result<SimulationResult, Str
         }
         EnclosureConfig::Horn(enc) => {
             horn_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
+        }
+        EnclosureConfig::Bandpass(enc) => {
+            bandpass_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
+        }
+        EnclosureConfig::PassiveRadiator(enc) => {
+            passive_radiator_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
+        }
+        EnclosureConfig::OpenBaffle(enc) => {
+            open_baffle_frequency_response(&driver, enc, &freqs, input.drive_voltage_rms)
         }
     };
 

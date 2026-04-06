@@ -273,6 +273,61 @@ pub struct HornParams {
 fn default_ang() -> f64 { 2.0 * std::f64::consts::PI }
 fn default_horn_segments() -> u32 { 30 }
 
+/// 4th-order bandpass enclosure: sealed rear chamber + vented front chamber.
+/// The driver fires into a sealed rear volume; the front volume has a port.
+/// All acoustic output comes from the port — the driver is not directly visible.
+/// Reference: Fincham, L.R. "A Bandpass Filter Loudspeaker System" (AES, 1983)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BandpassParams {
+    /// Rear (sealed) chamber volume (m³)
+    pub rear_volume_m3: f64,
+    /// Front (vented) chamber volume (m³)
+    pub front_volume_m3: f64,
+    /// Front port cross-sectional area (m²)
+    pub port_area_m2: f64,
+    /// Front port physical length (m)
+    pub port_length_m: f64,
+    /// Port is flanged
+    pub port_flanged: bool,
+    /// Rear chamber Ql
+    pub rear_ql: f64,
+    /// Front chamber Ql
+    pub front_ql: f64,
+}
+
+/// Passive radiator enclosure: sealed box with a mass-loaded passive cone.
+/// The passive radiator replaces the port — tuned by adding mass.
+/// Reference: Small, R.H. "Passive-Radiator Loudspeaker Systems" (JAES, 1974)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PassiveRadiatorParams {
+    /// Box volume (m³)
+    pub volume_m3: f64,
+    /// Passive radiator effective area (m²)
+    pub pr_sd_m2: f64,
+    /// Passive radiator compliance (m/N) — from suspension
+    pub pr_cms: f64,
+    /// Passive radiator total moving mass (kg) — diaphragm + added mass
+    pub pr_mms_kg: f64,
+    /// Passive radiator mechanical resistance (N·s/m)
+    pub pr_rms: f64,
+    /// Box Ql
+    pub ql: f64,
+}
+
+/// Open baffle — no box. Driver radiates into free space front and back.
+/// Below the baffle step frequency, front and back radiation cancel (dipole null).
+/// Reference: Linkwitz, S. "Open Baffle Loudspeakers" (2007)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenBaffleParams {
+    /// Baffle width (m) — determines baffle step frequency
+    pub width_m: f64,
+    /// Baffle height (m)
+    pub height_m: f64,
+    /// Driver offset from center (m) — affects diffraction pattern
+    #[serde(default)]
+    pub driver_offset_m: f64,
+}
+
 /// Enclosure configuration — tagged union for all enclosure types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -281,6 +336,9 @@ pub enum EnclosureConfig {
     Vented(VentedBoxParams),
     TransmissionLine(TransmissionLineParams),
     Horn(HornParams),
+    Bandpass(BandpassParams),
+    PassiveRadiator(PassiveRadiatorParams),
+    OpenBaffle(OpenBaffleParams),
 }
 
 /// Complete simulation input — everything needed to run a sweep.

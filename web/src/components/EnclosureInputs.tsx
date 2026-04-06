@@ -39,6 +39,9 @@ const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
   Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7 },
   TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
   Horn: { type: 'Horn', segments: [{ area_start_m2: 132e-4, area_end_m2: 2000e-4, length_m: 0.60, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2 * Math.PI, num_tmm_segments: 30, stuffing_zones: [] },
+  Bandpass: { type: 'Bandpass', rear_volume_m3: 15e-3, front_volume_m3: 20e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
+  PassiveRadiator: { type: 'PassiveRadiator', volume_m3: 20e-3, pr_sd_m2: 200e-4, pr_cms: 1.0e-3, pr_mms_kg: 0.050, pr_rms: 1.0, ql: 7 },
+  OpenBaffle: { type: 'OpenBaffle', width_m: 0.40, height_m: 0.60, driver_offset_m: 0.0 },
 };
 
 
@@ -80,14 +83,18 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
     <div className="section-card">
       <div className="section-title">Enclosure</div>
       <div className="btn-row" style={{ marginBottom: 8 }}>
-        {(['Sealed', 'Vented', 'TransmissionLine', 'Horn'] as EnclosureType[]).map((t) => (
-          <button key={t}
-            className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
-            onClick={() => switchType(t)}
-          >
-            {t === 'TransmissionLine' ? 'T-Line' : t}
-          </button>
-        ))}
+        {(['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'] as EnclosureType[]).map((t) => {
+          const labels: Record<string, string> = {
+            TransmissionLine: 'T-Line', PassiveRadiator: 'PR', OpenBaffle: 'OB',
+            Bandpass: 'BP', Sealed: 'Sealed', Vented: 'Vented', Horn: 'Horn',
+          };
+          return (
+            <button key={t}
+              className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+              onClick={() => switchType(t)}
+            >{labels[t]}</button>
+          );
+        })}
       </div>
 
       {config.type === 'Sealed' && (
@@ -259,6 +266,66 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
               </div>
             </>
           )}
+        </>
+      )}
+
+      {config.type === 'Bandpass' && (
+        <>
+          <NumericInput label="Rear vol." value={config.rear_volume_m3 * 1000} step={0.5} min={0.1} unit="L"
+            tooltip="Sealed rear chamber volume — determines high-pass rolloff of the bandpass."
+            onChange={(v) => onChange({ ...config, rear_volume_m3: v / 1000 })} />
+          <NumericInput label="Front vol." value={config.front_volume_m3 * 1000} step={0.5} min={0.1} unit="L"
+            tooltip="Vented front chamber volume — the port radiates from this chamber."
+            onChange={(v) => onChange({ ...config, front_volume_m3: v / 1000 })} />
+          <NumericInput label="Port area" value={config.port_area_m2 * 1e4} step={1} min={1} unit="cm²"
+            tooltip="Front port cross-sectional area."
+            onChange={(v) => onChange({ ...config, port_area_m2: v / 1e4 })} />
+          <NumericInput label="Port len." value={config.port_length_m * 100} step={1} min={1} unit="cm"
+            tooltip="Front port physical length."
+            onChange={(v) => onChange({ ...config, port_length_m: v / 100 })} />
+          <NumericInput label="Rear Ql" value={config.rear_ql} step={0.5} min={1}
+            tooltip="Rear chamber loss Q."
+            onChange={(v) => onChange({ ...config, rear_ql: v })} />
+          <NumericInput label="Front Ql" value={config.front_ql} step={0.5} min={1}
+            tooltip="Front chamber loss Q."
+            onChange={(v) => onChange({ ...config, front_ql: v })} />
+        </>
+      )}
+
+      {config.type === 'PassiveRadiator' && (
+        <>
+          <NumericInput label="Volume" value={config.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
+            tooltip="Box volume — sealed enclosure containing both the driver and the passive radiator."
+            onChange={(v) => onChange({ ...config, volume_m3: v / 1000 })} />
+          <NumericInput label="PR Sd" value={config.pr_sd_m2 * 1e4} step={1} min={1} unit="cm²"
+            tooltip="Passive radiator effective cone area. Often larger than the driver Sd."
+            onChange={(v) => onChange({ ...config, pr_sd_m2: v / 1e4 })} />
+          <NumericInput label="PR Cms" value={config.pr_cms * 1e3} step={0.1} min={0.01} unit="mm/N"
+            tooltip="Passive radiator compliance — determines tuning. Lower = higher tuning frequency."
+            onChange={(v) => onChange({ ...config, pr_cms: v / 1e3 })} />
+          <NumericInput label="PR Mms" value={config.pr_mms_kg * 1000} step={1} min={1} unit="g"
+            tooltip="Passive radiator total moving mass (diaphragm + added mass). Increase to lower tuning."
+            onChange={(v) => onChange({ ...config, pr_mms_kg: v / 1000 })} />
+          <NumericInput label="PR Rms" value={config.pr_rms} step={0.1} min={0} unit="N·s/m"
+            tooltip="Passive radiator mechanical damping."
+            onChange={(v) => onChange({ ...config, pr_rms: v })} />
+          <NumericInput label="Ql" value={config.ql} step={0.5} min={1}
+            tooltip="Box loss Q."
+            onChange={(v) => onChange({ ...config, ql: v })} />
+        </>
+      )}
+
+      {config.type === 'OpenBaffle' && (
+        <>
+          <NumericInput label="Width" value={config.width_m * 100} step={5} min={10} unit="cm"
+            tooltip="Baffle width — determines baffle step frequency: f_step ≈ 343/(π×w). Wider baffle = lower step."
+            onChange={(v) => onChange({ ...config, width_m: v / 100 })} />
+          <NumericInput label="Height" value={config.height_m * 100} step={5} min={10} unit="cm"
+            tooltip="Baffle height — affects diffraction path length."
+            onChange={(v) => onChange({ ...config, height_m: v / 100 })} />
+          <NumericInput label="Offset" value={config.driver_offset_m * 100} step={1} min={0} unit="cm"
+            tooltip="Driver horizontal offset from baffle center — asymmetry smooths diffraction ripple."
+            onChange={(v) => onChange({ ...config, driver_offset_m: v / 100 })} />
         </>
       )}
 

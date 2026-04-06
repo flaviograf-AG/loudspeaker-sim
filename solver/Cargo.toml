@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "loudspeaker-solver"
+path = "src/main.rs"
+
 [dependencies]
 nalgebra = "0.33"
 num-complex = "0.4"

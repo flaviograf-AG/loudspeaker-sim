@@ -20,7 +20,7 @@ export function PresetSelector({ onSelect }: Props) {
   }, [search]);
 
   return (
-    <div className="section-card" style={{ position: 'relative' }}>
+    <div className="section-card" style={{ position: 'relative', overflow: 'visible' }}>
       <div className="section-title">Driver Database</div>
 
       {/* Search input */}
@@ -39,7 +39,7 @@ export function PresetSelector({ onSelect }: Props) {
       {/* Search results dropdown */}
       {showList && filtered.length > 0 && (
         <div style={{
-          position: 'absolute', zIndex: 10, left: 8, right: 8,
+          position: 'absolute', zIndex: 100, left: 0, right: 0,
           maxHeight: 200, overflowY: 'auto',
           background: 'var(--graf-surface, #fff)',
           border: '1px solid var(--graf-border, #e8e4dc)',

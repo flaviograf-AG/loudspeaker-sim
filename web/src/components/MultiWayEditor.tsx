@@ -145,7 +145,20 @@ export function MultiWayEditor({ ways, onChange }: Props) {
           onChange={(v) => updateWay(activeWay, { z_offset_m: v / 100 })} />
       </div>
 
-      {/* Active filters */}
+      {/* 1. Driver selection (the starting point of any design) */}
+      <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+      <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+
+      {/* 2. Enclosure for this way */}
+      <EnclosureInputs
+        config={way.enclosure}
+        driverVas={way.driver.vas_m3}
+        driverFs={way.driver.fs_hz}
+        driverQts={qts}
+        onChange={(enc: EnclosureConfig) => updateWay(activeWay, { enclosure: enc })}
+      />
+
+      {/* 3. Active filters */}
       <div className="section-card">
         <div className="section-title">Active Filters</div>
         {way.active_filters.map((f, i) => (
@@ -392,17 +405,6 @@ export function MultiWayEditor({ ways, onChange }: Props) {
       {way.passive_filters.length > 0 && (
         <CrossoverSchematic filters={way.passive_filters} driverRe={way.driver.re_ohm} />
       )}
-
-      {/* Driver + Enclosure for this way */}
-      <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
-      <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
-      <EnclosureInputs
-        config={way.enclosure}
-        driverVas={way.driver.vas_m3}
-        driverFs={way.driver.fs_hz}
-        driverQts={qts}
-        onChange={(enc: EnclosureConfig) => updateWay(activeWay, { enclosure: enc })}
-      />
     </>
   );
 }

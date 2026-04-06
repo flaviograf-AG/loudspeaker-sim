@@ -161,3 +161,35 @@ impl SystemInputJson {
         }
     }
 }
+
+/// JSON-serializable optimizer parameter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum OptParamJson {
+    FilterFreq { way_idx: usize, filter_idx: usize },
+    WayGain { way_idx: usize },
+    WayDelay { way_idx: usize },
+}
+
+/// JSON-serializable optimizer input.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizerInputJson {
+    pub system: SystemInputJson,
+    pub params: Vec<OptParamJson>,
+    pub target_db: f64,
+    pub freq_min_hz: f64,
+    pub freq_max_hz: f64,
+    #[serde(default = "default_max_iter")]
+    pub max_iterations: usize,
+}
+
+fn default_max_iter() -> usize { 100 }
+
+/// JSON-serializable optimizer result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizerResultJson {
+    pub optimized_system: SystemInputJson,
+    pub final_cost: f64,
+    pub iterations: usize,
+    pub cost_history: Vec<f64>,
+}

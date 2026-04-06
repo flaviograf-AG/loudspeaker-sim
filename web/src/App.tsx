@@ -13,6 +13,7 @@ import { ExportControls } from './components/ExportControls';
 import { NumericInput } from './components/NumericInput';
 import { ImportOverlay, type OverlayData } from './components/ImportOverlay';
 import { BiquadExport } from './components/BiquadExport';
+import { OptimizerPanel } from './components/OptimizerPanel';
 import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput } from './types';
 
 const DEFAULT_INPUT: SimulationInput = {
@@ -161,6 +162,7 @@ function App() {
                 tooltip="Frequency points."
                 onChange={(v) => setSysParams(p => ({ ...p, freq_points: Math.round(v) }))} />
             </div>
+            <OptimizerPanel ways={ways} sysParams={sysParams} onApply={setWays} />
             <div className="section-card">
               <div className="section-title">Export</div>
               <div className="btn-row">

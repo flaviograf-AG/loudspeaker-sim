@@ -174,3 +174,84 @@ pub fn simulate_system(input_json: &str) -> Result<String, JsValue> {
     serde_json::to_string(&output)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
+
+/// WASM entry point for crossover optimization.
+#[wasm_bindgen]
+pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
+    let input: system_api::OptimizerInputJson = serde_json::from_str(input_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid optimizer input: {}", e)))?;
+
+    let project = input.system.to_project();
+    let opt_params: Vec<optimizer::OptParam> = input.params.iter().map(|p| match p {
+        system_api::OptParamJson::FilterFreq { way_idx, filter_idx } =>
+            optimizer::OptParam::FilterFreq { way_idx: *way_idx, filter_idx: *filter_idx },
+        system_api::OptParamJson::WayGain { way_idx } =>
+            optimizer::OptParam::WayGain { way_idx: *way_idx },
+        system_api::OptParamJson::WayDelay { way_idx } =>
+            optimizer::OptParam::WayDelay { way_idx: *way_idx },
+    }).collect();
+
+    let config = optimizer::OptimizerConfig {
+        params: opt_params.clone(),
+        target_db: input.target_db,
+        freq_min_hz: input.freq_min_hz,
+        freq_max_hz: input.freq_max_hz,
+        max_iterations: input.max_iterations,
+        tolerance: 0.01,
+    };
+
+    let result = optimizer::optimize(&project, &config);
+
+    // Apply optimized values back to the input system for return
+    let mut opt_project = project.clone();
+    optimizer::apply_values_pub(&mut opt_project, &opt_params, &result.values);
+
+    // Convert back to JSON
+    let opt_system = system_api::SystemInputJson {
+        ways: opt_project.ways.iter().zip(input.system.ways.iter()).map(|(w, orig)| {
+            let mut wj = orig.clone();
+            // Update filter frequencies and gains from optimized values
+            for (i, af) in w.active_filters.iter().enumerate() {
+                if i < wj.active_filters.len() {
+                    // Re-serialize the optimized filter
+                    wj.active_filters[i] = active_filter_to_json(af);
+                }
+            }
+            wj.gain_db = w.gain_db;
+            wj.delay_s = w.delay_s;
+            wj
+        }).collect(),
+        ..input.system
+    };
+
+    let output = system_api::OptimizerResultJson {
+        optimized_system: opt_system,
+        final_cost: result.final_cost,
+        iterations: result.iterations,
+        cost_history: result.cost_history,
+    };
+
+    serde_json::to_string(&output)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+fn active_filter_to_json(af: &crossover::ActiveFilter) -> system_api::ActiveFilterJson {
+    match af {
+        crossover::ActiveFilter::LowPass1 { freq_hz } => system_api::ActiveFilterJson::LowPass1 { freq_hz: *freq_hz },
+        crossover::ActiveFilter::HighPass1 { freq_hz } => system_api::ActiveFilterJson::HighPass1 { freq_hz: *freq_hz },
+        crossover::ActiveFilter::LowPass2 { freq_hz, q } => system_api::ActiveFilterJson::LowPass2 { freq_hz: *freq_hz, q: *q },
+        crossover::ActiveFilter::HighPass2 { freq_hz, q } => system_api::ActiveFilterJson::HighPass2 { freq_hz: *freq_hz, q: *q },
+        crossover::ActiveFilter::LR4LowPass { freq_hz } => system_api::ActiveFilterJson::LR4LowPass { freq_hz: *freq_hz },
+        crossover::ActiveFilter::LR4HighPass { freq_hz } => system_api::ActiveFilterJson::LR4HighPass { freq_hz: *freq_hz },
+        crossover::ActiveFilter::LR2LowPass { freq_hz } => system_api::ActiveFilterJson::LR2LowPass { freq_hz: *freq_hz },
+        crossover::ActiveFilter::LR2HighPass { freq_hz } => system_api::ActiveFilterJson::LR2HighPass { freq_hz: *freq_hz },
+        crossover::ActiveFilter::PEQ { freq_hz, q, gain_db } => system_api::ActiveFilterJson::PEQ { freq_hz: *freq_hz, q: *q, gain_db: *gain_db },
+        crossover::ActiveFilter::AllPass1 { freq_hz } => system_api::ActiveFilterJson::AllPass1 { freq_hz: *freq_hz },
+        crossover::ActiveFilter::AllPass2 { freq_hz, q } => system_api::ActiveFilterJson::AllPass2 { freq_hz: *freq_hz, q: *q },
+        crossover::ActiveFilter::ShelfLow { freq_hz, gain_db } => system_api::ActiveFilterJson::ShelfLow { freq_hz: *freq_hz, gain_db: *gain_db },
+        crossover::ActiveFilter::ShelfHigh { freq_hz, gain_db } => system_api::ActiveFilterJson::ShelfHigh { freq_hz: *freq_hz, gain_db: *gain_db },
+        crossover::ActiveFilter::LinkwitzTransform { fo, qo, fp, qp } => system_api::ActiveFilterJson::LinkwitzTransform { fo: *fo, qo: *qo, fp: *fp, qp: *qp },
+        crossover::ActiveFilter::Gain { db } => system_api::ActiveFilterJson::Gain { db: *db },
+        crossover::ActiveFilter::Invert => system_api::ActiveFilterJson::Invert,
+    }
+}

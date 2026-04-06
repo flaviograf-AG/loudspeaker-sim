@@ -81,6 +81,11 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
     }).collect()
 }
 
+/// Apply parameter values back into the project (public for WASM API).
+pub fn apply_values_pub(project: &mut SpeakerProject, params: &[OptParam], values: &[f64]) {
+    apply_values(project, params, values);
+}
+
 /// Apply parameter values back into the project.
 fn apply_values(project: &mut SpeakerProject, params: &[OptParam], values: &[f64]) {
     for (p, &v) in params.iter().zip(values.iter()) {

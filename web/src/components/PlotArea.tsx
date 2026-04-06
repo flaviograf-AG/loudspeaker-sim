@@ -100,6 +100,16 @@ export function PlotArea({ result, xmaxMm }: PlotAreaProps) {
         yLabel="ms"
         group={CHART_GROUP}
       />
+
+      {result.acoustic_phase_deg && (
+        <FrequencyPlot
+          title="Acoustic Phase (degrees)"
+          frequencies={result.frequencies_hz}
+          series={[{ label: 'Phase', data: result.acoustic_phase_deg, color: '#7f8c8d' }]}
+          yLabel="deg"
+          group={CHART_GROUP}
+        />
+      )}
     </div>
   );
 }

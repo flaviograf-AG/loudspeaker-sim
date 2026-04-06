@@ -37,6 +37,10 @@ const FILTER_PRESETS: { label: string; filter: ActiveFilter }[] = [
   { label: 'HP1 1kHz', filter: { type: 'HighPass1', freq_hz: 1000 } },
   { label: 'PEQ +3dB @1kHz', filter: { type: 'PEQ', freq_hz: 1000, q: 2, gain_db: 3 } },
   { label: 'PEQ -3dB @1kHz', filter: { type: 'PEQ', freq_hz: 1000, q: 2, gain_db: -3 } },
+  { label: 'LR2 LP 2kHz', filter: { type: 'LR2LowPass', freq_hz: 2000 } },
+  { label: 'LR2 HP 2kHz', filter: { type: 'LR2HighPass', freq_hz: 2000 } },
+  { label: 'Low shelf +3dB 200Hz', filter: { type: 'ShelfLow', freq_hz: 200, gain_db: 3 } },
+  { label: 'High shelf -3dB 5kHz', filter: { type: 'ShelfHigh', freq_hz: 5000, gain_db: -3 } },
   { label: 'All-pass 2kHz', filter: { type: 'AllPass1', freq_hz: 2000 } },
   { label: 'Invert polarity', filter: { type: 'Invert' } },
 ];
@@ -52,6 +56,11 @@ function filterLabel(f: ActiveFilter): string {
     case 'PEQ': return `PEQ ${f.freq_hz}Hz ${f.gain_db>0?'+':''}${f.gain_db}dB`;
     case 'AllPass1': return `AP1 ${f.freq_hz}Hz`;
     case 'AllPass2': return `AP2 ${f.freq_hz}Hz`;
+    case 'LR2LowPass': return `LR2 LP ${f.freq_hz}Hz`;
+    case 'LR2HighPass': return `LR2 HP ${f.freq_hz}Hz`;
+    case 'ShelfLow': return `Lo shelf ${f.gain_db>0?'+':''}${f.gain_db}dB ${f.freq_hz}Hz`;
+    case 'ShelfHigh': return `Hi shelf ${f.gain_db>0?'+':''}${f.gain_db}dB ${f.freq_hz}Hz`;
+    case 'LinkwitzTransform': return `LT ${f.fo}→${f.fp}Hz`;
     case 'Gain': return `${f.db>0?'+':''}${f.db}dB`;
     case 'Invert': return 'Invert';
   }

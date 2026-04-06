@@ -99,6 +99,26 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
 
       {config.type === 'Sealed' && (
         <>
+          {driverQts && driverFs && driverVas && (
+            <div className="param-row" title="Auto-calculate box volume for a standard alignment target">
+              <span className="param-label">Alignment</span>
+              <select className="graf-form-control" style={{ width: 140 }} value=""
+                onChange={(e) => {
+                  const qtcTarget = parseFloat(e.target.value);
+                  if (isNaN(qtcTarget) || !driverQts || !driverVas) return;
+                  const alpha = (qtcTarget / driverQts) ** 2 - 1;
+                  if (alpha > 0) {
+                    onChange({ ...config, volume_m3: driverVas / alpha });
+                  }
+                  e.target.value = '';
+                }}>
+                <option value="" disabled>Set Qtc target...</option>
+                <option value="0.577">Bessel (Qtc=0.577)</option>
+                <option value="0.707">Butterworth (Qtc=0.707)</option>
+                <option value="0.957">Cheby 1dB (Qtc=0.957)</option>
+              </select>
+            </div>
+          )}
           <NumericInput label="Volume" value={config.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
             tooltip="Internal box volume — determines system resonance and Q. Smaller box = higher Fc, higher Qtc."
             onChange={(v) => onChange({ ...config, volume_m3: v / 1000 })} />
@@ -110,6 +130,33 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
 
       {config.type === 'Vented' && (
         <>
+          {driverQts && driverFs && driverVas && (
+            <div className="param-row" title="Auto-calculate box volume and port tuning for a standard vented alignment">
+              <span className="param-label">Alignment</span>
+              <select className="graf-form-control" style={{ width: 140 }} value=""
+                onChange={(e) => {
+                  const preset = e.target.value;
+                  if (!driverFs || !driverVas || !driverQts) return;
+                  let vb = 0, fb = 0;
+                  if (preset === 'B4') { vb = driverVas; fb = driverFs; }
+                  else if (preset === 'QB3') { vb = 15 * driverVas * driverQts ** 2.87; fb = 0.26 * driverFs * driverQts ** -1.4; }
+                  else if (preset === 'SC4') { vb = 2.0 * driverVas; fb = 0.9 * driverFs; }
+                  else if (preset === 'EBS') { vb = 3.0 * driverVas; fb = 0.42 * driverFs; }
+                  if (vb > 0 && fb > 0) {
+                    const newLength = portLengthForFb(fb, vb, config.port_area_m2, config.num_ports, config.port_flanged);
+                    onChange({ ...config, volume_m3: vb, port_length_m: newLength });
+                    setTargetFb(Math.round(fb));
+                  }
+                  e.target.value = '';
+                }}>
+                <option value="" disabled>Set alignment...</option>
+                <option value="B4">B4 Butterworth (Vb≈Vas, Fb≈Fs)</option>
+                <option value="QB3">QB3 Quasi-Butterworth</option>
+                <option value="SC4">SC4 Sub-Chebyshev</option>
+                <option value="EBS">EBS Extended Bass</option>
+              </select>
+            </div>
+          )}
           <NumericInput label="Volume" value={config.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
             tooltip="Internal box volume — affects port tuning and system alignment."
             onChange={(v) => onChange({ ...config, volume_m3: v / 1000 })} />

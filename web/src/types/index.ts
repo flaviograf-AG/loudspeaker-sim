@@ -137,6 +137,7 @@ export interface SimulationResult {
   impedance_phase_deg: number[];
   cone_displacement_mm: number[];
   group_delay_ms: number[];
+  acoustic_phase_deg: number[];
   port_velocity_ms: number[] | null;
 }
 
@@ -166,6 +167,11 @@ export type ActiveFilter =
   | { type: 'PEQ'; freq_hz: number; q: number; gain_db: number }
   | { type: 'AllPass1'; freq_hz: number }
   | { type: 'AllPass2'; freq_hz: number; q: number }
+  | { type: 'LR2LowPass'; freq_hz: number }
+  | { type: 'LR2HighPass'; freq_hz: number }
+  | { type: 'ShelfLow'; freq_hz: number; gain_db: number }
+  | { type: 'ShelfHigh'; freq_hz: number; gain_db: number }
+  | { type: 'LinkwitzTransform'; fo: number; qo: number; fp: number; qp: number }
   | { type: 'Gain'; db: number }
   | { type: 'Invert' };
 

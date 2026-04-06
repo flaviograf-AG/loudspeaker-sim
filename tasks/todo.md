@@ -24,8 +24,27 @@
 - [ ] **ECharts cross-chart linking** — `echarts.connect('freq-group')` so hovering on SPL shows crosshair on impedance/displacement simultaneously. This is THE reason we chose ECharts.
 - [ ] **Port length calculator** — for vented: given target Fb, auto-calculate port length using `port_resonance_hz()` inverse
 
-## Priority 3: Solver enhancements
+## Priority 3: Transmission line model expansion
 
+The current TL model is minimal (uniform stuffing, driver at closed end, linear taper). Real TL design has 10+ continuous parameters that interact nonlinearly — this is where AI optimization will have the most impact.
+
+### 3a. Extended TL parameters (solver)
+- [ ] **Driver position** — offset from closed end as % of line length (0% = at wall, 33% = classic 1/3 offset). Changes which standing wave harmonics the driver excites.
+- [ ] **Dead-end section** — closed stub behind the driver. Ratio of total line length (0–50%). Creates bandpass behavior, shifts tuning.
+- [ ] **Stuffing zones** — replace single uniform density with N zones, each with:
+  - `start_pct`, `end_pct` (% of line length)
+  - `density_kg_m3`, `flow_resistivity_pa_s_m2`
+  - Typical: heavy near driver (10–20 kg/m³), medium in middle (5–10), light/empty near mouth (0–5)
+- [ ] **Taper profiles** — beyond linear: exponential, conical, hyperbolic. Each has different impedance matching and low-frequency cutoff. Implement as `taper_type` enum with per-type parameters.
+- [ ] **Mouth termination types** — flush (current), slot (narrow rectangular), flared (horn-like end correction). Affects radiation impedance and effective length.
+- [ ] **Fold/bend losses** — folded line geometry adds acoustic mass at each bend. Input as number of folds; each adds a small impedance discontinuity.
+
+### 3b. Extended TL parameters (UI)
+- [ ] **Stuffing zone editor** — visual representation of the line showing driver position, zones, and density per zone. Drag to adjust zone boundaries.
+- [ ] **Taper visualization** — show cross-section profile alongside the FR plot
+- [ ] **Dead-end ratio slider** — with real-time plot update
+
+### 3c. Other solver enhancements
 - [ ] **Passive radiator model** — common alternative to ported box, similar math to vented but with a second driver instead of port
 - [ ] **Bandpass enclosures** — 4th and 6th order bandpass (two-chamber designs)
 - [ ] **Room gain simulation** — simple half-space to room boundary model
@@ -74,6 +93,7 @@
 - [ ] **MCP tool: `evaluate_flatness`** — given a SimulationResult and target band (e.g., 40Hz–20kHz), returns: max deviation from mean, ±dB ripple, -3dB and -6dB corner frequencies, impedance minimum. This is what Claude uses to judge "how good" a design is.
 - [ ] **MCP tool: `suggest_enclosure`** — given driver T/S params and target alignment (e.g., Butterworth B2, Bessel), compute optimal sealed Vb or vented Vb+Fb using classical alignment tables (Small, Thiele).
 - [ ] **MCP tool: `sweep_parameter`** — vary one parameter (e.g., box volume 10L–50L in 20 steps) and return all results. Claude can then pick the best.
+- [ ] **MCP tool: `sweep_multivariate`** — vary multiple parameters simultaneously (grid search or Latin hypercube sampling). Essential for TL optimization where parameters interact nonlinearly.
 
 ### 5c. Optimization loop (Claude-driven)
 - [ ] **Optimization prompt template** — structured prompt that tells Claude how to use the tools:
@@ -85,6 +105,43 @@
   6. Report final design with rationale for each choice
 - [ ] **Constraint specification** — user defines: target band, max ripple (±dB), min impedance, max Xmax at rated power, max box volume, max port velocity
 - [ ] **Multi-objective scoring** — weighted score combining flatness, extension, impedance safety, displacement headroom
+
+### 5d. TL-specific optimization variables
+All of these should be exposable as optimization targets in the MCP tools:
+- Line length (m)
+- Driver position (% of line)
+- Dead-end ratio (% of line behind driver)
+- Taper profile (straight/exponential/conical) + expansion ratio
+- Mouth-to-driver area ratio
+- Per-zone stuffing density (N zones × density + flow resistivity)
+- Number of zones and zone boundaries
+
+**Example TL optimization call:**
+```json
+{
+  "driver": { "fs_hz": 40, "qes": 0.38, ... },
+  "optimize": {
+    "target_band_hz": [35, 500],
+    "max_ripple_db": 2.0,
+    "variables": {
+      "line_length_m": { "min": 1.5, "max": 3.5 },
+      "driver_position_pct": { "min": 0, "max": 40 },
+      "dead_end_pct": { "min": 0, "max": 30 },
+      "taper_ratio": { "min": 0.5, "max": 3.0 },
+      "stuffing_zones": [
+        { "density_range": [5, 20], "flow_res_range": [3000, 15000] },
+        { "density_range": [0, 10], "flow_res_range": [0, 8000] },
+        { "density_range": [0, 5], "flow_res_range": [0, 5000] }
+      ]
+    },
+    "constraints": {
+      "max_line_length_m": 3.0,
+      "min_impedance_ohm": 5.0,
+      "max_displacement_mm": 5.0
+    }
+  }
+}
+```
 
 ### 5d. Integration with UI
 - [ ] **"Optimize with AI" button** in the web UI — sends current design to Claude via API, streams back parameter adjustments in real-time, plots update live as Claude iterates

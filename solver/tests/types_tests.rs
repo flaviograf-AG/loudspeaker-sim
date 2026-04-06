@@ -84,6 +84,7 @@ fn transmission_line_params_fields() {
         stuffing_density_kg_m3: 0.5,
         flow_resistivity_pa_s_m2: 5000.0,
         open_end: true,
+        ..Default::default()
     };
     assert_eq!(t.num_segments, 20);
     assert!(t.open_end);

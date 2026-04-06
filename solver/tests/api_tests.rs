@@ -90,6 +90,7 @@ fn tl_simulation_end_to_end() {
             stuffing_density_kg_m3: 10.0,
             flow_resistivity_pa_s_m2: 5000.0,
             open_end: true,
+            ..Default::default()
         }),
         freq_start_hz: 20.0,
         freq_end_hz: 20000.0,

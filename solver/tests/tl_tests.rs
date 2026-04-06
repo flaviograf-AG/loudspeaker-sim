@@ -25,6 +25,7 @@ fn quarter_wave_tl() -> TransmissionLineParams {
         stuffing_density_kg_m3: 0.0,
         flow_resistivity_pa_s_m2: 0.0,
         open_end: true,
+        ..Default::default()
     }
 }
 

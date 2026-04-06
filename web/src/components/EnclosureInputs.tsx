@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EnclosureConfig, EnclosureType } from '../types';
+import type { EnclosureConfig, EnclosureType, TaperProfile } from '../types';
 import { NumericInput } from './NumericInput';
 
 const C0 = 343.21; // speed of sound (m/s)
@@ -36,7 +36,7 @@ interface Props {
 const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
   Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7 },
-  TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true },
+  TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
 };
 
 export function EnclosureInputs({ config, onChange }: Props) {
@@ -120,6 +120,27 @@ export function EnclosureInputs({ config, onChange }: Props) {
             onChange={(v) => onChange({ ...config, area_driver_m2: v / 1e4 })} />
           <NumericInput label="Mouth area" value={config.area_mouth_m2 * 1e4} step={1} min={1} unit="cm²"
             onChange={(v) => onChange({ ...config, area_mouth_m2: v / 1e4 })} />
+
+          <NumericInput label="Driver pos." value={config.driver_position * 100} step={1} min={0} max={49} unit="%"
+            onChange={(v) => onChange({ ...config, driver_position: v / 100 })} />
+
+          <div className="param-row">
+            <span className="param-label">Taper</span>
+            <select
+              className="graf-form-control"
+              style={{ width: 120 }}
+              value={config.taper_profile.type}
+              onChange={(e) => onChange({ ...config, taper_profile: { type: e.target.value as TaperProfile['type'] } })}
+            >
+              <option value="Straight">Straight</option>
+              <option value="Exponential">Exponential</option>
+              <option value="Conical">Conical</option>
+            </select>
+          </div>
+
+          <NumericInput label="Folds" value={config.num_folds} step={1} min={0} max={8}
+            onChange={(v) => onChange({ ...config, num_folds: Math.round(v) })} />
+
           <NumericInput label="Segments" value={config.num_segments} step={1} min={5} max={50}
             onChange={(v) => onChange({ ...config, num_segments: Math.round(v) })} />
           <NumericInput label="Stuffing" value={config.stuffing_density_kg_m3} step={1} min={0} unit="kg/m³"

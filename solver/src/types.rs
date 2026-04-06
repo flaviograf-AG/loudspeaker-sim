@@ -68,8 +68,58 @@ pub struct VentedBoxParams {
     pub ql: f64,
 }
 
-/// Transmission line enclosure parameters.
+/// Taper profile for transmission line cross-section variation.
+/// Reference: King, M.J. "Quarter Wavelength Loudspeaker Design" (2005-2020)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum TaperProfile {
+    /// Linear taper in radius (area varies quadratically). Default.
+    Straight,
+    /// Exponential taper: S(x) = S_driver × e^(m×x), m = ln(S_mouth/S_driver)/L
+    Exponential,
+    /// Conical taper: linear in area, S(x) = S_driver + (S_mouth-S_driver)×x/L
+    Conical,
+}
+
+impl Default for TaperProfile {
+    fn default() -> Self {
+        TaperProfile::Straight
+    }
+}
+
+/// A stuffing zone within the transmission line.
+/// Multiple zones allow heavy stuffing near the driver and light near the mouth.
+/// Reference: Bradbury, L.J.S. "The Use of Fibrous Materials in Loudspeaker Enclosures" (JAES, 1976)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StuffingZone {
+    /// Start position as fraction of line length (0.0 = driver end)
+    pub start_pct: f64,
+    /// End position as fraction of line length (1.0 = mouth)
+    pub end_pct: f64,
+    /// Stuffing density (kg/m³)
+    pub density_kg_m3: f64,
+    /// Specific flow resistivity (Pa·s/m²)
+    pub flow_resistivity_pa_s_m2: f64,
+}
+
+/// Mouth termination type affecting radiation impedance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum MouthTermination {
+    /// Standard flush opening — simple piston radiation impedance.
+    Flush,
+    /// Flared mouth with larger effective radiating area.
+    Flared { flare_radius_m: f64 },
+}
+
+impl Default for MouthTermination {
+    fn default() -> Self {
+        MouthTermination::Flush
+    }
+}
+
+/// Transmission line enclosure parameters.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TransmissionLineParams {
     /// Line physical length (m)
     pub length_m: f64,
@@ -79,7 +129,7 @@ pub struct TransmissionLineParams {
     pub area_mouth_m2: f64,
     /// Number of segments for TMM discretization (default 20)
     pub num_segments: u32,
-    /// Stuffing density (kg/m³) — 0 = no stuffing
+    /// Stuffing density (kg/m³) — 0 = no stuffing. Used when stuffing_zones is empty.
     pub stuffing_density_kg_m3: f64,
     /// Specific flow resistivity of stuffing material (Pa·s/m²)
     /// Typical polyester fill: ~3500–8000; fiberglass: ~10000–40000
@@ -87,6 +137,25 @@ pub struct TransmissionLineParams {
     pub flow_resistivity_pa_s_m2: f64,
     /// Open end (true = quarter-wave TL) or closed end
     pub open_end: bool,
+    /// Driver offset from closed end as fraction of line length (0.0 = at wall, default)
+    /// Placing driver at 1/3 suppresses 3rd harmonic standing wave.
+    /// Reference: King (2005-2020)
+    #[serde(default)]
+    pub driver_position: f64,
+    /// Taper profile for cross-section variation along the line
+    #[serde(default)]
+    pub taper_profile: TaperProfile,
+    /// Per-zone stuffing configuration. When non-empty, overrides the global
+    /// stuffing_density_kg_m3 and flow_resistivity_pa_s_m2 fields.
+    #[serde(default)]
+    pub stuffing_zones: Vec<StuffingZone>,
+    /// Mouth termination type
+    #[serde(default)]
+    pub mouth_termination: MouthTermination,
+    /// Number of folds in the line. Each fold adds acoustic mass.
+    /// Reference: practical TL construction constraint.
+    #[serde(default)]
+    pub num_folds: u32,
 }
 
 /// Enclosure configuration — tagged union for all enclosure types.

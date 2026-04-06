@@ -23,6 +23,22 @@ export interface VentedBoxParams {
   ql: number;
 }
 
+export type TaperProfile =
+  | { type: 'Straight' }
+  | { type: 'Exponential' }
+  | { type: 'Conical' };
+
+export interface StuffingZone {
+  start_pct: number;
+  end_pct: number;
+  density_kg_m3: number;
+  flow_resistivity_pa_s_m2: number;
+}
+
+export type MouthTermination =
+  | { type: 'Flush' }
+  | { type: 'Flared'; flare_radius_m: number };
+
 export interface TransmissionLineParams {
   length_m: number;
   area_driver_m2: number;
@@ -31,13 +47,18 @@ export interface TransmissionLineParams {
   stuffing_density_kg_m3: number;
   flow_resistivity_pa_s_m2: number;
   open_end: boolean;
+  driver_position: number;
+  taper_profile: TaperProfile;
+  stuffing_zones: StuffingZone[];
+  mouth_termination: MouthTermination;
+  num_folds: number;
 }
 
 // Matches Rust #[serde(tag = "type")] enum
 export type EnclosureConfig =
   | { type: 'Sealed'; volume_m3: number; ql: number }
   | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; num_ports: number; port_flanged: boolean; ql: number }
-  | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean };
+  | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean; driver_position: number; taper_profile: TaperProfile; stuffing_zones: StuffingZone[]; mouth_termination: MouthTermination; num_folds: number };
 
 export interface SimulationInput {
   driver: DriverParams;

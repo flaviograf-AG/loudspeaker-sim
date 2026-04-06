@@ -1,4 +1,5 @@
 import type { SimulationResult } from '../types';
+import type { OverlayData } from './ImportOverlay';
 import { FrequencyPlot } from './FrequencyPlot';
 
 // GDS chart palette
@@ -10,6 +11,8 @@ const CHART_COLORS = {
   xmaxLimit: '#e74c3c',   // red dashed for Xmax
   port: '#8e44ad',         // purple
   groupDelay: '#d4a017',   // graf-warning gold
+  overlayFrd: '#2c3e50',   // dark blue-gray for imported FRD
+  overlayZma: '#8e44ad',   // purple for imported ZMA
 };
 
 const CHART_GROUP = 'freq-response';
@@ -17,9 +20,26 @@ const CHART_GROUP = 'freq-response';
 interface PlotAreaProps {
   result: SimulationResult | null;
   xmaxMm?: number;
+  overlay?: OverlayData;
 }
 
-export function PlotArea({ result, xmaxMm }: PlotAreaProps) {
+// Linear interpolation of overlay data onto the simulation frequency grid
+function interpolateOverlay(overlayFreqs: number[], overlayValues: number[], simFreqs: number[]): number[] {
+  return simFreqs.map(f => {
+    if (f <= overlayFreqs[0]) return overlayValues[0];
+    if (f >= overlayFreqs[overlayFreqs.length - 1]) return overlayValues[overlayValues.length - 1];
+    // Binary search for bracket
+    let lo = 0, hi = overlayFreqs.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (overlayFreqs[mid] <= f) lo = mid; else hi = mid;
+    }
+    const t = (f - overlayFreqs[lo]) / (overlayFreqs[hi] - overlayFreqs[lo]);
+    return overlayValues[lo] + t * (overlayValues[hi] - overlayValues[lo]);
+  });
+}
+
+export function PlotArea({ result, xmaxMm, overlay }: PlotAreaProps) {
   if (!result) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--graf-warm-400)' }}>
@@ -51,7 +71,15 @@ export function PlotArea({ result, xmaxMm }: PlotAreaProps) {
       <FrequencyPlot
         title="SPL (dB) — 1m, 2.83V"
         frequencies={result.frequencies_hz}
-        series={[{ label: 'SPL', data: result.spl_db, color: CHART_COLORS.spl }]}
+        series={[
+          { label: 'SPL', data: result.spl_db, color: CHART_COLORS.spl },
+          ...(overlay?.frd ? [{
+            label: 'Imported FRD',
+            data: interpolateOverlay(overlay.frd.frequencies, overlay.frd.spl_db, result.frequencies_hz),
+            color: CHART_COLORS.overlayFrd,
+            dash: true,
+          }] : []),
+        ]}
         yLabel="dB SPL"
         yMin={splMin}
         yMax={splMax}
@@ -64,6 +92,13 @@ export function PlotArea({ result, xmaxMm }: PlotAreaProps) {
         series={[
           { label: '|Z|', data: result.impedance_ohm, color: CHART_COLORS.impedance, yAxisIndex: 0 },
           { label: 'Phase', data: result.impedance_phase_deg, color: CHART_COLORS.impedancePhase, dash: true, yAxisIndex: 1 },
+          ...(overlay?.zma ? [{
+            label: 'Imported |Z|',
+            data: interpolateOverlay(overlay.zma.frequencies, overlay.zma.impedance_ohm, result.frequencies_hz),
+            color: CHART_COLORS.overlayZma,
+            dash: true,
+            yAxisIndex: 0,
+          }] : []),
         ]}
         yLabel="Ohms"
         yMin={0}

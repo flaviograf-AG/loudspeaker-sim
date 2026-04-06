@@ -11,6 +11,7 @@ import { PresetSelector } from './components/PresetSelector';
 import { SaveLoadControls } from './components/SaveLoadControls';
 import { ExportControls } from './components/ExportControls';
 import { NumericInput } from './components/NumericInput';
+import { ImportOverlay, type OverlayData } from './components/ImportOverlay';
 import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput } from './types';
 
 const DEFAULT_INPUT: SimulationInput = {
@@ -45,6 +46,9 @@ function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>('single');
+
+  // Overlay (imported FRD/ZMA)
+  const [overlay, setOverlay] = useState<OverlayData>({ frd: null, zma: null });
 
   // Single-way state
   const [input, setInput] = useState<SimulationInput>(DEFAULT_INPUT);
@@ -134,6 +138,7 @@ function App() {
             </div>
             <SaveLoadControls input={input} onLoad={setInput} />
             <ExportControls result={singleResult} />
+            <ImportOverlay overlay={overlay} onChange={setOverlay} />
           </>
         )}
 
@@ -164,7 +169,7 @@ function App() {
       </aside>
 
       <main className="app-main">
-        {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} />}
+        {mode === 'single' && <PlotArea result={singleResult} xmaxMm={input.driver.xmax_m * 1000} overlay={overlay} />}
         {mode === 'multiway' && <SystemPlotArea result={systemResult} />}
       </main>
     </div>

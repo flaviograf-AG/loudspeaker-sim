@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { WayInput, DriverParams, EnclosureConfig, ActiveFilter } from '../types';
+import type { WayInput, DriverParams, EnclosureConfig, ActiveFilter, PassiveFilter } from '../types';
 import { DriverInputs } from './DriverInputs';
 import { EnclosureInputs } from './EnclosureInputs';
 import { PresetSelector } from './PresetSelector';
@@ -44,6 +44,25 @@ const FILTER_PRESETS: { label: string; filter: ActiveFilter }[] = [
   { label: 'All-pass 2kHz', filter: { type: 'AllPass1', freq_hz: 2000 } },
   { label: 'Invert polarity', filter: { type: 'Invert' } },
 ];
+
+function fmtL(h: number): string { return h >= 1e-3 ? `${(h*1e3).toFixed(2)}mH` : `${(h*1e6).toFixed(0)}µH`; }
+function fmtC(f: number): string { return f >= 1e-6 ? `${(f*1e6).toFixed(1)}µF` : `${(f*1e9).toFixed(0)}nF`; }
+function fmtR(r: number): string { return `${r.toFixed(1)}Ω`; }
+
+function passiveLabel(pf: PassiveFilter): string {
+  switch (pf.type) {
+    case 'SeriesR': return `Ser ${fmtR(pf.ohms)}`;
+    case 'SeriesL': return `Ser ${fmtL(pf.henries)} (DCR ${fmtR(pf.dcr_ohms)})`;
+    case 'SeriesC': return `Ser ${fmtC(pf.farads)}`;
+    case 'ShuntR': return `Shnt ${fmtR(pf.ohms)}`;
+    case 'ShuntL': return `Shnt ${fmtL(pf.henries)}`;
+    case 'ShuntC': return `Shnt ${fmtC(pf.farads)}`;
+    case 'ZobelShunt': return `Zobel ${fmtR(pf.ohms)}+${fmtC(pf.farads)}`;
+    case 'LPad': return `L-Pad ${fmtR(pf.series_ohms)}/${fmtR(pf.shunt_ohms)}`;
+    case 'NotchShunt': return `Notch ${fmtR(pf.ohms)} ${fmtL(pf.henries)} ${fmtC(pf.farads)}`;
+    case 'NotchSeries': return `Ser.Notch ${fmtR(pf.ohms)} ${fmtL(pf.henries)} ${fmtC(pf.farads)}`;
+  }
+}
 
 function filterLabel(f: ActiveFilter): string {
   switch (f.type) {
@@ -176,6 +195,106 @@ export function MultiWayEditor({ ways, onChange }: Props) {
           }}>
           <option value="" disabled>+ Add filter...</option>
           {FILTER_PRESETS.map((p, i) => <option key={i} value={i}>{p.label}</option>)}
+        </select>
+      </div>
+
+      {/* Passive crossover */}
+      <div className="section-card">
+        <div className="section-title">Passive Crossover</div>
+        {way.passive_filters.length === 0 && (
+          <div style={{ fontSize: 11, color: 'var(--graf-warm-400)', marginBottom: 4 }}>
+            No passive components. Use the wizard or add manually.
+          </div>
+        )}
+        {way.passive_filters.map((pf, i) => (
+          <div key={i} className="param-row" style={{ fontSize: 12 }}>
+            <span style={{ flex: 1 }}>{passiveLabel(pf)}</span>
+            <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 10 }}
+              onClick={() => {
+                const filters = way.passive_filters.filter((_, j) => j !== i);
+                updateWay(activeWay, { passive_filters: filters });
+              }}>✕</button>
+          </div>
+        ))}
+
+        {/* Passive wizard */}
+        <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
+          value="" title="Add a passive crossover component or a standard topology"
+          onChange={(e) => {
+            const preset = e.target.value;
+            if (!preset) return;
+            const re = way.driver.re_ohm || 8;
+            const le = way.driver.le_h || 0.5e-3;
+
+            let newFilters: PassiveFilter[] = [];
+            if (preset === 'bw2_lp') {
+              // 2nd-order Butterworth LP: series L + shunt C
+              const wc = 2 * Math.PI * 3000;
+              const l = re * Math.SQRT2 / wc;
+              const c = Math.SQRT2 / (wc * re);
+              newFilters = [
+                { type: 'SeriesL', henries: l, dcr_ohms: 0.3 },
+                { type: 'ShuntC', farads: c },
+              ];
+            } else if (preset === 'bw2_hp') {
+              const wc = 2 * Math.PI * 3000;
+              const c = 1 / (Math.SQRT2 * wc * re);
+              const l = re / (Math.SQRT2 * wc);
+              newFilters = [
+                { type: 'SeriesC', farads: c },
+                { type: 'ShuntL', henries: l, dcr_ohms: 0.3 },
+              ];
+            } else if (preset === 'zobel') {
+              newFilters = [{ type: 'ZobelShunt', ohms: re, farads: le / (re * re) }];
+            } else if (preset === 'lpad_3db') {
+              const ratio = Math.pow(10, 3 / 20);
+              newFilters = [{
+                type: 'LPad',
+                series_ohms: re * (ratio - 1) / ratio,
+                shunt_ohms: re * ratio / (ratio - 1),
+              }];
+            } else if (preset === 'notch') {
+              const fc = 1000;
+              const wc = 2 * Math.PI * fc;
+              newFilters = [{
+                type: 'NotchShunt',
+                ohms: 8, henries: 8 / wc, farads: 1 / (wc * 8),
+              }];
+            } else if (preset === 'series_r') {
+              newFilters = [{ type: 'SeriesR', ohms: 2.2 }];
+            } else if (preset === 'series_l') {
+              newFilters = [{ type: 'SeriesL', henries: 0.5e-3, dcr_ohms: 0.3 }];
+            } else if (preset === 'series_c') {
+              newFilters = [{ type: 'SeriesC', farads: 10e-6 }];
+            } else if (preset === 'shunt_r') {
+              newFilters = [{ type: 'ShuntR', ohms: 10 }];
+            } else if (preset === 'shunt_l') {
+              newFilters = [{ type: 'ShuntL', henries: 1e-3, dcr_ohms: 0.3 }];
+            } else if (preset === 'shunt_c') {
+              newFilters = [{ type: 'ShuntC', farads: 4.7e-6 }];
+            }
+
+            if (newFilters.length > 0) {
+              updateWay(activeWay, { passive_filters: [...way.passive_filters, ...newFilters] });
+            }
+            e.target.value = '';
+          }}>
+          <option value="" disabled>+ Add component / topology...</option>
+          <optgroup label="Standard Topologies">
+            <option value="bw2_lp">BW2 Low-Pass (L + C, 3kHz)</option>
+            <option value="bw2_hp">BW2 High-Pass (C + L, 3kHz)</option>
+            <option value="zobel">Zobel (impedance EQ)</option>
+            <option value="lpad_3db">L-Pad (-3dB attenuation)</option>
+            <option value="notch">Parallel Notch (1kHz)</option>
+          </optgroup>
+          <optgroup label="Individual Components">
+            <option value="series_r">Series Resistor</option>
+            <option value="series_l">Series Inductor</option>
+            <option value="series_c">Series Capacitor</option>
+            <option value="shunt_r">Shunt Resistor</option>
+            <option value="shunt_l">Shunt Inductor</option>
+            <option value="shunt_c">Shunt Capacitor</option>
+          </optgroup>
         </select>
       </div>
 

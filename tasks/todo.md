@@ -61,7 +61,36 @@
 - [ ] **System view** — overlay all per-way filtered responses + total system response on one plot
 - [ ] **Crossover optimizer** — target response curve, optimize component values
 
-## Priority 5: Polish
+## Priority 5: Claude-as-Optimizer (AI-driven design)
+
+**Goal:** Let Claude directly call the simulator to iteratively optimize enclosure dimensions, port tuning, and crossover component values for a target frequency response.
+
+### 5a. Native solver CLI (no browser needed)
+- [ ] **CLI binary target** — add `solver/src/main.rs` that reads JSON from stdin, writes result to stdout. `cargo run -- < input.json > output.json`. This lets Claude call the solver directly without a browser or WASM.
+- [ ] **Batch mode** — accept multiple inputs (parameter sweeps) in one call for efficiency
+
+### 5b. MCP server for Claude Code
+- [ ] **MCP tool: `simulate`** — wraps the CLI binary. Input: SimulationInput JSON. Output: SimulationResult JSON + computed metrics (flatness, -3dB point, impedance min, Xmax exceedance).
+- [ ] **MCP tool: `evaluate_flatness`** — given a SimulationResult and target band (e.g., 40Hz–20kHz), returns: max deviation from mean, ±dB ripple, -3dB and -6dB corner frequencies, impedance minimum. This is what Claude uses to judge "how good" a design is.
+- [ ] **MCP tool: `suggest_enclosure`** — given driver T/S params and target alignment (e.g., Butterworth B2, Bessel), compute optimal sealed Vb or vented Vb+Fb using classical alignment tables (Small, Thiele).
+- [ ] **MCP tool: `sweep_parameter`** — vary one parameter (e.g., box volume 10L–50L in 20 steps) and return all results. Claude can then pick the best.
+
+### 5c. Optimization loop (Claude-driven)
+- [ ] **Optimization prompt template** — structured prompt that tells Claude how to use the tools:
+  1. Evaluate current design with `simulate` + `evaluate_flatness`
+  2. Identify the worst problem (bass rolloff? crossover dip? impedance dip?)
+  3. Adjust the relevant parameter (box volume, port tuning, crossover component)
+  4. Re-simulate and compare
+  5. Repeat until target met or improvement < 0.1 dB
+  6. Report final design with rationale for each choice
+- [ ] **Constraint specification** — user defines: target band, max ripple (±dB), min impedance, max Xmax at rated power, max box volume, max port velocity
+- [ ] **Multi-objective scoring** — weighted score combining flatness, extension, impedance safety, displacement headroom
+
+### 5d. Integration with UI
+- [ ] **"Optimize with AI" button** in the web UI — sends current design to Claude via API, streams back parameter adjustments in real-time, plots update live as Claude iterates
+- [ ] **Optimization history** — show each iteration's parameters and score so user can understand Claude's reasoning
+
+## Priority 7: Polish
 
 - [ ] **ECharts tree-shaking** — current bundle is 1.3MB JS, can reduce to ~500KB by importing only needed chart types
 - [ ] **Mobile responsive layout** — sidebar collapses on narrow screens

@@ -186,9 +186,13 @@ function App() {
     setActiveSection('driver');
   };
 
-  // Clamp activeWay
-  const safeActiveWay = Math.min(activeWay, systemInput.ways.length - 1);
-  if (safeActiveWay !== activeWay) setActiveWay(safeActiveWay);
+  // Clamp activeWay — must be in useEffect, not during render
+  const safeActiveWay = Math.min(Math.max(0, activeWay), Math.max(0, systemInput.ways.length - 1));
+  useEffect(() => {
+    if (activeWay >= systemInput.ways.length && systemInput.ways.length > 0) {
+      setActiveWay(systemInput.ways.length - 1);
+    }
+  }, [activeWay, systemInput.ways.length]);
   const way = systemInput.ways[safeActiveWay];
 
   // Crossover summary for accordion
@@ -288,15 +292,17 @@ function App() {
                   <input type="file" accept=".frd,.txt" hidden onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const wayIdx = safeActiveWay; // capture at click time
+                    const existingMeasured = way.measured;
                     file.text().then(text => {
                       const frd = parseFrd(text);
-                      updateWay(safeActiveWay, {
+                      updateWay(wayIdx, {
                         measured: {
                           frequencies_hz: frd.frequencies,
                           spl_db: frd.spl_db,
                           phase_deg: frd.phase_deg,
-                          impedance_ohm: way.measured?.impedance_ohm ?? [],
-                          impedance_phase_deg: way.measured?.impedance_phase_deg ?? [],
+                          impedance_ohm: existingMeasured?.impedance_ohm ?? [],
+                          impedance_phase_deg: existingMeasured?.impedance_phase_deg ?? [],
                         }
                       });
                     });
@@ -308,13 +314,15 @@ function App() {
                   <input type="file" accept=".zma,.txt" hidden onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    const wayIdx = safeActiveWay; // capture at click time
+                    const existingMeasured = way.measured;
                     file.text().then(text => {
                       const zma = parseZma(text);
-                      updateWay(safeActiveWay, {
+                      updateWay(wayIdx, {
                         measured: {
-                          frequencies_hz: way.measured?.frequencies_hz ?? zma.frequencies,
-                          spl_db: way.measured?.spl_db ?? [],
-                          phase_deg: way.measured?.phase_deg ?? [],
+                          frequencies_hz: existingMeasured?.frequencies_hz ?? zma.frequencies,
+                          spl_db: existingMeasured?.spl_db ?? [],
+                          phase_deg: existingMeasured?.phase_deg ?? [],
                           impedance_ohm: zma.impedance_ohm,
                           impedance_phase_deg: zma.phase_deg,
                         }
@@ -454,7 +462,13 @@ function App() {
                     const { points, perWayEq: newEq } = extractCrossoverPoints(newWays);
                     setDesign({
                       ...design,
-                      system: { ...systemInput, ways: newWays.map((w, i) => ({ ...systemInput.ways[i], ...w, active_filters: [] })) },
+                      system: { ...systemInput, ways: newWays.map((w, i) => ({
+                        ...systemInput.ways[i],  // base: existing UI state (driver, enclosure, measured)
+                        gain_db: w.gain_db,       // optimizer may change these
+                        delay_s: w.delay_s,
+                        passive_filters: w.passive_filters,
+                        active_filters: [],       // rebuilt from crossover_points + per_way_eq
+                      })) },
                       crossover_points: points,
                       per_way_eq: newEq,
                     });

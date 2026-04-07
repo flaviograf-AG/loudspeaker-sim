@@ -9,29 +9,44 @@ interface UndoRedoState<T> {
   canRedo: boolean;
 }
 
-export function useUndoRedo<T>(initial: T, maxHistory = 50): UndoRedoState<T> {
-  const [history, setHistory] = useState<T[]>([initial]);
-  const [index, setIndex] = useState(0);
+interface HistoryState<T> {
+  entries: T[];
+  index: number;
+}
 
-  const value = history[index];
+export function useUndoRedo<T>(initial: T, maxHistory = 50): UndoRedoState<T> {
+  const [state, setState] = useState<HistoryState<T>>({
+    entries: [initial],
+    index: 0,
+  });
+
+  const value = state.entries[state.index];
 
   const set = useCallback((v: T) => {
-    setHistory(prev => {
-      const newHistory = prev.slice(0, index + 1);
-      newHistory.push(v);
-      if (newHistory.length > maxHistory) newHistory.shift();
-      return newHistory;
+    setState(prev => {
+      const newEntries = prev.entries.slice(0, prev.index + 1);
+      newEntries.push(v);
+      if (newEntries.length > maxHistory) newEntries.shift();
+      return {
+        entries: newEntries,
+        index: Math.min(newEntries.length - 1, maxHistory - 1),
+      };
     });
-    setIndex(prev => Math.min(prev + 1, maxHistory - 1));
-  }, [index, maxHistory]);
+  }, [maxHistory]);
 
   const undo = useCallback(() => {
-    setIndex(prev => Math.max(prev - 1, 0));
+    setState(prev => ({
+      ...prev,
+      index: Math.max(prev.index - 1, 0),
+    }));
   }, []);
 
   const redo = useCallback(() => {
-    setIndex(prev => Math.min(prev + 1, history.length - 1));
-  }, [history.length]);
+    setState(prev => ({
+      ...prev,
+      index: Math.min(prev.index + 1, prev.entries.length - 1),
+    }));
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -54,7 +69,7 @@ export function useUndoRedo<T>(initial: T, maxHistory = 50): UndoRedoState<T> {
     set,
     undo,
     redo,
-    canUndo: index > 0,
-    canRedo: index < history.length - 1,
+    canUndo: state.index > 0,
+    canRedo: state.index < state.entries.length - 1,
   };
 }

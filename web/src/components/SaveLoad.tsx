@@ -113,7 +113,7 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
       reader.onload = () => {
         try {
           const parsed = JSON.parse(reader.result as string);
-          if (parsed.version === 2) {
+          if (parsed.version === 2 && Array.isArray(parsed.ways) && parsed.ways.length > 0) {
             onLoad(parsed);
           } else if ('system' in parsed && 'topology' in parsed) {
             // Migrate v1 format: { topology, system }

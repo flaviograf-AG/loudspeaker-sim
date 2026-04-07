@@ -1,6 +1,13 @@
 import { useEffect } from 'react';
 import type { DesignState } from '../types';
 
+/** Encode a DesignState into a shareable URL string */
+export function encodeDesignUrl(design: DesignState): string {
+  const json = JSON.stringify(design);
+  const encoded = btoa(unescape(encodeURIComponent(json)));
+  return window.location.origin + window.location.pathname + '#v2=' + encoded;
+}
+
 export function useUrlSync(design: DesignState) {
   useEffect(() => {
     const timer = setTimeout(() => {

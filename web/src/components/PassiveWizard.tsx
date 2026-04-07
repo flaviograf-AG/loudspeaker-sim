@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NumericInput } from './NumericInput';
 import type { PassiveFilter } from '../types';
 
@@ -12,6 +12,11 @@ interface PassiveWizardProps {
 
 export function PassiveWizard({ crossoverFreq, driverRe, driverLe, passiveFilters, onApply }: PassiveWizardProps) {
   const [xoverFreq, setXoverFreq] = useState(crossoverFreq);
+
+  // Sync from parent when crossover freq changes externally
+  useEffect(() => {
+    setXoverFreq(crossoverFreq);
+  }, [crossoverFreq]);
   const re = driverRe || 8;
   const le = driverLe || 0.5e-3;
 

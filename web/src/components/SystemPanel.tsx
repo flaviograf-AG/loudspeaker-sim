@@ -5,6 +5,7 @@ import { ExportControls } from './ExportControls';
 import { BiquadExport } from './BiquadExport';
 import { ImportOverlay, type OverlayData } from './ImportOverlay';
 import { extractCrossoverPoints } from '../crossover';
+import { encodeDesignUrl } from '../hooks/useUrlSync';
 import type { DesignState, SystemInput, SimulationResult, SystemResult } from '../types';
 
 interface SystemPanelProps {
@@ -118,10 +119,7 @@ export function SystemPanel({
             title="Copy shareable URL to clipboard"
             onClick={() => {
               try {
-                const json = JSON.stringify(design);
-                const encoded = btoa(unescape(encodeURIComponent(json)));
-                const url = window.location.origin + window.location.pathname + '#v2=' + encoded;
-                navigator.clipboard.writeText(url);
+                navigator.clipboard.writeText(encodeDesignUrl(design));
               } catch { /* ignore */ }
             }}>Share</button>
         </div>

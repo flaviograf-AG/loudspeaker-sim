@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { PresetSelector } from './PresetSelector';
 import { DriverInputs } from './DriverInputs';
 import { parseFrd } from '../io/frd';
@@ -10,6 +11,45 @@ interface WayEditorProps {
 }
 
 export function WayEditor({ way, onUpdate }: WayEditorProps) {
+  const handleFrd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    file.text().then(text => {
+      const frd = parseFrd(text);
+      // Merge FRD into measured — read current way.measured at apply time via onUpdate
+      onUpdate({
+        measured: {
+          frequencies_hz: frd.frequencies,
+          spl_db: frd.spl_db,
+          phase_deg: frd.phase_deg,
+          // Preserve existing ZMA data if any (read from current way prop)
+          impedance_ohm: way.measured?.impedance_ohm ?? [],
+          impedance_phase_deg: way.measured?.impedance_phase_deg ?? [],
+        }
+      });
+    });
+    e.target.value = '';
+  }, [way.measured?.impedance_ohm, way.measured?.impedance_phase_deg, onUpdate]);
+
+  const handleZma = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    file.text().then(text => {
+      const zma = parseZma(text);
+      onUpdate({
+        measured: {
+          // Preserve existing FRD data if any
+          frequencies_hz: way.measured?.frequencies_hz ?? zma.frequencies,
+          spl_db: way.measured?.spl_db ?? [],
+          phase_deg: way.measured?.phase_deg ?? [],
+          impedance_ohm: zma.impedance_ohm,
+          impedance_phase_deg: zma.phase_deg,
+        }
+      });
+    });
+    e.target.value = '';
+  }, [way.measured?.frequencies_hz, way.measured?.spl_db, way.measured?.phase_deg, onUpdate]);
+
   return (
     <>
       <PresetSelector
@@ -22,45 +62,11 @@ export function WayEditor({ way, onUpdate }: WayEditorProps) {
       <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
         <label className="graf-btn graf-btn-sm graf-btn-outline" style={{ cursor: 'pointer', fontSize: 11 }}>
           Import FRD
-          <input type="file" accept=".frd,.txt" hidden onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const existingMeasured = way.measured;
-            file.text().then(text => {
-              const frd = parseFrd(text);
-              onUpdate({
-                measured: {
-                  frequencies_hz: frd.frequencies,
-                  spl_db: frd.spl_db,
-                  phase_deg: frd.phase_deg,
-                  impedance_ohm: existingMeasured?.impedance_ohm ?? [],
-                  impedance_phase_deg: existingMeasured?.impedance_phase_deg ?? [],
-                }
-              });
-            });
-            e.target.value = '';
-          }} />
+          <input type="file" accept=".frd,.txt" hidden onChange={handleFrd} />
         </label>
         <label className="graf-btn graf-btn-sm graf-btn-outline" style={{ cursor: 'pointer', fontSize: 11 }}>
           Import ZMA
-          <input type="file" accept=".zma,.txt" hidden onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const existingMeasured = way.measured;
-            file.text().then(text => {
-              const zma = parseZma(text);
-              onUpdate({
-                measured: {
-                  frequencies_hz: existingMeasured?.frequencies_hz ?? zma.frequencies,
-                  spl_db: existingMeasured?.spl_db ?? [],
-                  phase_deg: existingMeasured?.phase_deg ?? [],
-                  impedance_ohm: zma.impedance_ohm,
-                  impedance_phase_deg: zma.phase_deg,
-                }
-              });
-            });
-            e.target.value = '';
-          }} />
+          <input type="file" accept=".zma,.txt" hidden onChange={handleZma} />
         </label>
         {way.measured && (
           <button className="graf-btn graf-btn-sm" style={{ fontSize: 11 }}

@@ -5,23 +5,28 @@ import { initSolver } from './solver/wasm-bridge';
 import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
 import { buildSolverInput, defaultDesign } from './compute';
+import { defaultCrossoverPoints } from './crossover';
 import { PlotArea } from './components/PlotArea';
 import { SystemPlotArea } from './components/SystemPlotArea';
 import { EnclosureInputs } from './components/EnclosureInputs';
-import { NumericInput } from './components/NumericInput';
 import { type OverlayData } from './components/ImportOverlay';
 import { SchematicPanel } from './components/SchematicPanel';
 import { AccordionSection } from './components/AccordionSection';
 import { WayEditor } from './components/WayEditor';
 import { CrossoverPanel } from './components/CrossoverPanel';
 import { SystemPanel } from './components/SystemPanel';
-import type { SimulationInput, DesignStateV2, WayDesign, CrossoverPoint, ActiveFilter } from './types';
+import { SetupWizard } from './components/SetupWizard';
+import { buildWaysFromSetup } from './systemSetup';
+import type { SimulationInput, DesignStateV2, WayDesign, WayInput, CrossoverPoint, ActiveFilter, SystemTopology } from './types';
 
 function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const dragging = useRef(false);
+
+  // Setup wizard
+  const [showSetup, setShowSetup] = useState(true);
 
   // Accordion + way selection (ephemeral UI state)
   const [activeWay, setActiveWay] = useState(0);
@@ -32,8 +37,15 @@ function App() {
   const [snapshots, setSnapshots] = useState<{ name: string; spl: number[]; freqs: number[] }[]>([]);
 
   // === Single source of truth ===
-  const initialDesign = decodeFromUrl() ?? defaultDesign();
+  const urlState = decodeFromUrl();
+  const initialDesign = urlState ?? defaultDesign();
   const designUndo = useUndoRedo<DesignStateV2>(initialDesign);
+
+  // Skip wizard if loaded from URL
+  const [didInit] = useState(() => urlState !== null);
+  useEffect(() => {
+    if (didInit) setShowSetup(false);
+  }, [didInit]);
   const design = designUndo.value;
   const setDesign = designUndo.set;
 
@@ -101,6 +113,37 @@ function App() {
     setDesign({ ...design, per_way_eq: newEq });
   }, [design, setDesign]);
 
+  // Setup wizard callback — converts WayInput[] to DesignStateV2
+  const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[]) => {
+    const points = defaultCrossoverPoints(topo);
+    setDesign({
+      version: 2,
+      topology: topo,
+      ways: ways.map(w => ({
+        name: w.name,
+        driver: w.driver,
+        enclosure: w.enclosure,
+        passive_filters: w.passive_filters,
+        gain_db: w.gain_db,
+        delay_s: w.delay_s,
+        inverted: w.inverted,
+        z_offset_m: w.z_offset_m,
+        enabled: w.enabled,
+        preset_name: w.preset_name,
+        measured: w.measured,
+      })),
+      crossover_points: points,
+      per_way_eq: ways.map(() => []),
+      freq_start_hz: design.freq_start_hz,
+      freq_end_hz: design.freq_end_hz,
+      freq_points: design.freq_points,
+      drive_voltage_rms: design.drive_voltage_rms,
+    });
+    setShowSetup(false);
+    setActiveWay(0);
+    setActiveSection('driver');
+  }, [design, setDesign]);
+
   // Sidebar resize
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -159,6 +202,8 @@ function App() {
 
   return (
     <div className="app-layout">
+      {showSetup && <SetupWizard onComplete={handleSetupComplete} initialTopology={design.topology} />}
+
       <div className="sidebar-drag-handle" style={{ left: sidebarWidth - 3 }} onMouseDown={onDragStart} />
       <aside className="app-sidebar" style={{ width: sidebarWidth }}>
         {/* Header */}
@@ -167,6 +212,12 @@ function App() {
             <img src="/favicon/favicon.svg" alt="LS" width={28} height={28} />
             Loudspeaker Sim
           </h1>
+          <button
+            className="graf-btn graf-btn-sm graf-btn-outline"
+            onClick={() => setShowSetup(true)}
+            title="Change system topology — opens the setup wizard"
+            style={{ flexShrink: 0 }}
+          >Change System</button>
         </div>
 
         {/* Way tabs */}
@@ -228,6 +279,8 @@ function App() {
                 driverQts={(way.driver.qes * way.driver.qms) / (way.driver.qes + way.driver.qms)}
                 hpCrossoverHz={design.crossover_points.find(pt => pt.high_way_index === safeActiveWay)?.freq_hz}
                 onChange={(enc) => updateWay(safeActiveWay, { enclosure: enc })}
+                lockType
+                onChangeType={() => setShowSetup(true)}
               />
             </AccordionSection>
 

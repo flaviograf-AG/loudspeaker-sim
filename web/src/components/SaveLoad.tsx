@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { DesignStateV2 } from '../types';
+import { extractCrossoverPoints, defaultCrossoverPoints } from '../crossover';
+import type { DesignStateV2, SystemTopology } from '../types';
 
 const STORAGE_KEY = 'ls-designs-v2';
 
@@ -12,8 +13,48 @@ interface SavedDesign {
 function loadDesigns(): SavedDesign[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return migrateLegacyDesigns();
     return JSON.parse(raw);
+  } catch { return []; }
+}
+
+/** One-time migration: read old ls-designs key and convert to v2 format */
+function migrateLegacyDesigns(): SavedDesign[] {
+  try {
+    const raw = localStorage.getItem('ls-designs');
+    if (!raw) return [];
+    const legacy = JSON.parse(raw);
+    const migrated: SavedDesign[] = legacy.map((d: any) => {
+      const sys = d.system ?? { ways: [{ name: 'Full Range', driver: d.input?.driver, enclosure: d.input?.enclosure, passive_filters: [], active_filters: [], gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true }], freq_start_hz: d.input?.freq_start_hz ?? 10, freq_end_hz: d.input?.freq_end_hz ?? 20000, freq_points: d.input?.freq_points ?? 500, drive_voltage_rms: d.input?.drive_voltage_rms ?? 2.83 };
+      const topo = d.topology ?? '1-way';
+      const { points, perWayEq } = extractCrossoverPoints(sys.ways);
+      return {
+        name: d.name,
+        timestamp: d.timestamp,
+        design: {
+          version: 2 as const,
+          topology: topo,
+          ways: sys.ways.map((w: any) => ({
+            name: w.name, driver: w.driver, enclosure: w.enclosure,
+            passive_filters: w.passive_filters ?? [], gain_db: w.gain_db ?? 0,
+            delay_s: w.delay_s ?? 0, inverted: w.inverted ?? false,
+            z_offset_m: w.z_offset_m ?? 0, enabled: w.enabled ?? true,
+            preset_name: w.preset_name, measured: w.measured,
+          })),
+          crossover_points: points.length > 0 ? points : defaultCrossoverPoints(topo),
+          per_way_eq: perWayEq,
+          freq_start_hz: sys.freq_start_hz,
+          freq_end_hz: sys.freq_end_hz,
+          freq_points: sys.freq_points,
+          drive_voltage_rms: sys.drive_voltage_rms,
+        },
+      };
+    });
+    // Save migrated designs under new key
+    if (migrated.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    }
+    return migrated;
   } catch { return []; }
 }
 
@@ -74,8 +115,43 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
           const parsed = JSON.parse(reader.result as string);
           if (parsed.version === 2) {
             onLoad(parsed);
+          } else if ('system' in parsed && 'topology' in parsed) {
+            // Migrate v1 format: { topology, system }
+            const { points, perWayEq } = extractCrossoverPoints(parsed.system.ways);
+            onLoad({
+              version: 2,
+              topology: parsed.topology as SystemTopology,
+              ways: parsed.system.ways.map((w: any) => ({
+                name: w.name, driver: w.driver, enclosure: w.enclosure,
+                passive_filters: w.passive_filters ?? [], gain_db: w.gain_db ?? 0,
+                delay_s: w.delay_s ?? 0, inverted: w.inverted ?? false,
+                z_offset_m: w.z_offset_m ?? 0, enabled: w.enabled ?? true,
+                preset_name: w.preset_name, measured: w.measured,
+              })),
+              crossover_points: points.length > 0 ? points : defaultCrossoverPoints(parsed.topology),
+              per_way_eq: perWayEq,
+              freq_start_hz: parsed.system.freq_start_hz,
+              freq_end_hz: parsed.system.freq_end_hz,
+              freq_points: parsed.system.freq_points,
+              drive_voltage_rms: parsed.system.drive_voltage_rms,
+            });
+          } else if ('driver' in parsed) {
+            // Migrate legacy single-driver format
+            onLoad({
+              version: 2,
+              topology: '1-way',
+              ways: [{
+                name: 'Full Range', driver: parsed.driver, enclosure: parsed.enclosure,
+                passive_filters: [], gain_db: 0, delay_s: 0, inverted: false,
+                z_offset_m: 0, enabled: true,
+              }],
+              crossover_points: [],
+              per_way_eq: [[]],
+              freq_start_hz: parsed.freq_start_hz, freq_end_hz: parsed.freq_end_hz,
+              freq_points: parsed.freq_points, drive_voltage_rms: parsed.drive_voltage_rms,
+            });
           } else {
-            alert('Unrecognized file format (expected v2 design)');
+            alert('Unrecognized file format');
           }
         } catch {
           alert('Invalid JSON file');

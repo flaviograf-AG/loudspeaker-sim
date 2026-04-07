@@ -117,7 +117,12 @@ export function SystemPanel({
           <button className="graf-btn graf-btn-sm graf-btn-outline"
             title="Copy shareable URL to clipboard"
             onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
+              try {
+                const json = JSON.stringify(design);
+                const encoded = btoa(unescape(encodeURIComponent(json)));
+                const url = window.location.origin + window.location.pathname + '#v2=' + encoded;
+                navigator.clipboard.writeText(url);
+              } catch { /* ignore */ }
             }}>Share</button>
         </div>
         {snapshots.map((s, i) => (

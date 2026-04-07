@@ -1,6 +1,5 @@
 import { PresetSelector } from './PresetSelector';
 import { DriverInputs } from './DriverInputs';
-import { NumericInput } from './NumericInput';
 import { parseFrd } from '../io/frd';
 import { parseZma } from '../io/zma';
 import type { WayDesign, DriverParams } from '../types';
@@ -81,29 +80,6 @@ export function WayEditor({ way, wayIndex, onUpdate }: WayEditorProps) {
           {' \u2014 Using measured data (T/S simulation bypassed)'}
         </div>
       )}
-
-      {/* Per-way controls: gain, delay, z-offset, enable, invert */}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
-          <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
-            <input type="checkbox" checked={way.enabled}
-              onChange={(e) => onUpdate({ enabled: e.target.checked })} /> On
-          </label>
-          <label title="Invert polarity (180deg phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
-            <input type="checkbox" checked={way.inverted}
-              onChange={(e) => onUpdate({ inverted: e.target.checked })} /> Inv
-          </label>
-        </div>
-        <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
-          tooltip="Per-way level adjustment."
-          onChange={(v) => onUpdate({ gain_db: v })} />
-        <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="us"
-          tooltip="Per-way time delay. 29 us = 1 cm."
-          onChange={(v) => onUpdate({ delay_s: v / 1e6 })} />
-        <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
-          tooltip="Physical depth offset. Positive = recessed."
-          onChange={(v) => onUpdate({ z_offset_m: v / 100 })} />
-      </div>
     </>
   );
 }

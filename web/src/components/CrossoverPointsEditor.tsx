@@ -1,10 +1,10 @@
-import type { CrossoverPoint, CrossoverSlope, WayInput } from '../types';
+import type { CrossoverPoint, CrossoverSlope } from '../types';
 import { SLOPE_LABELS } from '../crossover';
 import { NumericInput } from './NumericInput';
 
 interface Props {
   points: CrossoverPoint[];
-  ways: WayInput[];
+  ways: { name: string }[];
   onChange: (points: CrossoverPoint[]) => void;
 }
 

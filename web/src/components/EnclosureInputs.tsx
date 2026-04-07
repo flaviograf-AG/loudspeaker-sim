@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EnclosureConfig, EnclosureType, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
+import { DEFAULT_ENCLOSURES } from '../systemSetup';
 import { NumericInput } from './NumericInput';
 
 const C0 = 343.21;
@@ -36,15 +37,8 @@ interface Props {
   onChangeType?: () => void;
 }
 
-const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
-  Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
-  Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7, port_shape: { type: 'Circular' } },
-  TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 0, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
-  Horn: { type: 'Horn', segments: [{ area_start_m2: 132e-4, area_end_m2: 2000e-4, length_m: 0.60, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2 * Math.PI, num_tmm_segments: 30, stuffing_zones: [] },
-  Bandpass: { type: 'Bandpass', rear_volume_m3: 15e-3, front_volume_m3: 20e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
-  PassiveRadiator: { type: 'PassiveRadiator', volume_m3: 20e-3, pr_sd_m2: 200e-4, pr_cms: 1.0e-3, pr_mms_kg: 0.050, pr_rms: 1.0, ql: 7 },
-  OpenBaffle: { type: 'OpenBaffle', width_m: 0.40, height_m: 0.60, driver_offset_m: 0.0 },
-};
+// Single source of truth — imported from systemSetup.ts
+const DEFAULT_CONFIGS = DEFAULT_ENCLOSURES;
 
 
 export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChange, lockType, onChangeType }: Props) {

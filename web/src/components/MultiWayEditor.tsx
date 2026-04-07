@@ -17,7 +17,7 @@ const DEFAULT_WOOFER: WayInput = {
   driver: { fs_hz: 37, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5, vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3 },
   enclosure: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
   passive_filters: [],
-  active_filters: [{ type: 'LR4LowPass', freq_hz: 2500 }],
+  active_filters: [],
   gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true,
 };
 
@@ -26,7 +26,7 @@ const DEFAULT_TWEETER: WayInput = {
   driver: { fs_hz: 800, re_ohm: 5.5, le_h: 0.05e-3, qes: 0.5, qms: 2.0, vas_m3: 0.5e-3, sd_m2: 8e-4, xmax_m: 1e-3 },
   enclosure: { type: 'Sealed', volume_m3: 0.5e-3, ql: 7 },
   passive_filters: [],
-  active_filters: [{ type: 'LR4HighPass', freq_hz: 2500 }],
+  active_filters: [],
   gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true,
 };
 

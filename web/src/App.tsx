@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import { decodeFromUrl, useUrlState, encodeToUrl } from './hooks/useUrlState';
 import { initSolver } from './solver/wasm-bridge';
@@ -8,7 +8,6 @@ import { PlotArea } from './components/PlotArea';
 import { SystemPlotArea } from './components/SystemPlotArea';
 import { DriverInputs } from './components/DriverInputs';
 import { EnclosureInputs } from './components/EnclosureInputs';
-import { MultiWayEditor } from './components/MultiWayEditor';
 import { PresetSelector } from './components/PresetSelector';
 import { SaveLoadControls } from './components/SaveLoadControls';
 import { ExportControls } from './components/ExportControls';
@@ -19,17 +18,29 @@ import { BiquadExport } from './components/BiquadExport';
 import { OptimizerPanel } from './components/OptimizerPanel';
 import { SetupWizard } from './components/SetupWizard';
 import { AccordionSection } from './components/AccordionSection';
-import { driverSummary, enclosureSummary, crossoverSummary } from './components/WaySummary';
+import { driverSummary, enclosureSummary } from './components/WaySummary';
+import { CrossoverPointsEditor } from './components/CrossoverPointsEditor';
+import { PerWayEqEditor } from './components/PerWayEqEditor';
+import { PassiveCrossoverEditor } from './components/MultiWayEditor';
 import { buildWaysFromSetup } from './systemSetup';
-import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput, SystemTopology } from './types';
+import { buildSolverInput, defaultCrossoverPoints, extractCrossoverPoints } from './crossover';
+import type { SimulationInput, DriverParams, EnclosureConfig, WayInput, SystemInput, SystemTopology, DesignState, ActiveFilter, CrossoverPoint } from './types';
 
-const DEFAULT_SYSTEM_INPUT: SystemInput = {
-  ways: buildWaysFromSetup('2-way', ['Sealed', 'Sealed']),
-  freq_start_hz: 10,
-  freq_end_hz: 20000,
-  freq_points: 500,
-  drive_voltage_rms: 2.83,
-};
+const DEFAULT_DESIGN: DesignState = (() => {
+  const ways = buildWaysFromSetup('2-way', ['Sealed', 'Sealed']);
+  return {
+    system: {
+      ways: ways.map(w => ({ ...w, active_filters: [] })),
+      freq_start_hz: 10,
+      freq_end_hz: 20000,
+      freq_points: 500,
+      drive_voltage_rms: 2.83,
+    },
+    crossover_points: defaultCrossoverPoints('2-way'),
+    per_way_eq: ways.map(() => []),
+    preset_names: ways.map(() => undefined),
+  };
+})();
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -51,48 +62,55 @@ function App() {
   // Comparison snapshots
   const [snapshots, setSnapshots] = useState<{ name: string; spl: number[]; freqs: number[] }[]>([]);
 
-  // Unified state with undo/redo
-  // Try to restore from URL first
+  // Unified design state with undo/redo
   const urlState = decodeFromUrl();
-  const initialSystem = urlState ?? DEFAULT_SYSTEM_INPUT;
-  const sysUndo = useUndoRedo<SystemInput>(initialSystem);
-  const systemInput = sysUndo.value;
-  const setSystemInput = sysUndo.set;
+  const initialDesign = urlState ?? DEFAULT_DESIGN;
+  const designUndo = useUndoRedo<DesignState>(initialDesign);
+  const design = designUndo.value;
+  const setDesign = designUndo.set;
+
+  // Convenience accessors
+  const systemInput = design.system;
+  const crossoverPoints = design.crossover_points;
+  const perWayEq = design.per_way_eq;
 
   // Skip wizard if we loaded from URL
-  const [didInit] = useState(() => {
-    if (urlState) return true;
-    return false;
-  });
+  const [didInit] = useState(() => urlState !== null);
   useEffect(() => {
     if (didInit) setShowSetup(false);
   }, [didInit]);
 
   // URL state sync
-  useUrlState(systemInput);
+  useUrlState(design);
+
+  // Build solver input by assembling active_filters from crossover + per-way EQ
+  const solverInput = useMemo(
+    () => buildSolverInput(systemInput, crossoverPoints, perWayEq),
+    [systemInput, crossoverPoints, perWayEq]
+  );
 
   // Determine single vs multi-way
-  const isMultiWay = systemInput.ways.length > 1;
+  const isMultiWay = solverInput.ways.length > 1;
 
   // Extract single-driver input for 1-way systems
-  const singleInput: SimulationInput | null = !isMultiWay && systemInput.ways[0]
+  const singleInput: SimulationInput | null = !isMultiWay && solverInput.ways[0]
     ? {
-        driver: systemInput.ways[0].driver,
-        enclosure: systemInput.ways[0].enclosure,
-        freq_start_hz: systemInput.freq_start_hz,
-        freq_end_hz: systemInput.freq_end_hz,
-        freq_points: systemInput.freq_points,
-        drive_voltage_rms: systemInput.drive_voltage_rms,
+        driver: solverInput.ways[0].driver,
+        enclosure: solverInput.ways[0].enclosure,
+        freq_start_hz: solverInput.freq_start_hz,
+        freq_end_hz: solverInput.freq_end_hz,
+        freq_points: solverInput.freq_points,
+        drive_voltage_rms: solverInput.drive_voltage_rms,
       }
     : null;
 
   // Use appropriate solver
   const { result: singleResult, error: singleError } = useSolver(
-    singleInput ?? { driver: systemInput.ways[0].driver, enclosure: systemInput.ways[0].enclosure, freq_start_hz: 10, freq_end_hz: 20000, freq_points: 500, drive_voltage_rms: 2.83 },
+    singleInput ?? { driver: solverInput.ways[0].driver, enclosure: solverInput.ways[0].enclosure, freq_start_hz: 10, freq_end_hz: 20000, freq_points: 500, drive_voltage_rms: 2.83 },
     ready && singleInput !== null
   );
   const { result: systemResult, error: systemError } = useSystemSolver(
-    isMultiWay ? systemInput : null,
+    isMultiWay ? solverInput : null,
     ready
   );
 
@@ -115,19 +133,52 @@ function App() {
       .catch((e) => setInitError(String(e)));
   }, []);
 
-  // --- Way update helpers ---
+  // --- Design update helpers ---
+  const updateSystem = (updates: Partial<SystemInput>) => {
+    setDesign({ ...design, system: { ...systemInput, ...updates } });
+  };
+
   const updateWay = (idx: number, updates: Partial<WayInput>) => {
     const newWays = [...systemInput.ways];
     newWays[idx] = { ...newWays[idx], ...updates };
-    setSystemInput({ ...systemInput, ways: newWays });
+    setDesign({ ...design, system: { ...systemInput, ways: newWays } });
   };
 
-  const updateDriver = (driver: DriverParams) => updateWay(activeWay, { driver });
+  const updateDriver = (driver: DriverParams, name: string) => {
+    const newWays = [...systemInput.ways];
+    newWays[activeWay] = { ...newWays[activeWay], driver, preset_name: name };
+    const newNames = [...design.preset_names];
+    newNames[activeWay] = name;
+    setDesign({ ...design, system: { ...systemInput, ways: newWays }, preset_names: newNames });
+  };
+
   const updateEnclosure = (enclosure: EnclosureConfig) => updateWay(activeWay, { enclosure });
+
+  const updateCrossoverPoints = (points: CrossoverPoint[]) => {
+    setDesign({ ...design, crossover_points: points });
+  };
+
+  const updatePerWayEq = (filters: ActiveFilter[]) => {
+    const newEq = [...perWayEq];
+    newEq[activeWay] = filters;
+    setDesign({ ...design, per_way_eq: newEq });
+  };
 
   const handleSetupComplete = (topo: SystemTopology, ways: WayInput[]) => {
     setTopology(topo);
-    setSystemInput({ ...systemInput, ways });
+    const points = defaultCrossoverPoints(topo);
+    setDesign({
+      system: {
+        ways: ways.map(w => ({ ...w, active_filters: [] })),
+        freq_start_hz: systemInput.freq_start_hz,
+        freq_end_hz: systemInput.freq_end_hz,
+        freq_points: systemInput.freq_points,
+        drive_voltage_rms: systemInput.drive_voltage_rms,
+      },
+      crossover_points: points,
+      per_way_eq: ways.map(() => []),
+      preset_names: ways.map(() => undefined),
+    });
     setShowSetup(false);
     setActiveWay(0);
     setActiveSection('driver');
@@ -137,6 +188,11 @@ function App() {
   const safeActiveWay = Math.min(activeWay, systemInput.ways.length - 1);
   if (safeActiveWay !== activeWay) setActiveWay(safeActiveWay);
   const way = systemInput.ways[safeActiveWay];
+
+  // Crossover summary for accordion
+  const xoverSummary = crossoverPoints.length > 0
+    ? crossoverPoints.map(pt => `${pt.freq_hz}Hz ${pt.slope}`).join(', ')
+    : 'No crossover';
 
   if (initError) {
     return (
@@ -165,8 +221,8 @@ function App() {
       <div className="sidebar-drag-handle" style={{ left: sidebarWidth - 3 }} onMouseDown={onDragStart} />
       <aside className="app-sidebar" style={{ width: sidebarWidth }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+          <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', display: 'flex', alignItems: 'center', gap: 8, margin: 0, whiteSpace: 'nowrap' }}>
             <img src="/favicon/favicon.svg" alt="LS" width={28} height={28} />
             Loudspeaker Sim
           </h1>
@@ -174,6 +230,7 @@ function App() {
             className="graf-btn graf-btn-sm graf-btn-outline"
             onClick={() => setShowSetup(true)}
             title="Change system topology — opens the setup wizard"
+            style={{ flexShrink: 0 }}
           >Change System</button>
         </div>
 
@@ -192,20 +249,24 @@ function App() {
           </div>
         )}
 
-        {/* Accordion: Driver */}
+        {/* Accordion sections */}
         {way && (
           <>
+            {/* Driver */}
             <AccordionSection
               title="Driver"
               summary={driverSummary(way)}
               expanded={activeSection === 'driver'}
               onToggle={() => setActiveSection(activeSection === 'driver' ? 'system' : 'driver')}
             >
-              <PresetSelector onSelect={updateDriver} />
-              <DriverInputs params={way.driver} onChange={updateDriver} />
+              <PresetSelector
+                onSelect={updateDriver}
+                currentName={design.preset_names[safeActiveWay]}
+              />
+              <DriverInputs params={way.driver} onChange={(d) => updateWay(safeActiveWay, { driver: d })} />
             </AccordionSection>
 
-            {/* Accordion: Enclosure */}
+            {/* Enclosure */}
             <AccordionSection
               title="Enclosure"
               summary={enclosureSummary(way)}
@@ -223,46 +284,62 @@ function App() {
               />
             </AccordionSection>
 
-            {/* Accordion: Crossover */}
+            {/* Crossover — system-level points + per-way EQ */}
             <AccordionSection
               title="Crossover"
-              summary={crossoverSummary(way)}
+              summary={xoverSummary}
               expanded={activeSection === 'crossover'}
               onToggle={() => setActiveSection(activeSection === 'crossover' ? 'system' : 'crossover')}
             >
-              {/* Way controls: gain, delay, z-offset, on/inv */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={way.enabled}
-                      onChange={(e) => updateWay(safeActiveWay, { enabled: e.target.checked })} /> On
-                  </label>
-                  <label title="Invert polarity (180deg phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={way.inverted}
-                      onChange={(e) => updateWay(safeActiveWay, { inverted: e.target.checked })} /> Inv
-                  </label>
-                </div>
-              </div>
-              <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
-                tooltip="Per-way level adjustment. Use to match sensitivity between drivers."
-                onChange={(v) => updateWay(safeActiveWay, { gain_db: v })} />
-              <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="us"
-                tooltip="Per-way time delay for alignment. 29 us = 1 cm acoustic path difference."
-                onChange={(v) => updateWay(safeActiveWay, { delay_s: v / 1e6 })} />
-              <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
-                tooltip="Physical depth offset from reference plane. Positive = recessed."
-                onChange={(v) => updateWay(safeActiveWay, { z_offset_m: v / 100 })} />
-
-              {/* Active + passive filters — reuse MultiWayEditor's filter sections */}
-              <MultiWayEditor
+              {/* System-level crossover points */}
+              <CrossoverPointsEditor
+                points={crossoverPoints}
                 ways={systemInput.ways}
-                onChange={(newWays) => setSystemInput({ ...systemInput, ways: newWays })}
-                activeWayOverride={safeActiveWay}
-                crossoverOnly
+                onChange={updateCrossoverPoints}
+              />
+
+              {/* Per-way controls */}
+              {isMultiWay && (
+                <>
+                  <div className="section-subtitle" style={{ marginTop: 8, marginBottom: 4 }}>
+                    {way.name} Controls
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                    <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={way.enabled}
+                        onChange={(e) => updateWay(safeActiveWay, { enabled: e.target.checked })} /> On
+                    </label>
+                    <label title="Invert polarity (180deg phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={way.inverted}
+                        onChange={(e) => updateWay(safeActiveWay, { inverted: e.target.checked })} /> Inv
+                    </label>
+                  </div>
+                  <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
+                    tooltip="Per-way level adjustment."
+                    onChange={(v) => updateWay(safeActiveWay, { gain_db: v })} />
+                  <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="us"
+                    tooltip="Per-way time delay. 29 us = 1 cm."
+                    onChange={(v) => updateWay(safeActiveWay, { delay_s: v / 1e6 })} />
+                  <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
+                    tooltip="Physical depth offset. Positive = recessed."
+                    onChange={(v) => updateWay(safeActiveWay, { z_offset_m: v / 100 })} />
+                </>
+              )}
+
+              {/* Per-way EQ (PEQ, shelf, allpass, gain) */}
+              <PerWayEqEditor
+                filters={perWayEq[safeActiveWay] ?? []}
+                onChange={updatePerWayEq}
+              />
+
+              {/* Passive crossover (per-way) */}
+              <PassiveCrossoverEditor
+                way={way}
+                onUpdate={(updates) => updateWay(safeActiveWay, updates)}
               />
             </AccordionSection>
 
-            {/* Accordion: System */}
+            {/* System */}
             <AccordionSection
               title="System"
               summary="Settings, export, compare"
@@ -273,37 +350,53 @@ function App() {
                 <div className="section-title">Simulation</div>
                 <NumericInput label="Drive" value={systemInput.drive_voltage_rms} step={0.1} min={0.1} unit="V rms"
                   tooltip="Amplifier drive voltage (RMS). 2.83V = 1W into 8ohm."
-                  onChange={(v) => setSystemInput({ ...systemInput, drive_voltage_rms: v })} />
+                  onChange={(v) => updateSystem({ drive_voltage_rms: v })} />
                 <NumericInput label="F start" value={systemInput.freq_start_hz} step={1} min={1} unit="Hz"
                   tooltip="Sweep start frequency."
-                  onChange={(v) => setSystemInput({ ...systemInput, freq_start_hz: v })} />
+                  onChange={(v) => updateSystem({ freq_start_hz: v })} />
                 <NumericInput label="F end" value={systemInput.freq_end_hz} step={1000} min={100} unit="Hz"
                   tooltip="Sweep end frequency."
-                  onChange={(v) => setSystemInput({ ...systemInput, freq_end_hz: v })} />
+                  onChange={(v) => updateSystem({ freq_end_hz: v })} />
                 <NumericInput label="Points" value={systemInput.freq_points} step={100} min={50} max={2000}
                   tooltip="Frequency points."
-                  onChange={(v) => setSystemInput({ ...systemInput, freq_points: Math.round(v) })} />
+                  onChange={(v) => updateSystem({ freq_points: Math.round(v) })} />
               </div>
 
               {isMultiWay && (
                 <OptimizerPanel
-                  ways={systemInput.ways}
+                  ways={solverInput.ways}
                   sysParams={{
                     freq_start_hz: systemInput.freq_start_hz,
                     freq_end_hz: systemInput.freq_end_hz,
                     freq_points: systemInput.freq_points,
                     drive_voltage_rms: systemInput.drive_voltage_rms,
                   }}
-                  onApply={(newWays) => setSystemInput({ ...systemInput, ways: newWays })}
+                  onApply={(newWays) => {
+                    // Optimizer modifies active_filters — extract back to crossover + EQ
+                    const { points, perWayEq: newEq } = extractCrossoverPoints(newWays);
+                    setDesign({
+                      ...design,
+                      system: { ...systemInput, ways: newWays.map((w, i) => ({ ...systemInput.ways[i], ...w, active_filters: [] })) },
+                      crossover_points: points,
+                      per_way_eq: newEq,
+                    });
+                  }}
                 />
               )}
 
               <SaveLoadControls
                 topology={topology}
-                system={systemInput}
+                system={solverInput}
                 onLoad={(topo, sys) => {
                   setTopology(topo);
-                  setSystemInput(sys);
+                  // Decompose loaded active_filters into crossover + EQ
+                  const { points, perWayEq: loadedEq } = extractCrossoverPoints(sys.ways);
+                  setDesign({
+                    system: { ...sys, ways: sys.ways.map(w => ({ ...w, active_filters: [] })) },
+                    crossover_points: points,
+                    per_way_eq: loadedEq,
+                    preset_names: sys.ways.map(w => w.preset_name),
+                  });
                 }}
               />
 
@@ -312,7 +405,7 @@ function App() {
                 <div className="section-card">
                   <div className="section-title">Export</div>
                   <div className="btn-row">
-                    <BiquadExport ways={systemInput.ways} />
+                    <BiquadExport ways={solverInput.ways} />
                   </div>
                 </div>
               )}
@@ -338,14 +431,14 @@ function App() {
                     <button className="graf-btn graf-btn-sm" style={{ color: 'var(--graf-danger)' }}
                       onClick={() => setSnapshots([])}>Clear</button>
                   )}
-                  <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={sysUndo.undo}
-                    disabled={!sysUndo.canUndo} title="Undo (Ctrl+Z)">Undo</button>
-                  <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={sysUndo.redo}
-                    disabled={!sysUndo.canRedo} title="Redo (Ctrl+Y)">Redo</button>
+                  <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={designUndo.undo}
+                    disabled={!designUndo.canUndo} title="Undo (Ctrl+Z)">Undo</button>
+                  <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={designUndo.redo}
+                    disabled={!designUndo.canRedo} title="Redo (Ctrl+Y)">Redo</button>
                   <button className="graf-btn graf-btn-sm graf-btn-outline"
                     title="Copy shareable URL to clipboard"
                     onClick={() => {
-                      const url = encodeToUrl(systemInput);
+                      const url = encodeToUrl(design);
                       navigator.clipboard.writeText(url);
                     }}>Share</button>
                 </div>

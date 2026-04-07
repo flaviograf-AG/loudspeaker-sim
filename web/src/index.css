@@ -297,6 +297,22 @@ body {
   padding: 4px 12px 12px 12px;
 }
 
+/* Crossover point cards */
+.crossover-point-card {
+  border: 1px solid var(--graf-warm-200, #d9d4ce);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: color-mix(in srgb, var(--graf-primary, #00809E) 3%, transparent);
+}
+
+.crossover-point-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--graf-primary, #00809E);
+  margin-bottom: 4px;
+}
+
 /* Responsive: single-column topology grid on narrow screens */
 @media (max-width: 480px) {
   .setup-topology-grid {

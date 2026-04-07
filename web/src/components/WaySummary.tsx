@@ -1,10 +1,10 @@
 import type { WayInput, ActiveFilter } from '../types';
 
 /** "Scan-Speak 18W · 37Hz · 6.5ohm · Qts 0.38" or "Custom · 37Hz · 6.5ohm · Qts 0.38" */
-export function driverSummary(way: WayInput, presetName?: string): string {
+export function driverSummary(way: WayInput): string {
   const d = way.driver;
   const qts = ((d.qes * d.qms) / (d.qes + d.qms)).toFixed(2);
-  const name = presetName || 'Custom';
+  const name = way.preset_name || 'Custom';
   return `${name} · ${d.fs_hz}Hz · ${d.re_ohm}\u03A9 · Qts ${qts}`;
 }
 

@@ -192,6 +192,7 @@ export interface WayInput {
   inverted: boolean;
   z_offset_m: number;
   enabled: boolean;
+  preset_name?: string;
 }
 
 export interface SystemInput {
@@ -227,4 +228,23 @@ export interface WayTemplate {
   name: string;
   role: 'full-range' | 'woofer' | 'woofer-bass-only' | 'midrange' | 'tweeter' | 'sub';
   defaultEnclosureType: EnclosureType;
+}
+
+// Crossover slope types — maps to LP/HP active filter pairs
+export type CrossoverSlope = '1st' | 'BW2' | 'LR2' | 'LR4';
+
+// A crossover point between two adjacent ways (or LP-only for bass-assist)
+export interface CrossoverPoint {
+  freq_hz: number;
+  slope: CrossoverSlope;
+  low_way_index: number;
+  high_way_index: number | null; // null = LP-only (bass-assist woofer, sub)
+}
+
+// Full UI design state — wraps SystemInput with crossover + UI metadata
+export interface DesignState {
+  system: SystemInput;
+  crossover_points: CrossoverPoint[];
+  per_way_eq: ActiveFilter[][];
+  preset_names: (string | undefined)[];
 }

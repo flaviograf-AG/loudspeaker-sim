@@ -4,11 +4,12 @@ import { DRIVER_PRESETS } from '../presets/drivers';
 import type { DriverParams } from '../types';
 
 interface Props {
-  onSelect: (params: DriverParams) => void;
+  onSelect: (params: DriverParams, name: string) => void;
+  currentName?: string;
 }
 
-export function PresetSelector({ onSelect }: Props) {
-  const [search, setSearch] = useState('');
+export function PresetSelector({ onSelect, currentName }: Props) {
+  const [search, setSearch] = useState(currentName ?? '');
   const [showList, setShowList] = useState(false);
 
   const filtered = useMemo(() => {
@@ -53,8 +54,9 @@ export function PresetSelector({ onSelect }: Props) {
               }}
               onMouseDown={(e) => {
                 e.preventDefault();
-                onSelect(d.params);
-                setSearch(`${d.vendor} ${d.model}`);
+                const name = `${d.vendor} ${d.model}`;
+                onSelect(d.params, name);
+                setSearch(name);
                 setShowList(false);
               }}
             >
@@ -77,7 +79,7 @@ export function PresetSelector({ onSelect }: Props) {
           onChange={(e) => {
             const idx = parseInt(e.target.value);
             if (!isNaN(idx)) {
-              onSelect(DRIVER_PRESETS[idx].params);
+              onSelect(DRIVER_PRESETS[idx].params, DRIVER_PRESETS[idx].name);
               setSearch(DRIVER_PRESETS[idx].name);
             }
             e.target.value = '';

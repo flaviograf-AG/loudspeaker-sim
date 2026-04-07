@@ -1,4 +1,4 @@
-import type { SystemTopology, WayTemplate, WayInput, EnclosureType, EnclosureConfig, ActiveFilter } from './types';
+import type { SystemTopology, WayTemplate, WayInput, EnclosureType, EnclosureConfig } from './types';
 
 export const TOPOLOGY_TEMPLATES: Record<SystemTopology, WayTemplate[]> = {
   '1-way': [
@@ -42,39 +42,6 @@ const DEFAULT_DRIVERS: Record<string, { fs_hz: number; re_ohm: number; le_h: num
   'sub': { fs_hz: 22, re_ohm: 3.5, le_h: 1.0e-3, qes: 0.38, qms: 5.0, vas_m3: 80e-3, sd_m2: 350e-4, xmax_m: 12e-3 },
 };
 
-// Default active filters per role for typical crossover points
-function defaultFilters(role: string, topology: SystemTopology): ActiveFilter[] {
-  switch (topology) {
-    case '1-way': return [];
-    case '2-way':
-      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 2500 }];
-      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 2500 }];
-      return [];
-    case '2.5-way':
-      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 2500 }];
-      if (role === 'woofer-bass-only') return [{ type: 'LR4LowPass', freq_hz: 500 }];
-      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 2500 }];
-      return [];
-    case '3-way':
-      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 500 }];
-      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
-      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
-      return [];
-    case '3.5-way':
-      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 500 }];
-      if (role === 'woofer-bass-only') return [{ type: 'LR4LowPass', freq_hz: 200 }];
-      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
-      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
-      return [];
-    case '4-way':
-      if (role === 'sub') return [{ type: 'LR4LowPass', freq_hz: 80 }];
-      if (role === 'woofer') return [{ type: 'LR4HighPass', freq_hz: 80 }, { type: 'LR4LowPass', freq_hz: 500 }];
-      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
-      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
-      return [];
-  }
-}
-
 // Default enclosure config per type
 export const DEFAULT_ENCLOSURES: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
@@ -101,7 +68,7 @@ export function buildWaysFromSetup(
       driver: { ...DEFAULT_DRIVERS[tpl.role] },
       enclosure: { ...DEFAULT_ENCLOSURES[encType] },
       passive_filters: [],
-      active_filters: defaultFilters(tpl.role, topology),
+      active_filters: [], // crossover filters are generated from CrossoverPoints
       gain_db: 0,
       delay_s: 0,
       inverted: false,
@@ -116,7 +83,7 @@ export const ENCLOSURE_TYPES_FOR_ROLE: Record<string, EnclosureType[]> = {
   'full-range': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'],
   'woofer': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'],
   'woofer-bass-only': ['Sealed', 'Vented', 'TransmissionLine', 'Bandpass', 'PassiveRadiator'],
-  'midrange': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'OpenBaffle'],
-  'tweeter': ['Sealed', 'Vented', 'Horn', 'OpenBaffle'],
+  'midrange': ['Sealed', 'Vented', 'Horn', 'OpenBaffle'],
+  'tweeter': ['Sealed', 'Horn', 'OpenBaffle'],
   'sub': ['Sealed', 'Vented', 'Bandpass', 'PassiveRadiator'],
 };

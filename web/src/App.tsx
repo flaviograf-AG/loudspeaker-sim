@@ -298,24 +298,14 @@ function App() {
                 />
               )}
 
-              <SaveLoadControls input={singleInput ?? { driver: way.driver, enclosure: way.enclosure, freq_start_hz: systemInput.freq_start_hz, freq_end_hz: systemInput.freq_end_hz, freq_points: systemInput.freq_points, drive_voltage_rms: systemInput.drive_voltage_rms }} onLoad={(loaded) => {
-                // Legacy load: single SimulationInput → 1-way system
-                setTopology('1-way');
-                setSystemInput({
-                  ways: [{
-                    name: 'Full Range',
-                    driver: loaded.driver,
-                    enclosure: loaded.enclosure,
-                    passive_filters: [],
-                    active_filters: [],
-                    gain_db: 0, delay_s: 0, inverted: false, z_offset_m: 0, enabled: true,
-                  }],
-                  freq_start_hz: loaded.freq_start_hz,
-                  freq_end_hz: loaded.freq_end_hz,
-                  freq_points: loaded.freq_points,
-                  drive_voltage_rms: loaded.drive_voltage_rms,
-                });
-              }} />
+              <SaveLoadControls
+                topology={topology}
+                system={systemInput}
+                onLoad={(topo, sys) => {
+                  setTopology(topo);
+                  setSystemInput(sys);
+                }}
+              />
 
               {!isMultiWay && <ExportControls result={singleResult} />}
               {isMultiWay && (

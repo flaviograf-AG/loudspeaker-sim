@@ -2,10 +2,10 @@ import { CrossoverPointsEditor } from './CrossoverPointsEditor';
 import { PerWayEqEditor } from './PerWayEqEditor';
 import { PassiveWizard } from './PassiveWizard';
 import { NumericInput } from './NumericInput';
-import type { DesignStateV2, WayDesign, CrossoverPoint, ActiveFilter } from '../types';
+import type { DesignState, WayDesign, CrossoverPoint, ActiveFilter } from '../types';
 
 interface CrossoverPanelProps {
-  design: DesignStateV2;
+  design: DesignState;
   activeWay: number;
   onUpdatePoints: (points: CrossoverPoint[]) => void;
   onUpdateEq: (wayIndex: number, eq: ActiveFilter[]) => void;

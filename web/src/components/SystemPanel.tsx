@@ -5,16 +5,16 @@ import { ExportControls } from './ExportControls';
 import { BiquadExport } from './BiquadExport';
 import { ImportOverlay, type OverlayData } from './ImportOverlay';
 import { extractCrossoverPoints } from '../crossover';
-import type { DesignStateV2, SystemInput, SimulationResult, SystemResult } from '../types';
+import type { DesignState, SystemInput, SimulationResult, SystemResult } from '../types';
 
 interface SystemPanelProps {
-  design: DesignStateV2;
+  design: DesignState;
   solverInput: SystemInput;
   singleResult: SimulationResult | null;
   systemResult: SystemResult | null;
   isMultiWay: boolean;
-  onUpdateDesign: (updates: Partial<DesignStateV2>) => void;
-  onSetDesign: (design: DesignStateV2) => void;
+  onUpdateDesign: (updates: Partial<DesignState>) => void;
+  onSetDesign: (design: DesignState) => void;
   overlay: OverlayData;
   onSetOverlay: (o: OverlayData) => void;
   snapshots: { name: string; spl: number[]; freqs: number[] }[];

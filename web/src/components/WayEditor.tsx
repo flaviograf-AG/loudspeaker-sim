@@ -6,11 +6,10 @@ import type { WayDesign, DriverParams } from '../types';
 
 interface WayEditorProps {
   way: WayDesign;
-  wayIndex: number;
   onUpdate: (updates: Partial<WayDesign>) => void;
 }
 
-export function WayEditor({ way, wayIndex, onUpdate }: WayEditorProps) {
+export function WayEditor({ way, onUpdate }: WayEditorProps) {
   return (
     <>
       <PresetSelector
@@ -26,7 +25,6 @@ export function WayEditor({ way, wayIndex, onUpdate }: WayEditorProps) {
           <input type="file" accept=".frd,.txt" hidden onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
-            const idx = wayIndex; // capture at click time
             const existingMeasured = way.measured;
             file.text().then(text => {
               const frd = parseFrd(text);

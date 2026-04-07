@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import type { DesignStateV2 } from '../types';
+import type { DesignState } from '../types';
 
-export function useUrlSync(design: DesignStateV2) {
+export function useUrlSync(design: DesignState) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -14,7 +14,7 @@ export function useUrlSync(design: DesignStateV2) {
   }, [design]);
 }
 
-export function decodeFromUrl(): DesignStateV2 | null {
+export function decodeFromUrl(): DesignState | null {
   const hash = location.hash;
   if (!hash || hash.length < 5) return null;
 

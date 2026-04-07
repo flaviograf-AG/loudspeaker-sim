@@ -248,15 +248,7 @@ export interface CrossoverPoint {
   high_way_index: number | null; // null = LP-only (bass-assist woofer, sub)
 }
 
-// Full UI design state — wraps SystemInput with crossover + UI metadata
-export interface DesignState {
-  system: SystemInput;
-  crossover_points: CrossoverPoint[];
-  per_way_eq: ActiveFilter[][];
-  preset_names: (string | undefined)[];
-}
-
-// === NEW STATE MODEL (v2) ===
+// === STATE MODEL (v2) ===
 
 export interface WayDesign {
   name: string;
@@ -278,7 +270,7 @@ export interface WayDesign {
   };
 }
 
-export interface DesignStateV2 {
+export interface DesignState {
   version: 2;
   topology: SystemTopology;
   ways: WayDesign[];

@@ -16,8 +16,7 @@ import { WayEditor } from './components/WayEditor';
 import { CrossoverPanel } from './components/CrossoverPanel';
 import { SystemPanel } from './components/SystemPanel';
 import { SetupWizard } from './components/SetupWizard';
-import { buildWaysFromSetup } from './systemSetup';
-import type { SimulationInput, DesignStateV2, WayDesign, WayInput, CrossoverPoint, ActiveFilter, SystemTopology } from './types';
+import type { SimulationInput, DesignState, WayDesign, WayInput, CrossoverPoint, ActiveFilter, SystemTopology } from './types';
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -39,7 +38,7 @@ function App() {
   // === Single source of truth ===
   const urlState = decodeFromUrl();
   const initialDesign = urlState ?? defaultDesign();
-  const designUndo = useUndoRedo<DesignStateV2>(initialDesign);
+  const designUndo = useUndoRedo<DesignState>(initialDesign);
 
   // Skip wizard if loaded from URL
   const [didInit] = useState(() => urlState !== null);
@@ -113,7 +112,7 @@ function App() {
     setDesign({ ...design, per_way_eq: newEq });
   }, [design, setDesign]);
 
-  // Setup wizard callback — converts WayInput[] to DesignStateV2
+  // Setup wizard callback — converts WayInput[] to DesignState
   const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[]) => {
     const points = defaultCrossoverPoints(topo);
     setDesign({
@@ -260,7 +259,6 @@ function App() {
             >
               <WayEditor
                 way={way}
-                wayIndex={safeActiveWay}
                 onUpdate={(updates) => updateWay(safeActiveWay, updates)}
               />
             </AccordionSection>

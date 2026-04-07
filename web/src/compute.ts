@@ -1,4 +1,4 @@
-import type { DesignStateV2, SystemInput, WayInput, ActiveFilter, CrossoverPoint, CrossoverSlope } from './types';
+import type { DesignState, SystemInput, WayInput, ActiveFilter, CrossoverPoint, CrossoverSlope } from './types';
 
 /**
  * Assemble active filters for one way from crossover points + per-way EQ.
@@ -46,7 +46,7 @@ function makeHighPass(freq: number, slope: CrossoverSlope): ActiveFilter {
  * Build solver input from design state.
  * One pure function, one direction, no reverse path.
  */
-export function buildSolverInput(design: DesignStateV2): SystemInput {
+export function buildSolverInput(design: DesignState): SystemInput {
   return {
     ways: design.ways.map((w, i): WayInput => ({
       name: w.name,
@@ -69,7 +69,7 @@ export function buildSolverInput(design: DesignStateV2): SystemInput {
 }
 
 /** Default 2-way design for fresh start. */
-export function defaultDesign(): DesignStateV2 {
+export function defaultDesign(): DesignState {
   return {
     version: 2,
     topology: '2-way',

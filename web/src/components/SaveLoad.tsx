@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { extractCrossoverPoints, defaultCrossoverPoints } from '../crossover';
-import type { DesignStateV2, SystemTopology } from '../types';
+import type { DesignState, SystemTopology } from '../types';
 
 const STORAGE_KEY = 'ls-designs-v2';
 
 interface SavedDesign {
   name: string;
   timestamp: number;
-  design: DesignStateV2;
+  design: DesignState;
 }
 
 function loadDesigns(): SavedDesign[] {
@@ -58,7 +58,7 @@ function migrateLegacyDesigns(): SavedDesign[] {
   } catch { return []; }
 }
 
-function saveDesignToStorage(name: string, design: DesignStateV2): void {
+function saveDesignToStorage(name: string, design: DesignState): void {
   const designs = loadDesigns();
   designs.push({ name, timestamp: Date.now(), design });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(designs));
@@ -71,8 +71,8 @@ function deleteDesignFromStorage(index: number): void {
 }
 
 interface SaveLoadProps {
-  design: DesignStateV2;
-  onLoad: (design: DesignStateV2) => void;
+  design: DesignState;
+  onLoad: (design: DesignState) => void;
 }
 
 export function SaveLoad({ design, onLoad }: SaveLoadProps) {

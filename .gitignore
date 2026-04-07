@@ -16,5 +16,8 @@ Thumbs.db
 # PDFs (reference only, stored locally)
 docs/references/*.pdf
 
+# Worktrees
+.worktrees/
+
 # Misc
 --sqlite

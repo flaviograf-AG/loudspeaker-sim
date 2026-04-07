@@ -33,21 +33,25 @@ interface Props {
   driverVas?: number;
   driverFs?: number;
   driverQts?: number;
+  hpCrossoverHz?: number;
   onChange: (config: EnclosureConfig) => void;
   lockType?: boolean;
   onChangeType?: () => void;
 }
 
 
-export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, onChange, lockType, onChangeType }: Props) {
+export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
 
   const switchType = (t: EnclosureType) => {
     if (t !== encType) {
-      // Compute enclosure from driver T/S params if available, else use static defaults
-      onChange(driver ? computeDefaultEnclosure(driver, t) : DEFAULT_ENCLOSURES[t]);
+      onChange(driver ? computeDefaultEnclosure(driver, t, hpCrossoverHz) : DEFAULT_ENCLOSURES[t]);
     }
+  };
+
+  const loadDefaults = () => {
+    if (driver) onChange(computeDefaultEnclosure(driver, encType, hpCrossoverHz));
   };
 
   // Computed readouts
@@ -85,6 +89,11 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
           {onChangeType && (
             <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={onChangeType}
               style={{ fontSize: 11, padding: '0 4px' }}>change</button>
+          )}
+          {driver && (
+            <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={loadDefaults}
+              title="Recompute enclosure dimensions from current driver T/S parameters"
+              style={{ fontSize: 11, padding: '0 4px' }}>load defaults</button>
           )}
         </div>
       ) : (

@@ -62,8 +62,10 @@ const C0 = 343.21; // speed of sound m/s
 /**
  * Compute physically sensible enclosure defaults from driver T/S parameters.
  * Each enclosure type derives dimensions from fs, Vas, Sd, Qts.
+ * Optional hpCrossoverHz: the HP crossover frequency for this way (from crossover topology).
+ * Used for horn cutoff — if the driver only plays above 500Hz, the horn should load from 500Hz.
  */
-export function computeDefaultEnclosure(driver: DriverParams, type: EnclosureType): EnclosureConfig {
+export function computeDefaultEnclosure(driver: DriverParams, type: EnclosureType, hpCrossoverHz?: number): EnclosureConfig {
   const { fs_hz, sd_m2, vas_m3, qes, qms } = driver;
   const qts = (qes * qms) / (qes + qms);
 
@@ -105,8 +107,8 @@ export function computeDefaultEnclosure(driver: DriverParams, type: EnclosureTyp
     }
     case 'Horn': {
       // Throat = Sd, mouth circumference >= wavelength at cutoff
-      // Cutoff ~ Fs, mouth area = (c / (2*Fc))^2 / pi for circular wavefront
-      const cutoff = Math.max(fs_hz, 50);
+      // Cutoff from HP crossover if available (horn loads above that), else driver Fs
+      const cutoff = Math.max(hpCrossoverHz ?? fs_hz, 50);
       const lambda = C0 / cutoff;
       const mouthArea = Math.max((lambda * lambda) / (4 * Math.PI), sd_m2 * 10);
       // Length ~ lambda/4 at cutoff (minimum for useful loading)

@@ -279,6 +279,7 @@ function App() {
                 driverVas={way.driver.vas_m3}
                 driverFs={way.driver.fs_hz}
                 driverQts={(way.driver.qes * way.driver.qms) / (way.driver.qes + way.driver.qms)}
+                hpCrossoverHz={crossoverPoints.find(pt => pt.high_way_index === safeActiveWay)?.freq_hz}
                 onChange={updateEnclosure}
                 lockType
                 onChangeType={() => setShowSetup(true)}

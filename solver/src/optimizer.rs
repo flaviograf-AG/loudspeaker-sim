@@ -282,6 +282,30 @@ fn cost(project: &SpeakerProject, config: &OptimizerConfig) -> f64 {
         }
     }
 
+    // Crossover ordering penalty: if CrossoverFreq params exist, they must be monotonically increasing.
+    // Collect the actual applied crossover frequencies from the project.
+    {
+        let mut xover_freqs: Vec<f64> = Vec::new();
+        for p in &config.params {
+            if let OptParam::CrossoverFreq { lp_way_idx, lp_filter_idx, .. } = p {
+                let filter = &project.ways[*lp_way_idx].active_filters[*lp_filter_idx];
+                let f = match filter {
+                    ActiveFilter::LowPass1 { freq_hz } | ActiveFilter::LR4LowPass { freq_hz } |
+                    ActiveFilter::LR2LowPass { freq_hz } | ActiveFilter::LowPass2 { freq_hz, .. } => *freq_hz,
+                    _ => 0.0,
+                };
+                xover_freqs.push(f);
+            }
+        }
+        for w in xover_freqs.windows(2) {
+            if w[0] >= w[1] {
+                // Inverted crossover: heavy penalty proportional to the overlap
+                let overlap = w[0] - w[1];
+                spl_cost += 100.0 * (1.0 + overlap / 100.0);
+            }
+        }
+    }
+
     // Displacement penalty: penalize any way exceeding its Xmax
     if config.displacement_penalty_weight > 0.0 {
         for (i, &max_disp) in result.way_max_displacement_mm.iter().enumerate() {
@@ -358,6 +382,20 @@ pub fn optimize(
         }
         if let Some(&hi) = config.param_max_bounds.get(i) {
             if *val > hi { *val = hi; }
+        }
+    }
+
+    // Enforce crossover frequency ordering: collect CrossoverFreq param indices,
+    // then ensure their values are monotonically increasing.
+    let xover_indices: Vec<usize> = config.params.iter().enumerate()
+        .filter_map(|(i, p)| if matches!(p, OptParam::CrossoverFreq { .. }) { Some(i) } else { None })
+        .collect();
+    for w in xover_indices.windows(2) {
+        if result.values[w[0]] > result.values[w[1]] {
+            // Swap to enforce ordering
+            let mid = (result.values[w[0]] + result.values[w[1]]) / 2.0;
+            result.values[w[0]] = mid * 0.9; // slightly below midpoint
+            result.values[w[1]] = mid * 1.1; // slightly above midpoint
         }
     }
 

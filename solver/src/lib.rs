@@ -197,6 +197,8 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
                 lp_way_idx: *lp_way_idx, lp_filter_idx: *lp_filter_idx,
                 hp_way_idx: *hp_way_idx, hp_filter_idx: *hp_filter_idx,
             },
+        system_api::OptParamJson::LPadAttenuation { way_idx } =>
+            optimizer::OptParam::LPadAttenuation { way_idx: *way_idx },
     }).collect();
 
     // Convert target curve (with legacy fallback)
@@ -258,6 +260,7 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
                 (lo, hi)
             }
             optimizer::OptParam::WayGain { .. } => (-20.0, 20.0),
+            optimizer::OptParam::LPadAttenuation { .. } => (0.0, 20.0),
             optimizer::OptParam::WayDelay { .. } => (0.0, 0.1), // max 100ms delay
             optimizer::OptParam::CrossoverFreq { hp_way_idx, hp_filter_idx: _, .. } => {
                 // Min bound: max of displacement limit and 2.5× Fs
@@ -315,6 +318,8 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             }
             wj.gain_db = w.gain_db;
             wj.delay_s = w.delay_s;
+            // Update passive filters (may have been modified by LPadAttenuation)
+            wj.passive_filters = w.passive_filters.iter().map(|pf| passive_block_to_json(pf)).collect();
             wj
         }).collect(),
         ..input.system
@@ -357,5 +362,20 @@ fn active_filter_to_json(af: &crossover::ActiveFilter) -> system_api::ActiveFilt
         crossover::ActiveFilter::LinkwitzTransform { fo, qo, fp, qp } => system_api::ActiveFilterJson::LinkwitzTransform { fo: *fo, qo: *qo, fp: *fp, qp: *qp },
         crossover::ActiveFilter::Gain { db } => system_api::ActiveFilterJson::Gain { db: *db },
         crossover::ActiveFilter::Invert => system_api::ActiveFilterJson::Invert,
+    }
+}
+
+fn passive_block_to_json(pb: &crossover::PassiveBlock) -> system_api::PassiveFilterJson {
+    match pb {
+        crossover::PassiveBlock::SeriesR { ohms } => system_api::PassiveFilterJson::SeriesR { ohms: *ohms },
+        crossover::PassiveBlock::SeriesL { henries, dcr_ohms } => system_api::PassiveFilterJson::SeriesL { henries: *henries, dcr_ohms: *dcr_ohms },
+        crossover::PassiveBlock::SeriesC { farads } => system_api::PassiveFilterJson::SeriesC { farads: *farads },
+        crossover::PassiveBlock::ShuntR { ohms } => system_api::PassiveFilterJson::ShuntR { ohms: *ohms },
+        crossover::PassiveBlock::ShuntL { henries, dcr_ohms } => system_api::PassiveFilterJson::ShuntL { henries: *henries, dcr_ohms: *dcr_ohms },
+        crossover::PassiveBlock::ShuntC { farads } => system_api::PassiveFilterJson::ShuntC { farads: *farads },
+        crossover::PassiveBlock::ZobelShunt { ohms, farads } => system_api::PassiveFilterJson::ZobelShunt { ohms: *ohms, farads: *farads },
+        crossover::PassiveBlock::LPad { series_ohms, shunt_ohms } => system_api::PassiveFilterJson::LPad { series_ohms: *series_ohms, shunt_ohms: *shunt_ohms },
+        crossover::PassiveBlock::NotchShunt { ohms, henries, farads } => system_api::PassiveFilterJson::NotchShunt { ohms: *ohms, henries: *henries, farads: *farads },
+        crossover::PassiveBlock::NotchSeries { ohms, henries, farads } => system_api::PassiveFilterJson::NotchSeries { ohms: *ohms, henries: *henries, farads: *farads },
     }
 }

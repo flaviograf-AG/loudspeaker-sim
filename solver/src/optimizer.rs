@@ -80,6 +80,11 @@ pub enum OptParam {
         lp_way_idx: usize, lp_filter_idx: usize,
         hp_way_idx: usize, hp_filter_idx: usize,
     },
+    /// L-Pad attenuation for a way (dB, positive = attenuation).
+    /// Computes R_series and R_shunt from driver Re and inserts/updates
+    /// an LPad PassiveBlock. The solver's ABCD matrix models the impedance
+    /// interaction correctly, unlike the ideal gain_db approach.
+    LPadAttenuation { way_idx: usize },
 }
 
 /// Frequency weighting for cost function.
@@ -171,6 +176,22 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
                 _ => 1000.0,
             }
         }
+        OptParam::LPadAttenuation { way_idx } => {
+            // Extract current attenuation from existing LPad block
+            use crate::crossover::PassiveBlock;
+            let re = project.ways[*way_idx].driver.re_ohm;
+            project.ways[*way_idx].passive_filters.iter()
+                .find_map(|pf| {
+                    if let PassiveBlock::LPad { series_ohms, .. } = pf {
+                        if re > *series_ohms && *series_ohms > 0.0 {
+                            Some(20.0 * (re / (re - series_ohms)).log10())
+                        } else {
+                            Some(0.0)
+                        }
+                    } else { None }
+                })
+                .unwrap_or(0.0)
+        }
     }).collect()
 }
 
@@ -218,6 +239,30 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
             }
             OptParam::WayDelay { way_idx } => {
                 project.ways[*way_idx].delay_s = v.max(0.0);
+            }
+            OptParam::LPadAttenuation { way_idx } => {
+                use crate::crossover::PassiveBlock;
+                let atten_db = v.max(lo).min(hi); // clamp to bounds
+                let re = project.ways[*way_idx].driver.re_ohm;
+                if atten_db > 0.3 && re > 0.0 {
+                    let ratio = 10.0_f64.powf(atten_db / 20.0);
+                    let series_ohms = re * (ratio - 1.0) / ratio;
+                    let shunt_ohms = re * ratio / (ratio - 1.0);
+                    // Find existing LPad and update, or insert new one
+                    let lpad_idx = project.ways[*way_idx].passive_filters.iter()
+                        .position(|pf| matches!(pf, PassiveBlock::LPad { .. }));
+                    if let Some(idx) = lpad_idx {
+                        project.ways[*way_idx].passive_filters[idx] = PassiveBlock::LPad { series_ohms, shunt_ohms };
+                    } else {
+                        project.ways[*way_idx].passive_filters.push(PassiveBlock::LPad { series_ohms, shunt_ohms });
+                    }
+                    // Zero out gain_db since L-Pad handles attenuation
+                    project.ways[*way_idx].gain_db = 0.0;
+                } else {
+                    // No attenuation needed — remove any existing LPad
+                    project.ways[*way_idx].passive_filters.retain(|pf| !matches!(pf, PassiveBlock::LPad { .. }));
+                    project.ways[*way_idx].gain_db = 0.0;
+                }
             }
             OptParam::CrossoverFreq { lp_way_idx, lp_filter_idx, hp_way_idx, hp_filter_idx } => {
                 let freq = v.max(10.0).max(lo).min(hi);

@@ -86,9 +86,14 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         }
       });
     }
-    // Add gain for all enabled ways
-    enabledWays.forEach(w => {
-      params.push({ type: 'WayGain', way_idx: w.idx });
+    // Level matching: first way uses WayGain (reference), others use LPadAttenuation
+    // so the optimizer tunes real passive L-Pad resistors with proper impedance modeling
+    enabledWays.forEach((w, i) => {
+      if (i === 0) {
+        params.push({ type: 'WayGain', way_idx: w.idx });
+      } else {
+        params.push({ type: 'LPadAttenuation', way_idx: w.idx });
+      }
     });
 
     if (params.length === 0) {
@@ -117,25 +122,22 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
 
       setResult({ cost: optResult.final_cost, iterations: optResult.iterations, minSafeFreqs: optResult.min_safe_freq_hz });
 
-      // Apply optimized ways back, converting negative gain to L-Pad
+      // Apply optimized ways back — L-Pad values come from solver directly
       const gainNotes: string[] = [];
       onApply(optResult.optimized_system.ways.map((ow, i) => {
-        const way = { ...ways[i], active_filters: ow.active_filters, gain_db: ow.gain_db, delay_s: ow.delay_s };
-        const absGain = Math.abs(ow.gain_db);
+        const way = {
+          ...ways[i],
+          active_filters: ow.active_filters,
+          passive_filters: ow.passive_filters, // includes solver-optimized L-Pad
+          gain_db: ow.gain_db,
+          delay_s: ow.delay_s,
+        };
 
-        if (ow.gain_db < -0.5) {
-          // Convert attenuation to L-Pad using driver Re
-          const re = ways[i].driver.re_ohm;
-          if (re > 0) {
-            const ratio = Math.pow(10, absGain / 20);
-            const series_ohms = re * (ratio - 1) / ratio;
-            const shunt_ohms = re * ratio / (ratio - 1);
-            // Remove any existing L-Pad, then append new one
-            const filtered = way.passive_filters.filter(f => f.type !== 'LPad');
-            way.passive_filters = [...filtered, { type: 'LPad' as const, series_ohms, shunt_ohms }];
-            way.gain_db = 0;
-            gainNotes.push(`${ways[i].name}: L-Pad ${absGain.toFixed(1)} dB (${series_ohms.toFixed(1)}Ω / ${shunt_ohms.toFixed(1)}Ω)`);
-          }
+        // Report L-Pad values
+        const lpad = ow.passive_filters.find(f => f.type === 'LPad');
+        if (lpad && 'series_ohms' in lpad && 'shunt_ohms' in lpad) {
+          const atten = 20 * Math.log10(1 + (lpad.series_ohms as number) / ways[i].driver.re_ohm);
+          gainNotes.push(`${ways[i].name}: L-Pad ${atten.toFixed(1)} dB (${(lpad.series_ohms as number).toFixed(1)}Ω / ${(lpad.shunt_ohms as number).toFixed(1)}Ω)`);
         } else if (ow.gain_db > 0.5) {
           gainNotes.push(`${ways[i].name}: +${ow.gain_db.toFixed(1)} dB (requires active gain stage)`);
         }

@@ -176,6 +176,7 @@ pub enum OptParamJson {
         lp_way_idx: usize, lp_filter_idx: usize,
         hp_way_idx: usize, hp_filter_idx: usize,
     },
+    LPadAttenuation { way_idx: usize },
 }
 
 /// Target curve specification for the optimizer.

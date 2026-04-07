@@ -275,6 +275,7 @@ function App() {
             >
               <EnclosureInputs
                 config={way.enclosure}
+                driver={way.driver}
                 driverVas={way.driver.vas_m3}
                 driverFs={way.driver.fs_hz}
                 driverQts={(way.driver.qes * way.driver.qms) / (way.driver.qes + way.driver.qms)}

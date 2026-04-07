@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { EnclosureConfig, EnclosureType, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
-import { DEFAULT_ENCLOSURES } from '../systemSetup';
+import type { EnclosureConfig, EnclosureType, DriverParams, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
+import { DEFAULT_ENCLOSURES, computeDefaultEnclosure } from '../systemSetup';
 import { NumericInput } from './NumericInput';
 
 const C0 = 343.21;
@@ -29,6 +29,7 @@ function computeFb(volume_m3: number, port_area_m2: number, port_length_m: numbe
 
 interface Props {
   config: EnclosureConfig;
+  driver?: DriverParams;
   driverVas?: number;
   driverFs?: number;
   driverQts?: number;
@@ -37,16 +38,16 @@ interface Props {
   onChangeType?: () => void;
 }
 
-// Single source of truth — imported from systemSetup.ts
-const DEFAULT_CONFIGS = DEFAULT_ENCLOSURES;
 
-
-export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChange, lockType, onChangeType }: Props) {
+export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, onChange, lockType, onChangeType }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
 
   const switchType = (t: EnclosureType) => {
-    if (t !== encType) onChange(DEFAULT_CONFIGS[t]);
+    if (t !== encType) {
+      // Compute enclosure from driver T/S params if available, else use static defaults
+      onChange(driver ? computeDefaultEnclosure(driver, t) : DEFAULT_ENCLOSURES[t]);
+    }
   };
 
   // Computed readouts

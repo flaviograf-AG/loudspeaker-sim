@@ -1,4 +1,4 @@
-import type { SystemTopology, WayTemplate, WayInput, EnclosureType, EnclosureConfig } from './types';
+import type { SystemTopology, WayTemplate, WayInput, EnclosureType, EnclosureConfig, DriverParams } from './types';
 
 export const TOPOLOGY_TEMPLATES: Record<SystemTopology, WayTemplate[]> = {
   '1-way': [
@@ -57,6 +57,115 @@ export const DEFAULT_ENCLOSURES: Record<EnclosureType, EnclosureConfig> = {
   OpenBaffle: { type: 'OpenBaffle', width_m: 0.40, height_m: 0.60, driver_offset_m: 0.1 },
 };
 
+const C0 = 343.21; // speed of sound m/s
+
+/**
+ * Compute physically sensible enclosure defaults from driver T/S parameters.
+ * Each enclosure type derives dimensions from fs, Vas, Sd, Qts.
+ */
+export function computeDefaultEnclosure(driver: DriverParams, type: EnclosureType): EnclosureConfig {
+  const { fs_hz, sd_m2, vas_m3, qes, qms } = driver;
+  const qts = (qes * qms) / (qes + qms);
+
+  switch (type) {
+    case 'Sealed': {
+      // Target Qtc = 0.707 (Butterworth): Vb = Vas / ((Qtc/Qts)^2 - 1)
+      const qtc = 0.707;
+      const ratio = (qtc / qts) ** 2 - 1;
+      const vb = ratio > 0 ? vas_m3 / ratio : vas_m3;
+      return { type: 'Sealed', volume_m3: Math.max(vb, 0.5e-3), ql: 7 };
+    }
+    case 'Vented': {
+      // Vb ≈ Vas for B4-like alignment, Fb ≈ Fs
+      const vb = vas_m3;
+      const portArea = sd_m2 / 3; // port area ~ Sd/3 to keep velocity low
+      // Port length for Fb = Fs: L = c²·Sp/(4π²·Fb²·Vb) - end correction
+      const fb = fs_hz;
+      const portRadius = Math.sqrt(portArea / Math.PI);
+      const endCorrection = 0.85 * portRadius * 2; // flanged both ends
+      const rawLength = (C0 ** 2 * portArea) / (4 * Math.PI ** 2 * fb ** 2 * vb) - endCorrection;
+      const portLength = Math.max(rawLength, 0.02);
+      return {
+        type: 'Vented', volume_m3: Math.max(vb, 1e-3), port_area_m2: portArea,
+        port_length_m: portLength, num_ports: 1, port_flanged: true, ql: 7,
+        port_shape: { type: 'Circular' },
+      };
+    }
+    case 'TransmissionLine': {
+      // Length = c / (4 * Fs) = quarter wavelength at Fs
+      // Cross-section at driver = Sd
+      const length = C0 / (4 * fs_hz);
+      return {
+        type: 'TransmissionLine', length_m: Math.min(length, 4.0),
+        area_driver_m2: sd_m2, area_mouth_m2: sd_m2,
+        num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 0,
+        open_end: true, driver_position: 0, taper_profile: { type: 'Straight' },
+        stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0,
+      };
+    }
+    case 'Horn': {
+      // Throat = Sd, mouth circumference >= wavelength at cutoff
+      // Cutoff ~ Fs, mouth area = (c / (2*Fc))^2 / pi for circular wavefront
+      const cutoff = Math.max(fs_hz, 50);
+      const lambda = C0 / cutoff;
+      const mouthArea = Math.max((lambda * lambda) / (4 * Math.PI), sd_m2 * 10);
+      // Length ~ lambda/4 at cutoff (minimum for useful loading)
+      const hornLength = Math.min(lambda / 4, 2.0);
+      return {
+        type: 'Horn',
+        segments: [{ area_start_m2: sd_m2, area_end_m2: mouthArea, length_m: hornLength,
+          profile: { type: 'Exponential' }, cutoff_hz: cutoff }],
+        rear_chamber: { type: 'Sealed', volume_m3: vas_m3 * 0.3,
+          depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 },
+        throat_chamber: null, radiation_angle_sr: 2 * Math.PI,
+        num_tmm_segments: 30, stuffing_zones: [],
+      };
+    }
+    case 'Bandpass': {
+      // Rear = sealed volume (Qtc=0.707), Front ≈ 1.5× rear, port tuned to Fs
+      const qtc = 0.707;
+      const ratio = (qtc / qts) ** 2 - 1;
+      const rearVol = ratio > 0 ? vas_m3 / ratio : vas_m3;
+      const frontVol = rearVol * 1.5;
+      const portArea = sd_m2 / 3;
+      const portRadius = Math.sqrt(portArea / Math.PI);
+      const endCorr = 0.85 * portRadius * 2;
+      const rawLen = (C0 ** 2 * portArea) / (4 * Math.PI ** 2 * fs_hz ** 2 * frontVol) - endCorr;
+      return {
+        type: 'Bandpass', rear_volume_m3: Math.max(rearVol, 1e-3),
+        front_volume_m3: Math.max(frontVol, 1e-3),
+        port_area_m2: portArea, port_length_m: Math.max(rawLen, 0.02),
+        port_flanged: true, rear_ql: 7, front_ql: 7,
+      };
+    }
+    case 'PassiveRadiator': {
+      // Box = sealed volume, PR Sd ≈ driver Sd, tune PR to Fs
+      // f_pr = 1/(2π√(Cms·Mms)), solve for Mms given target Cms
+      const qtc = 0.707;
+      const ratio = (qtc / qts) ** 2 - 1;
+      const vb = ratio > 0 ? vas_m3 / ratio : vas_m3;
+      const prSd = sd_m2 * 1.5; // PR slightly larger than driver
+      // Target PR tuning = Fs: Mms = 1/(Cms·(2πFs)²)
+      const cms = 1e-3; // typical compliance
+      const mms = 1 / (cms * (2 * Math.PI * fs_hz) ** 2);
+      return {
+        type: 'PassiveRadiator', volume_m3: Math.max(vb, 1e-3),
+        pr_sd_m2: prSd, pr_cms: cms, pr_mms_kg: Math.max(mms, 0.005),
+        pr_rms: 1, ql: 7,
+      };
+    }
+    case 'OpenBaffle': {
+      // Baffle width ≈ 3× driver diameter for reasonable baffle step
+      const driverDia = 2 * Math.sqrt(sd_m2 / Math.PI);
+      const width = Math.max(driverDia * 3, 0.25);
+      return {
+        type: 'OpenBaffle', width_m: width, height_m: width * 1.5,
+        driver_offset_m: width * 0.15,
+      };
+    }
+  }
+}
+
 /**
  * Generate a complete WayInput[] from a topology + per-way enclosure overrides.
  */
@@ -67,10 +176,11 @@ export function buildWaysFromSetup(
   const templates = TOPOLOGY_TEMPLATES[topology];
   return templates.map((tpl, i) => {
     const encType = enclosureOverrides[i] ?? tpl.defaultEnclosureType;
+    const driver = { ...DEFAULT_DRIVERS[tpl.role] };
     return {
       name: tpl.name,
-      driver: { ...DEFAULT_DRIVERS[tpl.role] },
-      enclosure: { ...DEFAULT_ENCLOSURES[encType] },
+      driver,
+      enclosure: computeDefaultEnclosure(driver, encType),
       passive_filters: [],
       active_filters: [], // crossover filters are generated from CrossoverPoints
       gain_db: 0,

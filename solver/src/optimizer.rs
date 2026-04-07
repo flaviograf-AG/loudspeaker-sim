@@ -74,6 +74,12 @@ pub enum OptParam {
     WayGain { way_idx: usize },
     /// Per-way delay in seconds
     WayDelay { way_idx: usize },
+    /// Linked crossover point: sets both a LP filter and a HP filter to the same frequency.
+    /// Used for multi-way systems where woofer LP ≈ mid HP at the crossover point.
+    CrossoverFreq {
+        lp_way_idx: usize, lp_filter_idx: usize,
+        hp_way_idx: usize, hp_filter_idx: usize,
+    },
 }
 
 /// Frequency weighting for cost function.
@@ -111,6 +117,8 @@ pub struct OptimizerConfig {
     pub algorithm: Algorithm,
     /// Per-parameter minimum bounds (same length as params, or empty for no bounds)
     pub param_min_bounds: Vec<f64>,
+    /// Per-parameter maximum bounds (same length as params, or empty for no bounds)
+    pub param_max_bounds: Vec<f64>,
 }
 
 /// Optimizer result.
@@ -152,6 +160,17 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
         }
         OptParam::WayGain { way_idx } => project.ways[*way_idx].gain_db,
         OptParam::WayDelay { way_idx } => project.ways[*way_idx].delay_s,
+        OptParam::CrossoverFreq { lp_way_idx, lp_filter_idx, .. } => {
+            // Extract from the LP filter (LP and HP should be the same)
+            let filter = &project.ways[*lp_way_idx].active_filters[*lp_filter_idx];
+            match filter {
+                ActiveFilter::LowPass1 { freq_hz } |
+                ActiveFilter::LR4LowPass { freq_hz } |
+                ActiveFilter::LR2LowPass { freq_hz } => *freq_hz,
+                ActiveFilter::LowPass2 { freq_hz, .. } => *freq_hz,
+                _ => 1000.0,
+            }
+        }
     }).collect()
 }
 
@@ -162,17 +181,19 @@ pub fn apply_values_pub(project: &mut SpeakerProject, params: &[OptParam], value
 
 /// Apply parameter values back into the project, with optional per-param min bounds.
 fn apply_values(project: &mut SpeakerProject, params: &[OptParam], values: &[f64]) {
-    apply_values_bounded(project, params, values, &[]);
+    apply_values_bounded(project, params, values, &[], &[]);
 }
 
-/// Apply parameter values with per-parameter minimum bounds.
-fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], values: &[f64], min_bounds: &[f64]) {
+/// Apply parameter values with per-parameter min/max bounds.
+fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], values: &[f64],
+                        min_bounds: &[f64], max_bounds: &[f64]) {
     for (i, (p, &v)) in params.iter().zip(values.iter()).enumerate() {
-        let bound = min_bounds.get(i).copied().unwrap_or(0.0);
+        let lo = min_bounds.get(i).copied().unwrap_or(0.0);
+        let hi = max_bounds.get(i).copied().unwrap_or(f64::MAX);
         match p {
             OptParam::FilterFreq { way_idx, filter_idx } => {
                 let filter = &mut project.ways[*way_idx].active_filters[*filter_idx];
-                let freq = v.max(10.0).max(bound); // clamp to minimum 10 Hz and param bound
+                let freq = v.max(10.0).max(lo).min(hi);
                 match filter {
                     ActiveFilter::LowPass1 { freq_hz } |
                     ActiveFilter::HighPass1 { freq_hz } |
@@ -197,6 +218,26 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
             }
             OptParam::WayDelay { way_idx } => {
                 project.ways[*way_idx].delay_s = v.max(0.0);
+            }
+            OptParam::CrossoverFreq { lp_way_idx, lp_filter_idx, hp_way_idx, hp_filter_idx } => {
+                let freq = v.max(10.0).max(lo).min(hi);
+                // Apply to LP filter
+                let set_freq = |filter: &mut ActiveFilter, f: f64| {
+                    match filter {
+                        ActiveFilter::LowPass1 { freq_hz } |
+                        ActiveFilter::HighPass1 { freq_hz } |
+                        ActiveFilter::LR4LowPass { freq_hz } |
+                        ActiveFilter::LR4HighPass { freq_hz } |
+                        ActiveFilter::LR2LowPass { freq_hz } |
+                        ActiveFilter::LR2HighPass { freq_hz } |
+                        ActiveFilter::AllPass1 { freq_hz } => *freq_hz = f,
+                        ActiveFilter::LowPass2 { freq_hz, .. } |
+                        ActiveFilter::HighPass2 { freq_hz, .. } => *freq_hz = f,
+                        _ => {}
+                    }
+                };
+                set_freq(&mut project.ways[*lp_way_idx].active_filters[*lp_filter_idx], freq);
+                set_freq(&mut project.ways[*hp_way_idx].active_filters[*hp_filter_idx], freq);
             }
         }
     }
@@ -294,7 +335,7 @@ pub fn optimize(
 
             // Phase 2: NM polish from DE's best (1/3 of iterations)
             let mut polished_project = project.clone();
-            apply_values_bounded(&mut polished_project, &config.params, &de_values, &config.param_min_bounds);
+            apply_values_bounded(&mut polished_project, &config.params, &de_values, &config.param_min_bounds, &config.param_max_bounds);
             let mut nm_config = config.clone();
             nm_config.max_iterations = config.max_iterations - de_iters;
             nm_config.algorithm = Algorithm::NelderMead;
@@ -310,12 +351,13 @@ pub fn optimize(
         }
     };
 
-    // Clamp returned values to respect param_min_bounds
+    // Clamp returned values to respect param bounds
     for (i, val) in result.values.iter_mut().enumerate() {
-        if let Some(&bound) = config.param_min_bounds.get(i) {
-            if bound > 0.0 && *val < bound {
-                *val = bound;
-            }
+        if let Some(&lo) = config.param_min_bounds.get(i) {
+            if *val < lo { *val = lo; }
+        }
+        if let Some(&hi) = config.param_max_bounds.get(i) {
+            if *val > hi { *val = hi; }
         }
     }
 
@@ -344,7 +386,7 @@ fn nelder_mead(
     // Evaluate cost at each vertex
     let mut costs: Vec<f64> = simplex.iter().map(|v| {
         let mut p = project.clone();
-        apply_values_bounded(&mut p, &config.params, v, &config.param_min_bounds);
+        apply_values_bounded(&mut p, &config.params, v, &config.param_min_bounds, &config.param_max_bounds);
         cost(&p, config)
     }).collect();
 
@@ -384,7 +426,7 @@ fn nelder_mead(
         // Reflection
         let reflected: Vec<f64> = (0..n).map(|j| centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j])).collect();
         let mut p = project.clone();
-        apply_values_bounded(&mut p, &config.params, &reflected, &config.param_min_bounds);
+        apply_values_bounded(&mut p, &config.params, &reflected, &config.param_min_bounds, &config.param_max_bounds);
         let reflected_cost = cost(&p, config);
 
         if reflected_cost < costs[order[n - 1]] && reflected_cost >= costs[order[0]] {
@@ -397,7 +439,7 @@ fn nelder_mead(
             // Expansion
             let expanded: Vec<f64> = (0..n).map(|j| centroid[j] + gamma * (reflected[j] - centroid[j])).collect();
             let mut p2 = project.clone();
-            apply_values_bounded(&mut p2, &config.params, &expanded, &config.param_min_bounds);
+            apply_values_bounded(&mut p2, &config.params, &expanded, &config.param_min_bounds, &config.param_max_bounds);
             let expanded_cost = cost(&p2, config);
 
             if expanded_cost < reflected_cost {
@@ -413,7 +455,7 @@ fn nelder_mead(
         // Contraction
         let contracted: Vec<f64> = (0..n).map(|j| centroid[j] + rho * (simplex[worst_idx][j] - centroid[j])).collect();
         let mut p3 = project.clone();
-        apply_values_bounded(&mut p3, &config.params, &contracted, &config.param_min_bounds);
+        apply_values_bounded(&mut p3, &config.params, &contracted, &config.param_min_bounds, &config.param_max_bounds);
         let contracted_cost = cost(&p3, config);
 
         if contracted_cost < costs[worst_idx] {
@@ -429,7 +471,7 @@ fn nelder_mead(
                 simplex[idx][j] = simplex[best_idx][j] + sigma * (simplex[idx][j] - simplex[best_idx][j]);
             }
             let mut ps = project.clone();
-            apply_values_bounded(&mut ps, &config.params, &simplex[idx], &config.param_min_bounds);
+            apply_values_bounded(&mut ps, &config.params, &simplex[idx], &config.param_min_bounds, &config.param_max_bounds);
             costs[idx] = cost(&ps, config);
         }
     }
@@ -499,7 +541,7 @@ fn differential_evolution(
     // Evaluate initial population
     let mut costs: Vec<f64> = population.iter().map(|ind| {
         let mut proj = project.clone();
-        apply_values_bounded(&mut proj, &config.params, ind, &config.param_min_bounds);
+        apply_values_bounded(&mut proj, &config.params, ind, &config.param_min_bounds, &config.param_max_bounds);
         cost(&proj, config)
     }).collect();
 
@@ -525,7 +567,7 @@ fn differential_evolution(
 
             // Evaluate trial
             let mut proj = project.clone();
-            apply_values_bounded(&mut proj, &config.params, &trial, &config.param_min_bounds);
+            apply_values_bounded(&mut proj, &config.params, &trial, &config.param_min_bounds, &config.param_max_bounds);
             let trial_cost = cost(&proj, config);
 
             // Selection: keep better

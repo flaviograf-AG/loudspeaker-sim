@@ -172,6 +172,10 @@ pub enum OptParamJson {
     FilterFreq { way_idx: usize, filter_idx: usize },
     WayGain { way_idx: usize },
     WayDelay { way_idx: usize },
+    CrossoverFreq {
+        lp_way_idx: usize, lp_filter_idx: usize,
+        hp_way_idx: usize, hp_filter_idx: usize,
+    },
 }
 
 /// Target curve specification for the optimizer.

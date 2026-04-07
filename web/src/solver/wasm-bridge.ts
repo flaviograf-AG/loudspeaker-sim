@@ -35,7 +35,7 @@ export type TargetCurve =
 
 export interface OptimizerInput {
   system: import('../types').SystemInput;
-  params: { type: string; way_idx?: number; filter_idx?: number }[];
+  params: Record<string, unknown>[];
   target: TargetCurve;
   target_db?: number; // legacy fallback
   freq_min_hz: number;

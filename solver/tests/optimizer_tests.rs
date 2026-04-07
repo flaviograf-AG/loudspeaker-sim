@@ -60,6 +60,7 @@ fn optimizer_reduces_cost() {
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::NelderMead,
         param_min_bounds: vec![],
+        param_max_bounds: vec![],
     };
 
     let result = optimize(&project, &config);
@@ -96,6 +97,7 @@ fn optimizer_finds_reasonable_crossover_frequency() {
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::NelderMead,
         param_min_bounds: vec![],
+        param_max_bounds: vec![],
     };
 
     let result = optimize(&project, &config);
@@ -170,6 +172,7 @@ fn hybrid_converges() {
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::Hybrid,
         param_min_bounds: vec![],
+        param_max_bounds: vec![],
     };
     let result = optimize(&project, &config);
     eprintln!("Hybrid: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);
@@ -198,6 +201,7 @@ fn de_reduces_cost() {
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::DifferentialEvolution,
         param_min_bounds: vec![],
+        param_max_bounds: vec![],
     };
     let result = optimize(&project, &config);
     eprintln!("DE: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);

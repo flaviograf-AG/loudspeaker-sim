@@ -192,6 +192,11 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             optimizer::OptParam::WayGain { way_idx: *way_idx },
         system_api::OptParamJson::WayDelay { way_idx } =>
             optimizer::OptParam::WayDelay { way_idx: *way_idx },
+        system_api::OptParamJson::CrossoverFreq { lp_way_idx, lp_filter_idx, hp_way_idx, hp_filter_idx } =>
+            optimizer::OptParam::CrossoverFreq {
+                lp_way_idx: *lp_way_idx, lp_filter_idx: *lp_filter_idx,
+                hp_way_idx: *hp_way_idx, hp_filter_idx: *hp_filter_idx,
+            },
     }).collect();
 
     // Convert target curve (with legacy fallback)
@@ -219,7 +224,7 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
         optimizer::TargetCurve::Slope { db_at_1khz, .. } => *db_at_1khz,
         optimizer::TargetCurve::Custom(pts) => pts.get(0).map_or(86.0, |p| p.1),
     };
-    let param_min_bounds: Vec<f64> = opt_params.iter().map(|p| {
+    let (param_min_bounds, param_max_bounds): (Vec<f64>, Vec<f64>) = opt_params.iter().map(|p| {
         match p {
             optimizer::OptParam::FilterFreq { way_idx, filter_idx } => {
                 let way = &project.ways[*way_idx];
@@ -230,15 +235,35 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
                     Some(crossover::ActiveFilter::LR4HighPass { .. }) |
                     Some(crossover::ActiveFilter::LR2HighPass { .. })
                 );
-                if is_hp {
+                let is_lp = matches!(
+                    way.active_filters.get(*filter_idx),
+                    Some(crossover::ActiveFilter::LowPass1 { .. }) |
+                    Some(crossover::ActiveFilter::LowPass2 { .. }) |
+                    Some(crossover::ActiveFilter::LR4LowPass { .. }) |
+                    Some(crossover::ActiveFilter::LR2LowPass { .. })
+                );
+                let lo = if is_hp {
                     optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref)
                 } else {
-                    0.0
-                }
+                    20.0  // floor for LP filters
+                };
+                let hi = if is_lp {
+                    input.freq_max_hz  // LP shouldn't exceed optimization range
+                } else {
+                    20000.0  // HP can go up to 20 kHz
+                };
+                (lo, hi)
             }
-            _ => 0.0,
+            optimizer::OptParam::WayGain { .. } => (-20.0, 20.0),
+            optimizer::OptParam::WayDelay { .. } => (0.0, 0.1), // max 100ms delay
+            optimizer::OptParam::CrossoverFreq { hp_way_idx, hp_filter_idx: _, .. } => {
+                // Min bound from HP driver's Xmax, max from optimization range
+                let way = &project.ways[*hp_way_idx];
+                let lo = optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref);
+                (lo.max(20.0), input.freq_max_hz)
+            }
         }
-    }).collect();
+    }).unzip();
 
     let config = optimizer::OptimizerConfig {
         params: opt_params.clone(),
@@ -257,6 +282,7 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             _ => optimizer::Algorithm::Hybrid,
         },
         param_min_bounds,
+        param_max_bounds,
     };
 
     let result = optimizer::optimize(&project, &config);

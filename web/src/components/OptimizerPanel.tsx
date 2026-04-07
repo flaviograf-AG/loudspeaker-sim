@@ -43,14 +43,52 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
     setError(null);
     setResult(null);
 
-    // Build params: optimize all filter frequencies + all way gains
-    const params: { type: string; way_idx?: number; filter_idx?: number }[] = [];
-    ways.forEach((w, wi) => {
-      if (!w.enabled) return;
-      w.active_filters.forEach((_, fi) => {
-        params.push({ type: 'FilterFreq', way_idx: wi, filter_idx: fi });
+    // Build params: link adjacent LP/HP as crossover points, optimize gains
+    const params: Record<string, unknown>[] = [];
+    const enabledWays = ways.map((w, i) => ({ ...w, idx: i })).filter(w => w.enabled);
+
+    // Find LP/HP pairs between adjacent ways and link them
+    const linkedHpFilters = new Set<string>(); // "wayIdx:filterIdx" keys already linked
+    for (let i = 0; i < enabledWays.length - 1; i++) {
+      const lo = enabledWays[i];
+      const hi = enabledWays[i + 1];
+      // Find LP filter in lower way
+      const lpIdx = lo.active_filters.findIndex(f =>
+        f.type === 'LR4LowPass' || f.type === 'LR2LowPass' || f.type === 'LowPass1' || f.type === 'LowPass2');
+      // Find HP filter in higher way
+      const hpIdx = hi.active_filters.findIndex(f =>
+        f.type === 'LR4HighPass' || f.type === 'LR2HighPass' || f.type === 'HighPass1' || f.type === 'HighPass2');
+      if (lpIdx >= 0 && hpIdx >= 0) {
+        params.push({
+          type: 'CrossoverFreq',
+          lp_way_idx: lo.idx, lp_filter_idx: lpIdx,
+          hp_way_idx: hi.idx, hp_filter_idx: hpIdx,
+        });
+        linkedHpFilters.add(`${hi.idx}:${hpIdx}`);
+        // Don't add independent FilterFreq for linked filters
+        // but do add other filters (PEQ, allpass, etc.)
+        for (let fi = 0; fi < lo.active_filters.length; fi++) {
+          if (fi !== lpIdx) params.push({ type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi });
+        }
+      } else {
+        // No linkable pair — add all filters independently
+        lo.active_filters.forEach((_, fi) => {
+          params.push({ type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi });
+        });
+      }
+    }
+    // Last enabled way: add non-linked filters
+    if (enabledWays.length > 0) {
+      const last = enabledWays[enabledWays.length - 1];
+      last.active_filters.forEach((_, fi) => {
+        if (!linkedHpFilters.has(`${last.idx}:${fi}`)) {
+          params.push({ type: 'FilterFreq', way_idx: last.idx, filter_idx: fi });
+        }
       });
-      params.push({ type: 'WayGain', way_idx: wi });
+    }
+    // Add gain for all enabled ways
+    enabledWays.forEach(w => {
+      params.push({ type: 'WayGain', way_idx: w.idx });
     });
 
     if (params.length === 0) {

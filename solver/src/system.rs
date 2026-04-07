@@ -81,6 +81,8 @@ pub struct SystemResult {
     pub system_group_delay_ms: Vec<f64>,
     /// System impedance (parallel combination of all ways as seen by amplifier)
     pub system_impedance_ohm: Vec<f64>,
+    /// Maximum cone displacement per way (mm, peak)
+    pub way_max_displacement_mm: Vec<f64>,
 }
 
 /// Solve a complete multi-way speaker system.
@@ -93,9 +95,11 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
     let n = freqs.len();
 
     let mut way_results: Vec<WayResult> = Vec::new();
+    let mut way_max_displacement_mm: Vec<f64> = Vec::new();
 
     for way in &project.ways {
         if !way.enabled {
+            way_max_displacement_mm.push(0.0);
             continue;
         }
 
@@ -110,7 +114,13 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         };
         let raw_result = solve_simulation(&raw_input)?;
 
-        let j = Complex::new(0.0, 1.0);
+        // Track per-way peak displacement
+        let max_disp = raw_result.cone_displacement_mm.iter()
+            .cloned()
+            .fold(0.0_f64, f64::max);
+        way_max_displacement_mm.push(max_disp);
+
+        let _j = Complex::new(0.0, 1.0);
 
         let mut complex_pressure = Vec::with_capacity(n);
         let mut way_spl = Vec::with_capacity(n);
@@ -229,5 +239,6 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         system_spl_db: system_spl,
         system_group_delay_ms: system_group_delay,
         system_impedance_ohm: system_impedance,
+        way_max_displacement_mm,
     })
 }

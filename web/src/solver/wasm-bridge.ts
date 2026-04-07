@@ -28,13 +28,23 @@ export function runSystemSimulation(input: SystemInput): SystemResult {
   return JSON.parse(resultJson);
 }
 
+export type TargetCurve =
+  | { type: 'Flat'; db: number }
+  | { type: 'Slope'; db_at_1khz: number; slope_db_per_octave: number }
+  | { type: 'Custom'; points: { freq_hz: number; db: number }[] };
+
 export interface OptimizerInput {
   system: import('../types').SystemInput;
   params: { type: string; way_idx?: number; filter_idx?: number }[];
-  target_db: number;
+  target: TargetCurve;
+  target_db?: number; // legacy fallback
   freq_min_hz: number;
   freq_max_hz: number;
   max_iterations: number;
+  freq_weight?: string;
+  min_impedance_ohm?: number;
+  algorithm?: string;
+  e_series?: string;
 }
 
 export interface OptimizerResult {

@@ -10,7 +10,13 @@ interface Props {
 }
 
 export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
+  const [targetMode, setTargetMode] = useState<'flat' | 'slope'>('flat');
   const [targetDb, setTargetDb] = useState(86);
+  const [targetSlope, setTargetSlope] = useState(-0.2);
+  const [freqWeight, setFreqWeight] = useState<'uniform' | 'presence'>('uniform');
+  const [minImpedance, setMinImpedance] = useState<number | null>(null);
+  const [algorithm, setAlgorithm] = useState<'hybrid' | 'nm' | 'de'>('hybrid');
+  const [eSeries, setESeries] = useState<'none' | 'E12' | 'E24'>('none');
   const [freqMin, setFreqMin] = useState(200);
   const [freqMax, setFreqMax] = useState(10000);
   const [maxIter, setMaxIter] = useState(100);
@@ -40,14 +46,21 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
     }
 
     try {
+      const target = targetMode === 'flat'
+        ? { type: 'Flat' as const, db: targetDb }
+        : { type: 'Slope' as const, db_at_1khz: targetDb, slope_db_per_octave: targetSlope };
       const systemInput: SystemInput = { ways, ...sysParams };
       const optResult = runOptimizer({
         system: systemInput,
         params,
-        target_db: targetDb,
+        target,
         freq_min_hz: freqMin,
         freq_max_hz: freqMax,
         max_iterations: maxIter,
+        freq_weight: freqWeight !== 'uniform' ? freqWeight : undefined,
+        min_impedance_ohm: minImpedance ?? undefined,
+        algorithm,
+        e_series: eSeries !== 'none' ? eSeries : undefined,
       });
 
       setResult({ cost: optResult.final_cost, iterations: optResult.iterations });
@@ -69,9 +82,33 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   return (
     <div className="section-card">
       <div className="section-title">Optimizer</div>
-      <NumericInput label="Target SPL" value={targetDb} step={1} min={60} max={120} unit="dB"
-        tooltip="Target flat SPL level. The optimizer minimizes deviation from this line."
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>Target:</label>
+        <label style={{ fontSize: 11 }}>
+          <input type="radio" name="targetMode" value="flat" checked={targetMode === 'flat'}
+            onChange={() => setTargetMode('flat')} /> Flat
+        </label>
+        <label style={{ fontSize: 11 }}>
+          <input type="radio" name="targetMode" value="slope" checked={targetMode === 'slope'}
+            onChange={() => setTargetMode('slope')} /> Slope
+        </label>
+      </div>
+      <NumericInput label={targetMode === 'flat' ? 'Target SPL' : 'SPL at 1kHz'} value={targetDb} step={1} min={60} max={120} unit="dB"
+        tooltip={targetMode === 'flat' ? 'Target flat SPL level.' : 'SPL at 1kHz reference point for slope target.'}
         onChange={setTargetDb} />
+      {targetMode === 'slope' && (
+        <NumericInput label="Slope" value={targetSlope} step={0.1} min={-3} max={3} unit="dB/oct"
+          tooltip="Target slope in dB per octave. Negative = falling response (common: -0.2 to -0.5)."
+          onChange={setTargetSlope} />
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>Weighting:</label>
+        <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          value={freqWeight} onChange={e => setFreqWeight(e.target.value as 'uniform' | 'presence')}>
+          <option value="uniform">Uniform</option>
+          <option value="presence">Presence boost (1-5 kHz)</option>
+        </select>
+      </div>
       <NumericInput label="Freq min" value={freqMin} step={50} min={20} max={5000} unit="Hz"
         tooltip="Lower frequency bound for optimization. Errors below this are ignored."
         onChange={setFreqMin} />
@@ -81,12 +118,41 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <NumericInput label="Max iter" value={maxIter} step={50} min={10} max={500}
         tooltip="Maximum optimizer iterations. More = potentially better result but slower."
         onChange={(v) => setMaxIter(Math.round(v))} />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>
+          <input type="checkbox" checked={minImpedance !== null}
+            onChange={e => setMinImpedance(e.target.checked ? 3.2 : null)} /> Min Z
+        </label>
+        {minImpedance !== null && (
+          <NumericInput label="" value={minImpedance} step={0.1} min={1} max={16} unit="Ω"
+            tooltip="Penalize solutions where system impedance drops below this threshold."
+            onChange={setMinImpedance} />
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>Algorithm:</label>
+        <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          value={algorithm} onChange={e => setAlgorithm(e.target.value as 'hybrid' | 'nm' | 'de')}>
+          <option value="hybrid">Hybrid (recommended)</option>
+          <option value="de">Differential Evolution</option>
+          <option value="nm">Nelder-Mead</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>E-series:</label>
+        <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          value={eSeries} onChange={e => setESeries(e.target.value as 'none' | 'E12' | 'E24')}>
+          <option value="none">None</option>
+          <option value="E12">E12 (10%)</option>
+          <option value="E24">E24 (5%)</option>
+        </select>
+      </div>
       <button
         className={`graf-btn graf-btn-sm ${running ? 'graf-btn-outline' : 'graf-btn-primary'}`}
         style={{ width: '100%', marginTop: 4 }}
         onClick={handleOptimize}
         disabled={running}
-        title="Run Nelder-Mead optimizer to tune filter frequencies and per-way gains"
+        title="Run optimizer to tune filter frequencies and per-way gains"
       >
         {running ? 'Optimizing...' : 'Optimize'}
       </button>

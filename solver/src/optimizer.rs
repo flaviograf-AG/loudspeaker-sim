@@ -12,6 +12,39 @@
 use crate::system::{solve_system, SpeakerProject};
 use crate::crossover::ActiveFilter;
 
+/// Target curve for the optimizer cost function.
+#[derive(Debug, Clone)]
+pub enum TargetCurve {
+    Flat(f64),
+    Slope { db_at_1khz: f64, slope_db_per_octave: f64 },
+    Custom(Vec<(f64, f64)>), // (freq_hz, db) pairs, linearly interpolated on log-freq
+}
+
+impl TargetCurve {
+    pub fn target_at(&self, freq_hz: f64) -> f64 {
+        match self {
+            TargetCurve::Flat(db) => *db,
+            TargetCurve::Slope { db_at_1khz, slope_db_per_octave } => {
+                let octaves_from_1k = (freq_hz / 1000.0).log2();
+                db_at_1khz + slope_db_per_octave * octaves_from_1k
+            }
+            TargetCurve::Custom(pts) => {
+                if pts.is_empty() { return 86.0; }
+                if freq_hz <= pts[0].0 { return pts[0].1; }
+                if freq_hz >= pts.last().unwrap().0 { return pts.last().unwrap().1; }
+                // Linear interpolation on log-frequency scale
+                for w in pts.windows(2) {
+                    if freq_hz >= w[0].0 && freq_hz <= w[1].0 {
+                        let t = (freq_hz.ln() - w[0].0.ln()) / (w[1].0.ln() - w[0].0.ln());
+                        return w[0].1 + t * (w[1].1 - w[0].1);
+                    }
+                }
+                pts.last().unwrap().1
+            }
+        }
+    }
+}
+
 /// Which parameter to optimize.
 #[derive(Debug, Clone)]
 pub enum OptParam {
@@ -23,13 +56,24 @@ pub enum OptParam {
     WayDelay { way_idx: usize },
 }
 
+/// Frequency weighting for cost function.
+#[derive(Debug, Clone)]
+pub enum FrequencyWeight {
+    /// Equal weight across all frequencies
+    Uniform,
+    /// 2× weight in the 1-5 kHz presence region
+    PresenceBoosted,
+}
+
 /// Optimizer configuration.
 #[derive(Debug, Clone)]
 pub struct OptimizerConfig {
     /// Parameters to optimize
     pub params: Vec<OptParam>,
-    /// Target SPL (dB) — flat line or shaped curve
-    pub target_db: f64,
+    /// Target SPL curve
+    pub target: TargetCurve,
+    /// Frequency weighting
+    pub freq_weight: FrequencyWeight,
     /// Frequency range for cost function (Hz)
     pub freq_min_hz: f64,
     pub freq_max_hz: f64,
@@ -37,6 +81,14 @@ pub struct OptimizerConfig {
     pub max_iterations: usize,
     /// Convergence threshold (stop if cost improvement < this)
     pub tolerance: f64,
+    /// Minimum impedance constraint (Ω). None = no constraint.
+    pub min_impedance_ohm: Option<f64>,
+    /// Penalty weight for impedance violations (default 10.0)
+    pub impedance_penalty_weight: f64,
+    /// Penalty weight for displacement/Xmax violations (default 5.0)
+    pub displacement_penalty_weight: f64,
+    /// Algorithm choice
+    pub algorithm: Algorithm,
 }
 
 /// Optimizer result.
@@ -122,26 +174,70 @@ fn apply_values(project: &mut SpeakerProject, params: &[OptParam], values: &[f64
     }
 }
 
-/// Cost function: sum of squared error between system SPL and target.
-fn cost(project: &SpeakerProject, target_db: f64, freq_min: f64, freq_max: f64) -> f64 {
+/// Cost function: weighted mean squared error between system SPL and target curve.
+fn cost(project: &SpeakerProject, config: &OptimizerConfig) -> f64 {
     let result = match solve_system(project) {
         Ok(r) => r,
         Err(_) => return 1e12,
     };
 
-    let mut total = 0.0;
-    let mut count = 0;
-    for (i, &f) in result.frequencies_hz.iter().enumerate() {
-        if f >= freq_min && f <= freq_max {
-            let err = result.system_spl_db[i] - target_db;
-            total += err * err;
-            count += 1;
+    let mut sum = 0.0;
+    let mut total_weight = 0.0;
+    for (i, &freq) in result.frequencies_hz.iter().enumerate() {
+        if freq >= config.freq_min_hz && freq <= config.freq_max_hz {
+            let target = config.target.target_at(freq);
+            let err = result.system_spl_db[i] - target;
+            let weight = match config.freq_weight {
+                FrequencyWeight::Uniform => 1.0,
+                FrequencyWeight::PresenceBoosted => {
+                    if freq >= 1000.0 && freq <= 5000.0 { 2.0 } else { 1.0 }
+                }
+            };
+            sum += weight * err * err;
+            total_weight += weight;
         }
     }
-    if count > 0 { total / count as f64 } else { 1e12 }
+    if total_weight == 0.0 { return 1e12; }
+    let mut spl_cost = sum / total_weight;
+
+    // Impedance floor penalty
+    if let Some(z_min) = config.min_impedance_ohm {
+        let min_z = result.system_impedance_ohm.iter()
+            .zip(result.frequencies_hz.iter())
+            .filter(|(_, &f)| f >= 20.0 && f <= 20000.0)
+            .map(|(&z, _)| z)
+            .fold(f64::MAX, f64::min);
+        if min_z < z_min {
+            let violation = z_min - min_z;
+            spl_cost += config.impedance_penalty_weight * violation * violation;
+        }
+    }
+
+    // Displacement penalty: penalize any way exceeding its Xmax
+    if config.displacement_penalty_weight > 0.0 {
+        for (i, &max_disp) in result.way_max_displacement_mm.iter().enumerate() {
+            if i >= project.ways.len() { break; }
+            let xmax_mm = project.ways[i].driver.xmax_m * 1000.0;
+            if xmax_mm > 0.0 && max_disp > xmax_mm {
+                let overshoot = max_disp - xmax_mm;
+                spl_cost += config.displacement_penalty_weight * overshoot * overshoot;
+            }
+        }
+    }
+
+    spl_cost
 }
 
-/// Run Nelder-Mead optimization on a speaker project.
+/// Optimizer algorithm choice.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Algorithm {
+    NelderMead,
+    DifferentialEvolution,
+    /// DE global search + NM local polish
+    Hybrid,
+}
+
+/// Run optimization on a speaker project.
 pub fn optimize(
     project: &SpeakerProject,
     config: &OptimizerConfig,
@@ -153,11 +249,54 @@ pub fn optimize(
 
     let initial = extract_values(project, &config.params);
 
+    match config.algorithm {
+        Algorithm::NelderMead => {
+            nelder_mead(project, config, &initial)
+        }
+        Algorithm::DifferentialEvolution => {
+            let (values, final_cost, history) = differential_evolution(project, config, &initial);
+            OptimizerResult { values, final_cost, iterations: history.len(), cost_history: history }
+        }
+        Algorithm::Hybrid => {
+            // Phase 1: DE global search (2/3 of iterations)
+            let de_iters = (config.max_iterations * 2) / 3;
+            let mut de_config = config.clone();
+            de_config.max_iterations = de_iters;
+            let (de_values, _, mut history) = differential_evolution(project, &de_config, &initial);
+
+            // Phase 2: NM polish from DE's best (1/3 of iterations)
+            let mut polished_project = project.clone();
+            apply_values(&mut polished_project, &config.params, &de_values);
+            let mut nm_config = config.clone();
+            nm_config.max_iterations = config.max_iterations - de_iters;
+            nm_config.algorithm = Algorithm::NelderMead;
+            let nm_result = nelder_mead(&polished_project, &nm_config, &de_values);
+            history.extend(nm_result.cost_history);
+
+            OptimizerResult {
+                values: nm_result.values,
+                final_cost: nm_result.final_cost,
+                iterations: history.len(),
+                cost_history: history,
+            }
+        }
+    }
+}
+
+/// Nelder-Mead simplex optimizer.
+/// Reference: Nelder & Mead, "A Simplex Method for Function Minimization" (1965)
+fn nelder_mead(
+    project: &SpeakerProject,
+    config: &OptimizerConfig,
+    initial: &[f64],
+) -> OptimizerResult {
+    let n = initial.len();
+
     // Initialize simplex: n+1 vertices
     let mut simplex: Vec<Vec<f64>> = Vec::with_capacity(n + 1);
-    simplex.push(initial.clone());
+    simplex.push(initial.to_vec());
     for i in 0..n {
-        let mut v = initial.clone();
+        let mut v = initial.to_vec();
         let step = if v[i].abs() > 1.0 { v[i] * 0.1 } else { 1.0 };
         v[i] += step;
         simplex.push(v);
@@ -167,7 +306,7 @@ pub fn optimize(
     let mut costs: Vec<f64> = simplex.iter().map(|v| {
         let mut p = project.clone();
         apply_values(&mut p, &config.params, v);
-        cost(&p, config.target_db, config.freq_min_hz, config.freq_max_hz)
+        cost(&p, config)
     }).collect();
 
     let mut cost_history = Vec::new();
@@ -207,7 +346,7 @@ pub fn optimize(
         let reflected: Vec<f64> = (0..n).map(|j| centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j])).collect();
         let mut p = project.clone();
         apply_values(&mut p, &config.params, &reflected);
-        let reflected_cost = cost(&p, config.target_db, config.freq_min_hz, config.freq_max_hz);
+        let reflected_cost = cost(&p, config);
 
         if reflected_cost < costs[order[n - 1]] && reflected_cost >= costs[order[0]] {
             simplex[worst_idx] = reflected;
@@ -220,7 +359,7 @@ pub fn optimize(
             let expanded: Vec<f64> = (0..n).map(|j| centroid[j] + gamma * (reflected[j] - centroid[j])).collect();
             let mut p2 = project.clone();
             apply_values(&mut p2, &config.params, &expanded);
-            let expanded_cost = cost(&p2, config.target_db, config.freq_min_hz, config.freq_max_hz);
+            let expanded_cost = cost(&p2, config);
 
             if expanded_cost < reflected_cost {
                 simplex[worst_idx] = expanded;
@@ -236,7 +375,7 @@ pub fn optimize(
         let contracted: Vec<f64> = (0..n).map(|j| centroid[j] + rho * (simplex[worst_idx][j] - centroid[j])).collect();
         let mut p3 = project.clone();
         apply_values(&mut p3, &config.params, &contracted);
-        let contracted_cost = cost(&p3, config.target_db, config.freq_min_hz, config.freq_max_hz);
+        let contracted_cost = cost(&p3, config);
 
         if contracted_cost < costs[worst_idx] {
             simplex[worst_idx] = contracted;
@@ -252,7 +391,7 @@ pub fn optimize(
             }
             let mut ps = project.clone();
             apply_values(&mut ps, &config.params, &simplex[idx]);
-            costs[idx] = cost(&ps, config.target_db, config.freq_min_hz, config.freq_max_hz);
+            costs[idx] = cost(&ps, config);
         }
     }
 
@@ -264,5 +403,143 @@ pub fn optimize(
         final_cost: costs[best_idx],
         iterations: config.max_iterations,
         cost_history,
+    }
+}
+
+/// Xorshift64 PRNG — simple, no external deps, deterministic.
+fn xorshift(state: &mut u64) -> u64 {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    *state
+}
+
+/// Pick 3 distinct random indices, all != exclude.
+fn select_three_distinct(pop_size: usize, exclude: usize, rng: &mut u64) -> (usize, usize, usize) {
+    let pick = |rng: &mut u64, excl: &[usize]| -> usize {
+        loop {
+            let idx = (xorshift(rng) as usize) % pop_size;
+            if !excl.contains(&idx) { return idx; }
+        }
+    };
+    let a = pick(rng, &[exclude]);
+    let b = pick(rng, &[exclude, a]);
+    let c = pick(rng, &[exclude, a, b]);
+    (a, b, c)
+}
+
+/// Differential Evolution global optimizer.
+/// Reference: Storn & Price (1997) "Differential Evolution — A Simple and
+/// Efficient Heuristic for Global Optimization over Continuous Spaces"
+fn differential_evolution(
+    project: &SpeakerProject,
+    config: &OptimizerConfig,
+    initial_values: &[f64],
+) -> (Vec<f64>, f64, Vec<f64>) {
+    let n = initial_values.len();
+    let pop_size = (n * 10).max(20).min(100); // 10× params, clamped 20-100
+    let f_weight = 0.8;  // DE/rand/1 mutation weight
+    let cr = 0.9;        // crossover probability
+    let max_gen = config.max_iterations;
+
+    // Initialize population: random perturbations around initial values
+    let mut population: Vec<Vec<f64>> = Vec::with_capacity(pop_size);
+    population.push(initial_values.to_vec()); // include initial guess
+    let mut rng_state: u64 = 42;
+    for _ in 1..pop_size {
+        let mut individual = initial_values.to_vec();
+        for j in 0..n {
+            xorshift(&mut rng_state);
+            let r = (rng_state as f64) / (u64::MAX as f64);
+            let perturbation = (r - 0.5) * 2.0 * initial_values[j].abs().max(1.0) * 0.5;
+            individual[j] = initial_values[j] + perturbation;
+        }
+        population.push(individual);
+    }
+
+    // Evaluate initial population
+    let mut costs: Vec<f64> = population.iter().map(|ind| {
+        let mut proj = project.clone();
+        apply_values(&mut proj, &config.params, ind);
+        cost(&proj, config)
+    }).collect();
+
+    let mut cost_history = Vec::new();
+    let best_idx = costs.iter().enumerate().min_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
+    cost_history.push(costs[best_idx]);
+
+    // DE/rand/1/bin main loop
+    for _gen in 0..max_gen {
+        for i in 0..pop_size {
+            // Select 3 distinct random indices != i
+            let (a, b, c) = select_three_distinct(pop_size, i, &mut rng_state);
+
+            // Mutation + crossover
+            let j_rand = (xorshift(&mut rng_state) as usize) % n;
+            let mut trial = population[i].clone();
+            for j in 0..n {
+                let r = (xorshift(&mut rng_state) as f64) / (u64::MAX as f64);
+                if r < cr || j == j_rand {
+                    trial[j] = population[a][j] + f_weight * (population[b][j] - population[c][j]);
+                }
+            }
+
+            // Evaluate trial
+            let mut proj = project.clone();
+            apply_values(&mut proj, &config.params, &trial);
+            let trial_cost = cost(&proj, config);
+
+            // Selection: keep better
+            if trial_cost < costs[i] {
+                population[i] = trial;
+                costs[i] = trial_cost;
+            }
+        }
+
+        let best_idx = costs.iter().enumerate().min_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
+        cost_history.push(costs[best_idx]);
+    }
+
+    let best_idx = costs.iter().enumerate().min_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
+    (population[best_idx].clone(), costs[best_idx], cost_history)
+}
+
+/// Snap all passive component values to nearest E-series standard values.
+/// Applied after optimization as a post-processing step.
+pub fn snap_passive_to_e_series(project: &mut SpeakerProject, series: &str) {
+    use crate::crossover::e_series;
+    use crate::crossover::PassiveBlock;
+
+    let round_fn: fn(f64) -> f64 = match series {
+        "E12" => e_series::round_e12,
+        "E24" => e_series::round_e24,
+        _ => return,
+    };
+
+    for way in &mut project.ways {
+        for block in &mut way.passive_filters {
+            match block {
+                PassiveBlock::SeriesR { ohms } => *ohms = round_fn(*ohms),
+                PassiveBlock::SeriesL { henries, .. } => *henries = round_fn(*henries),
+                PassiveBlock::SeriesC { farads } => *farads = round_fn(*farads),
+                PassiveBlock::ShuntR { ohms } => *ohms = round_fn(*ohms),
+                PassiveBlock::ShuntL { henries, .. } => *henries = round_fn(*henries),
+                PassiveBlock::ShuntC { farads } => *farads = round_fn(*farads),
+                PassiveBlock::ZobelShunt { ohms, farads } => {
+                    *ohms = round_fn(*ohms);
+                    *farads = round_fn(*farads);
+                }
+                PassiveBlock::LPad { series_ohms, shunt_ohms } => {
+                    *series_ohms = round_fn(*series_ohms);
+                    *shunt_ohms = round_fn(*shunt_ohms);
+                }
+                PassiveBlock::NotchShunt { ohms, henries, farads } |
+                PassiveBlock::NotchSeries { ohms, henries, farads } => {
+                    *ohms = round_fn(*ohms);
+                    *henries = round_fn(*henries);
+                    *farads = round_fn(*farads);
+                }
+            }
+        }
     }
 }

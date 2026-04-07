@@ -194,13 +194,40 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             optimizer::OptParam::WayDelay { way_idx: *way_idx },
     }).collect();
 
+    // Convert target curve (with legacy fallback)
+    let target = if let Some(db) = input.target_db {
+        optimizer::TargetCurve::Flat(db)
+    } else {
+        match &input.target {
+            system_api::TargetCurveJson::Flat { db } => optimizer::TargetCurve::Flat(*db),
+            system_api::TargetCurveJson::Slope { db_at_1khz, slope_db_per_octave } =>
+                optimizer::TargetCurve::Slope { db_at_1khz: *db_at_1khz, slope_db_per_octave: *slope_db_per_octave },
+            system_api::TargetCurveJson::Custom { points } =>
+                optimizer::TargetCurve::Custom(points.iter().map(|p| (p.freq_hz, p.db)).collect()),
+        }
+    };
+
+    let freq_weight = match input.freq_weight.as_deref() {
+        Some("presence") => optimizer::FrequencyWeight::PresenceBoosted,
+        _ => optimizer::FrequencyWeight::Uniform,
+    };
+
     let config = optimizer::OptimizerConfig {
         params: opt_params.clone(),
-        target_db: input.target_db,
+        target,
+        freq_weight,
         freq_min_hz: input.freq_min_hz,
         freq_max_hz: input.freq_max_hz,
         max_iterations: input.max_iterations,
         tolerance: 0.01,
+        min_impedance_ohm: input.min_impedance_ohm,
+        impedance_penalty_weight: 10.0,
+        displacement_penalty_weight: 5.0,
+        algorithm: match input.algorithm.as_str() {
+            "nm" => optimizer::Algorithm::NelderMead,
+            "de" => optimizer::Algorithm::DifferentialEvolution,
+            _ => optimizer::Algorithm::Hybrid,
+        },
     };
 
     let result = optimizer::optimize(&project, &config);
@@ -208,6 +235,13 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
     // Apply optimized values back to the input system for return
     let mut opt_project = project.clone();
     optimizer::apply_values_pub(&mut opt_project, &opt_params, &result.values);
+
+    // E-series snapping (post-processing for passive components)
+    if let Some(ref series) = input.e_series {
+        if series != "none" {
+            optimizer::snap_passive_to_e_series(&mut opt_project, series);
+        }
+    }
 
     // Convert back to JSON
     let opt_system = system_api::SystemInputJson {

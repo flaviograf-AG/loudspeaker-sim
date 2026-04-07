@@ -174,17 +174,54 @@ pub enum OptParamJson {
     WayDelay { way_idx: usize },
 }
 
+/// Target curve specification for the optimizer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum TargetCurveJson {
+    Flat { db: f64 },
+    Slope { db_at_1khz: f64, slope_db_per_octave: f64 },
+    Custom { points: Vec<TargetPoint> },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TargetPoint {
+    pub freq_hz: f64,
+    pub db: f64,
+}
+
+fn default_target_curve() -> TargetCurveJson {
+    TargetCurveJson::Flat { db: 86.0 }
+}
+
 /// JSON-serializable optimizer input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizerInputJson {
     pub system: SystemInputJson,
     pub params: Vec<OptParamJson>,
-    pub target_db: f64,
+    #[serde(default = "default_target_curve")]
+    pub target: TargetCurveJson,
+    /// Legacy field — ignored if `target` is present
+    #[serde(default)]
+    pub target_db: Option<f64>,
     pub freq_min_hz: f64,
     pub freq_max_hz: f64,
     #[serde(default = "default_max_iter")]
     pub max_iterations: usize,
+    /// Frequency weighting: "uniform" or "presence"
+    #[serde(default)]
+    pub freq_weight: Option<String>,
+    /// Minimum impedance constraint (Ω). Omit or null = no constraint.
+    #[serde(default)]
+    pub min_impedance_ohm: Option<f64>,
+    /// Algorithm: "nm", "de", "hybrid" (default: "hybrid")
+    #[serde(default = "default_algorithm")]
+    pub algorithm: String,
+    /// E-series snapping: "E12", "E24", or "none" (default: none)
+    #[serde(default)]
+    pub e_series: Option<String>,
 }
+
+fn default_algorithm() -> String { "hybrid".to_string() }
 
 fn default_max_iter() -> usize { 100 }
 

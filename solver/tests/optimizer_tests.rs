@@ -1,7 +1,7 @@
 //! Optimizer tests — verify Nelder-Mead finds better crossover parameters.
 
 use loudspeaker_solver::crossover::ActiveFilter;
-use loudspeaker_solver::optimizer::*;
+use loudspeaker_solver::optimizer::{self, *};
 use loudspeaker_solver::system::{SpeakerProject, Way};
 use loudspeaker_solver::types::*;
 
@@ -49,11 +49,16 @@ fn optimizer_reduces_cost() {
             OptParam::FilterFreq { way_idx: 1, filter_idx: 0 }, // tweeter HP freq
             OptParam::WayGain { way_idx: 1 },                   // tweeter gain
         ],
-        target_db: 86.0, // target flat SPL
+        target: TargetCurve::Flat(86.0),
+        freq_weight: FrequencyWeight::Uniform,
         freq_min_hz: 500.0,
         freq_max_hz: 8000.0,
         max_iterations: 100,
         tolerance: 0.01,
+        min_impedance_ohm: None,
+        impedance_penalty_weight: 10.0,
+        displacement_penalty_weight: 5.0,
+        algorithm: Algorithm::NelderMead,
     };
 
     let result = optimize(&project, &config);
@@ -79,11 +84,16 @@ fn optimizer_finds_reasonable_crossover_frequency() {
             OptParam::FilterFreq { way_idx: 0, filter_idx: 0 },
             OptParam::FilterFreq { way_idx: 1, filter_idx: 0 },
         ],
-        target_db: 86.0,
+        target: TargetCurve::Flat(86.0),
+        freq_weight: FrequencyWeight::Uniform,
         freq_min_hz: 500.0,
         freq_max_hz: 8000.0,
         max_iterations: 50,
         tolerance: 0.1,
+        min_impedance_ohm: None,
+        impedance_penalty_weight: 10.0,
+        displacement_penalty_weight: 5.0,
+        algorithm: Algorithm::NelderMead,
     };
 
     let result = optimize(&project, &config);
@@ -100,4 +110,77 @@ fn optimizer_finds_reasonable_crossover_frequency() {
         "Woofer LP freq {:.0} should be positive and bounded", woofer_lp);
     assert!((woofer_lp - 1000.0).abs() > 100.0,
         "Optimizer should move crossover freq from initial 1kHz, got {:.0}", woofer_lp);
+}
+
+#[test]
+fn target_curve_slope() {
+    let t = TargetCurve::Slope { db_at_1khz: 86.0, slope_db_per_octave: -1.0 };
+    assert!((t.target_at(1000.0) - 86.0).abs() < 0.001);
+    assert!((t.target_at(2000.0) - 85.0).abs() < 0.001); // +1 octave, -1dB
+    assert!((t.target_at(500.0) - 87.0).abs() < 0.001);  // -1 octave, +1dB
+}
+
+#[test]
+fn target_curve_custom_interpolation() {
+    let t = TargetCurve::Custom(vec![(100.0, 90.0), (10000.0, 80.0)]);
+    // Midpoint on log scale: sqrt(100*10000) = 1000 Hz → 85 dB
+    assert!((t.target_at(1000.0) - 85.0).abs() < 0.1);
+    // Edges: clamp to first/last
+    assert!((t.target_at(50.0) - 90.0).abs() < 0.001);
+    assert!((t.target_at(20000.0) - 80.0).abs() < 0.001);
+}
+
+#[test]
+fn hybrid_converges() {
+    let project = test_2way_project(1000.0, -5.0);
+    let config = OptimizerConfig {
+        params: vec![
+            OptParam::FilterFreq { way_idx: 0, filter_idx: 0 },
+            OptParam::FilterFreq { way_idx: 1, filter_idx: 0 },
+            OptParam::WayGain { way_idx: 1 },
+        ],
+        target: TargetCurve::Flat(86.0),
+        freq_weight: FrequencyWeight::Uniform,
+        freq_min_hz: 500.0,
+        freq_max_hz: 8000.0,
+        max_iterations: 60,
+        tolerance: 0.01,
+        min_impedance_ohm: None,
+        impedance_penalty_weight: 10.0,
+        displacement_penalty_weight: 5.0,
+        algorithm: Algorithm::Hybrid,
+    };
+    let result = optimize(&project, &config);
+    eprintln!("Hybrid: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);
+    assert!(result.cost_history.len() > 1);
+    assert!(result.final_cost < result.cost_history[0],
+        "Hybrid should improve: first={:.2}, final={:.2}", result.cost_history[0], result.final_cost);
+}
+
+#[test]
+fn de_reduces_cost() {
+    let project = test_2way_project(1000.0, -5.0);
+    let config = OptimizerConfig {
+        params: vec![
+            OptParam::FilterFreq { way_idx: 0, filter_idx: 0 },
+            OptParam::FilterFreq { way_idx: 1, filter_idx: 0 },
+            OptParam::WayGain { way_idx: 1 },
+        ],
+        target: TargetCurve::Flat(86.0),
+        freq_weight: FrequencyWeight::Uniform,
+        freq_min_hz: 500.0,
+        freq_max_hz: 8000.0,
+        max_iterations: 30,
+        tolerance: 0.01,
+        min_impedance_ohm: None,
+        impedance_penalty_weight: 10.0,
+        displacement_penalty_weight: 5.0,
+        algorithm: Algorithm::DifferentialEvolution,
+    };
+    let result = optimize(&project, &config);
+    eprintln!("DE: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);
+    assert!(result.cost_history.len() > 1);
+    let initial_cost = result.cost_history[0];
+    assert!(result.final_cost < initial_cost,
+        "DE should reduce cost: initial={:.2}, final={:.2}", initial_cost, result.final_cost);
 }

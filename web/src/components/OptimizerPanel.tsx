@@ -15,7 +15,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [targetSlope, setTargetSlope] = useState(-0.2);
   const [freqWeight, setFreqWeight] = useState<'uniform' | 'presence'>('uniform');
   const [minImpedance, setMinImpedance] = useState<number | null>(null);
-  const [algorithm, setAlgorithm] = useState<'twophase' | 'hybrid' | 'nm' | 'de'>('twophase');
+  const [algorithm, setAlgorithm] = useState<'twophase' | 'hybrid' | 'nm' | 'de'>('hybrid');
   const [eSeries, setESeries] = useState<'none' | 'E12' | 'E24'>('none');
   const [freqMin, setFreqMin] = useState(200);
   const [freqMax, setFreqMax] = useState(10000);
@@ -86,13 +86,12 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         }
       });
     }
-    // Level matching: first way uses WayGain (reference), others use LPadAttenuation
-    // so the optimizer tunes real passive L-Pad resistors with proper impedance modeling
+    // Level matching: WayGain for Hybrid/DE/NM, LPadAttenuation for TwoPhase
     enabledWays.forEach((w, i) => {
-      if (i === 0) {
-        params.push({ type: 'WayGain', way_idx: w.idx });
-      } else {
+      if (algorithm === 'twophase' && i > 0) {
         params.push({ type: 'LPadAttenuation', way_idx: w.idx });
+      } else {
+        params.push({ type: 'WayGain', way_idx: w.idx });
       }
     });
 
@@ -212,8 +211,8 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
           title="Optimization algorithm. Two-Phase finds crossover points first, then tunes L-Pad attenuation with real impedance modeling."
           value={algorithm} onChange={e => setAlgorithm(e.target.value as 'twophase' | 'hybrid' | 'nm' | 'de')}>
-          <option value="twophase">Two-Phase (recommended)</option>
-          <option value="hybrid">Hybrid (DE+NM)</option>
+          <option value="hybrid">Hybrid (recommended)</option>
+          <option value="twophase">Two-Phase (passive L-Pad)</option>
           <option value="de">Differential Evolution</option>
           <option value="nm">Nelder-Mead</option>
         </select>

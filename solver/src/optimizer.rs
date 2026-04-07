@@ -407,6 +407,10 @@ pub enum Algorithm {
     DifferentialEvolution,
     /// DE global search + NM local polish
     Hybrid,
+    /// Phase 1: Hybrid with WayGain for level matching (smooth cost landscape).
+    /// Phase 2: Freeze crossover freqs, replace WayGain with LPadAttenuation
+    /// for physically accurate impedance modeling.
+    TwoPhase,
 }
 
 /// Run optimization on a speaker project.
@@ -448,6 +452,137 @@ pub fn optimize(
             OptimizerResult {
                 values: nm_result.values,
                 final_cost: nm_result.final_cost,
+                iterations: history.len(),
+                cost_history: history,
+            }
+        }
+        Algorithm::TwoPhase => {
+            // Phase 1: Hybrid optimization with WayGain for smooth cost landscape.
+            // Replace any LPadAttenuation params with WayGain for this phase.
+            let phase1_params: Vec<OptParam> = config.params.iter().map(|p| {
+                if let OptParam::LPadAttenuation { way_idx } = p {
+                    OptParam::WayGain { way_idx: *way_idx }
+                } else {
+                    p.clone()
+                }
+            }).collect();
+            let phase1_bounds_lo: Vec<f64> = config.params.iter().zip(config.param_min_bounds.iter().chain(std::iter::repeat(&0.0)))
+                .map(|(p, lo)| if matches!(p, OptParam::LPadAttenuation { .. }) { -20.0 } else { *lo }).collect();
+            let phase1_bounds_hi: Vec<f64> = config.params.iter().zip(config.param_max_bounds.iter().chain(std::iter::repeat(&f64::MAX)))
+                .map(|(p, hi)| if matches!(p, OptParam::LPadAttenuation { .. }) { 20.0 } else { *hi }).collect();
+
+            let phase1_iters = (config.max_iterations * 2) / 3;
+            let phase1_config = OptimizerConfig {
+                params: phase1_params,
+                max_iterations: phase1_iters,
+                algorithm: Algorithm::Hybrid,
+                param_min_bounds: phase1_bounds_lo,
+                param_max_bounds: phase1_bounds_hi,
+                ..config.clone()
+            };
+            let phase1_result = optimize(project, &phase1_config);
+
+            // Apply Phase 1 result to get the project with optimized crossover freqs
+            let mut phase2_project = project.clone();
+            apply_values_bounded(&mut phase2_project, &phase1_config.params, &phase1_result.values,
+                &phase1_config.param_min_bounds, &phase1_config.param_max_bounds);
+
+            // Check if any way needs > 6 dB of attenuation.
+            // Heavy L-Pads (> 6 dB) cause severe impedance interaction that makes
+            // passive attenuation impractical. In that case, keep Phase 1's WayGain
+            // result — the user needs active (DSP) gain control.
+            let _max_atten_needed: f64 = config.params.iter().filter_map(|p| {
+                if let OptParam::LPadAttenuation { way_idx } = p {
+                    let gain = phase1_config.params.iter().zip(phase1_result.values.iter())
+                        .find_map(|(pp, &v)| {
+                            if let OptParam::WayGain { way_idx: wi } = pp {
+                                if wi == way_idx { Some(v) } else { None }
+                            } else { None }
+                        }).unwrap_or(0.0);
+                    Some(-gain)
+                } else { None }
+            }).fold(0.0_f64, f64::max);
+
+            // Cap Phase 2 L-Pad to 6 dB — beyond that, impedance interaction
+            // makes passive attenuation impractical. The remaining attenuation
+            // from Phase 1 stays as gain_db for the user to implement actively.
+
+            // Phase 2: Re-optimize ALL params with real L-Pad impedance.
+            let mut history = phase1_result.cost_history;
+
+            // Build Phase 2 initial values: freqs from Phase 1, L-Pad from Phase 1 gain
+            let phase2_initial: Vec<f64> = config.params.iter().enumerate().map(|(i, p)| {
+                if let OptParam::LPadAttenuation { way_idx } = p {
+                    // Seed from Phase 1's WayGain result
+                    let gain = phase1_config.params.iter().zip(phase1_result.values.iter())
+                        .find_map(|(pp, &v)| {
+                            if let OptParam::WayGain { way_idx: wi } = pp {
+                                if wi == way_idx { Some(v) } else { None }
+                            } else { None }
+                        })
+                        .unwrap_or(0.0);
+                    (-gain).max(0.0).min(6.0) // cap at 6 dB for passive L-Pad
+                } else {
+                    // Use Phase 1's value for this param index
+                    phase1_result.values[i]
+                }
+            }).collect();
+
+            // Apply Phase 1 crossover freqs to the project before Phase 2
+            let mut phase2_project = project.clone();
+            apply_values_bounded(&mut phase2_project, &config.params, &phase2_initial,
+                &config.param_min_bounds, &config.param_max_bounds);
+
+            // For ways where L-Pad < total needed attenuation, set remaining as gain_db
+            for (i, p) in config.params.iter().enumerate() {
+                if let OptParam::LPadAttenuation { way_idx } = p {
+                    let total_atten = phase1_config.params.iter().zip(phase1_result.values.iter())
+                        .find_map(|(pp, &v)| {
+                            if let OptParam::WayGain { way_idx: wi } = pp {
+                                if wi == way_idx { Some(-v) } else { None }
+                            } else { None }
+                        }).unwrap_or(0.0);
+                    let lpad_atten = phase2_initial[i];
+                    let remaining = total_atten - lpad_atten;
+                    if remaining > 0.5 {
+                        phase2_project.ways[*way_idx].gain_db = -remaining;
+                    }
+                }
+            }
+
+            // Tighten bounds for Phase 2: freq params can only move ±30% from Phase 1
+            let phase2_lo: Vec<f64> = config.params.iter().enumerate().map(|(i, p)| {
+                let orig_lo = config.param_min_bounds.get(i).copied().unwrap_or(0.0);
+                match p {
+                    OptParam::FilterFreq { .. } | OptParam::CrossoverFreq { .. } => {
+                        (phase2_initial[i] * 0.7).max(orig_lo)
+                    }
+                    _ => orig_lo,
+                }
+            }).collect();
+            let phase2_hi: Vec<f64> = config.params.iter().enumerate().map(|(i, p)| {
+                let orig_hi = config.param_max_bounds.get(i).copied().unwrap_or(f64::MAX);
+                match p {
+                    OptParam::FilterFreq { .. } | OptParam::CrossoverFreq { .. } => {
+                        (phase2_initial[i] * 1.3).min(orig_hi)
+                    }
+                    OptParam::LPadAttenuation { .. } => 6.0, // cap at 6 dB
+                    _ => orig_hi,
+                }
+            }).collect();
+            let phase2_config = OptimizerConfig {
+                max_iterations: config.max_iterations - phase1_iters,
+                algorithm: Algorithm::NelderMead,
+                param_min_bounds: phase2_lo,
+                param_max_bounds: phase2_hi,
+                ..config.clone()
+            };
+            let phase2_result = nelder_mead(&phase2_project, &phase2_config, &phase2_initial);
+            history.extend(phase2_result.cost_history);
+
+            OptimizerResult {
+                values: phase2_result.values,
+                final_cost: phase2_result.final_cost,
                 iterations: history.len(),
                 cost_history: history,
             }

@@ -286,7 +286,8 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
         algorithm: match input.algorithm.as_str() {
             "nm" => optimizer::Algorithm::NelderMead,
             "de" => optimizer::Algorithm::DifferentialEvolution,
-            _ => optimizer::Algorithm::Hybrid,
+            "hybrid" => optimizer::Algorithm::Hybrid,
+            _ => optimizer::Algorithm::TwoPhase,
         },
         param_min_bounds,
         param_max_bounds,

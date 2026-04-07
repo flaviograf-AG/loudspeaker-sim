@@ -226,7 +226,7 @@ pub struct OptimizerInputJson {
     pub e_series: Option<String>,
 }
 
-fn default_algorithm() -> String { "hybrid".to_string() }
+fn default_algorithm() -> String { "twophase".to_string() }
 
 fn default_max_iter() -> usize { 100 }
 

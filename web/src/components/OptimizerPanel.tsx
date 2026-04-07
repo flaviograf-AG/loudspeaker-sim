@@ -15,7 +15,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [targetSlope, setTargetSlope] = useState(-0.2);
   const [freqWeight, setFreqWeight] = useState<'uniform' | 'presence'>('uniform');
   const [minImpedance, setMinImpedance] = useState<number | null>(null);
-  const [algorithm, setAlgorithm] = useState<'hybrid' | 'nm' | 'de'>('hybrid');
+  const [algorithm, setAlgorithm] = useState<'twophase' | 'hybrid' | 'nm' | 'de'>('twophase');
   const [eSeries, setESeries] = useState<'none' | 'E12' | 'E24'>('none');
   const [freqMin, setFreqMin] = useState(200);
   const [freqMax, setFreqMax] = useState(10000);
@@ -210,9 +210,10 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>Algorithm:</label>
         <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
-          title="Optimization algorithm. Hybrid runs DE for global search then NM for local polish. DE is better for complex systems, NM is faster for simple ones."
-          value={algorithm} onChange={e => setAlgorithm(e.target.value as 'hybrid' | 'nm' | 'de')}>
-          <option value="hybrid">Hybrid (recommended)</option>
+          title="Optimization algorithm. Two-Phase finds crossover points first, then tunes L-Pad attenuation with real impedance modeling."
+          value={algorithm} onChange={e => setAlgorithm(e.target.value as 'twophase' | 'hybrid' | 'nm' | 'de')}>
+          <option value="twophase">Two-Phase (recommended)</option>
+          <option value="hybrid">Hybrid (DE+NM)</option>
           <option value="de">Differential Evolution</option>
           <option value="nm">Nelder-Mead</option>
         </select>

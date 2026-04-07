@@ -4,6 +4,8 @@ import { DriverInputs } from './DriverInputs';
 import { EnclosureInputs } from './EnclosureInputs';
 import { PresetSelector } from './PresetSelector';
 import { NumericInput } from './NumericInput';
+import { parseFrd } from '../io/frd';
+import { parseZma } from '../io/zma';
 
 interface Props {
   ways: WayInput[];
@@ -154,6 +156,63 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
           {/* 1. Driver selection (the starting point of any design) */}
           <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
           <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+
+          {/* Measured FRD/ZMA import — replaces T/S simulation with real data */}
+          <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+            <label className="graf-btn graf-btn-sm graf-btn-outline" style={{ cursor: 'pointer', fontSize: 11 }}>
+              Import FRD
+              <input type="file" accept=".frd,.txt" hidden onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                file.text().then(text => {
+                  const frd = parseFrd(text);
+                  updateWay(activeWay, {
+                    measured: {
+                      frequencies_hz: frd.frequencies,
+                      spl_db: frd.spl_db,
+                      phase_deg: frd.phase_deg,
+                      impedance_ohm: way.measured?.impedance_ohm ?? [],
+                      impedance_phase_deg: way.measured?.impedance_phase_deg ?? [],
+                    }
+                  });
+                });
+              }} />
+            </label>
+            <label className="graf-btn graf-btn-sm graf-btn-outline" style={{ cursor: 'pointer', fontSize: 11 }}>
+              Import ZMA
+              <input type="file" accept=".zma,.txt" hidden onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                file.text().then(text => {
+                  const zma = parseZma(text);
+                  updateWay(activeWay, {
+                    measured: {
+                      frequencies_hz: way.measured?.frequencies_hz ?? zma.frequencies,
+                      spl_db: way.measured?.spl_db ?? [],
+                      phase_deg: way.measured?.phase_deg ?? [],
+                      impedance_ohm: zma.impedance_ohm,
+                      impedance_phase_deg: zma.phase_deg,
+                    }
+                  });
+                });
+              }} />
+            </label>
+            {way.measured && (
+              <button className="graf-btn graf-btn-sm" style={{ fontSize: 11 }}
+                onClick={() => updateWay(activeWay, { measured: undefined })}
+                title="Remove measured data and revert to T/S simulation">
+                Clear FRD/ZMA
+              </button>
+            )}
+          </div>
+          {way.measured && (
+            <div style={{ fontSize: 10, color: 'var(--graf-warm-500)', marginTop: 2 }}>
+              FRD: {way.measured.spl_db.length > 0 ? `${way.measured.spl_db.length} points` : 'none'}
+              {' | '}
+              ZMA: {way.measured.impedance_ohm.length > 0 ? `${way.measured.impedance_ohm.length} points` : 'none'}
+              {' \u2014 Using measured data (T/S simulation bypassed)'}
+            </div>
+          )}
 
           {/* 2. Enclosure for this way */}
           <EnclosureInputs

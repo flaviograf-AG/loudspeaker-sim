@@ -401,3 +401,21 @@ pub struct SimulationResult {
     /// Port air velocity (m/s) — None for sealed boxes
     pub port_velocity_ms: Option<Vec<f64>>,
 }
+
+/// Measured driver data from FRD/ZMA files.
+/// When present on a Way, replaces T/S-based simulation with real measurements.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeasuredDriverData {
+    /// Frequency points (Hz) — from FRD file
+    pub frequencies_hz: Vec<f64>,
+    /// SPL at 1m (dB) — from FRD file
+    pub spl_db: Vec<f64>,
+    /// Acoustic phase (degrees) — from FRD file
+    pub phase_deg: Vec<f64>,
+    /// Electrical impedance magnitude (Ohm) — from ZMA file (optional)
+    #[serde(default)]
+    pub impedance_ohm: Vec<f64>,
+    /// Electrical impedance phase (degrees) — from ZMA file (optional)
+    #[serde(default)]
+    pub impedance_phase_deg: Vec<f64>,
+}

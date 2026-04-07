@@ -107,6 +107,8 @@ pub struct WayJson {
     pub z_offset_m: f64,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default)]
+    pub measured: Option<MeasuredDriverData>,
 }
 
 fn default_true() -> bool { true }
@@ -156,6 +158,7 @@ impl SystemInputJson {
                 inverted: w.inverted,
                 z_offset_m: w.z_offset_m,
                 enabled: w.enabled,
+                measured: w.measured.clone(),
             }).collect(),
             freq_start_hz: self.freq_start_hz,
             freq_end_hz: self.freq_end_hz,

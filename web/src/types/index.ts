@@ -193,6 +193,13 @@ export interface WayInput {
   z_offset_m: number;
   enabled: boolean;
   preset_name?: string;
+  measured?: {
+    frequencies_hz: number[];
+    spl_db: number[];
+    phase_deg: number[];
+    impedance_ohm: number[];
+    impedance_phase_deg: number[];
+  };
 }
 
 export interface SystemInput {

@@ -161,6 +161,7 @@ fn single_way_system_matches_direct_simulation() {
             inverted: false,
             z_offset_m: 0.0,
             enabled: true,
+            measured: None,
         }],
         freq_start_hz: 20.0,
         freq_end_hz: 20000.0,
@@ -192,6 +193,7 @@ fn inverted_way_cancels() {
                 enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 18e-3, ql: 7.0 }),
                 passive_filters: vec![], active_filters: vec![],
                 gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+                measured: None,
             },
             Way {
                 name: "Inverted".into(),
@@ -199,6 +201,7 @@ fn inverted_way_cancels() {
                 enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 18e-3, ql: 7.0 }),
                 passive_filters: vec![], active_filters: vec![],
                 gain_db: 0.0, delay_s: 0.0, inverted: true, z_offset_m: 0.0, enabled: true,
+                measured: None,
             },
         ],
         freq_start_hz: 100.0,

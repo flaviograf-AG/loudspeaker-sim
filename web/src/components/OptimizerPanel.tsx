@@ -21,7 +21,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [freqMax, setFreqMax] = useState(10000);
   const [maxIter, setMaxIter] = useState(100);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<{ cost: number; iterations: number } | null>(null);
+  const [result, setResult] = useState<{ cost: number; iterations: number; notes?: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleOptimize = () => {
@@ -65,13 +65,33 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
 
       setResult({ cost: optResult.final_cost, iterations: optResult.iterations });
 
-      // Apply optimized ways back
-      onApply(optResult.optimized_system.ways.map((ow, i) => ({
-        ...ways[i],
-        active_filters: ow.active_filters,
-        gain_db: ow.gain_db,
-        delay_s: ow.delay_s,
-      })));
+      // Apply optimized ways back, converting negative gain to L-Pad
+      const gainNotes: string[] = [];
+      onApply(optResult.optimized_system.ways.map((ow, i) => {
+        const way = { ...ways[i], active_filters: ow.active_filters, gain_db: ow.gain_db, delay_s: ow.delay_s };
+        const absGain = Math.abs(ow.gain_db);
+
+        if (ow.gain_db < -0.5) {
+          // Convert attenuation to L-Pad using driver Re
+          const re = ways[i].driver.re_ohm;
+          if (re > 0) {
+            const ratio = Math.pow(10, absGain / 20);
+            const series_ohms = re * (ratio - 1) / ratio;
+            const shunt_ohms = re * ratio / (ratio - 1);
+            // Remove any existing L-Pad, then append new one
+            const filtered = way.passive_filters.filter(f => f.type !== 'LPad');
+            way.passive_filters = [...filtered, { type: 'LPad' as const, series_ohms, shunt_ohms }];
+            way.gain_db = 0;
+            gainNotes.push(`${ways[i].name}: L-Pad ${absGain.toFixed(1)} dB (${series_ohms.toFixed(1)}Ω / ${shunt_ohms.toFixed(1)}Ω)`);
+          }
+        } else if (ow.gain_db > 0.5) {
+          gainNotes.push(`${ways[i].name}: +${ow.gain_db.toFixed(1)} dB (requires active gain stage)`);
+        }
+        return way;
+      }));
+      if (gainNotes.length > 0) {
+        setResult(prev => prev ? { ...prev, notes: gainNotes } : prev);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -159,6 +179,11 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       {result && (
         <div style={{ fontSize: 11, color: 'var(--graf-warm-600)', marginTop: 4 }}>
           Done in {result.iterations} iterations. Cost: {result.cost.toFixed(2)} dB²
+          {result.notes && result.notes.map((n, i) => (
+            <div key={i} style={{ marginTop: 2, color: n.includes('active') ? 'var(--graf-danger)' : 'var(--graf-warm-500)' }}>
+              → {n}
+            </div>
+          ))}
         </div>
       )}
       {error && (

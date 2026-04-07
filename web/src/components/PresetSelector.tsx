@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DRIVER_DB } from '../presets/drivers_db';
 import { DRIVER_PRESETS } from '../presets/drivers';
 import type { DriverParams } from '../types';
@@ -10,6 +10,11 @@ interface Props {
 
 export function PresetSelector({ onSelect, currentName }: Props) {
   const [search, setSearch] = useState(currentName ?? '');
+
+  // Sync search field when active way changes
+  useEffect(() => {
+    setSearch(currentName ?? '');
+  }, [currentName]);
   const [showList, setShowList] = useState(false);
 
   const filtered = useMemo(() => {

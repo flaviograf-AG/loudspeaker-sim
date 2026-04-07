@@ -255,3 +255,37 @@ export interface DesignState {
   per_way_eq: ActiveFilter[][];
   preset_names: (string | undefined)[];
 }
+
+// === NEW STATE MODEL (v2) ===
+
+export interface WayDesign {
+  name: string;
+  driver: DriverParams;
+  enclosure: EnclosureConfig;
+  passive_filters: PassiveFilter[];
+  gain_db: number;
+  delay_s: number;
+  inverted: boolean;
+  z_offset_m: number;
+  enabled: boolean;
+  preset_name?: string;
+  measured?: {
+    frequencies_hz: number[];
+    spl_db: number[];
+    phase_deg: number[];
+    impedance_ohm: number[];
+    impedance_phase_deg: number[];
+  };
+}
+
+export interface DesignStateV2 {
+  version: 2;
+  topology: SystemTopology;
+  ways: WayDesign[];
+  crossover_points: CrossoverPoint[];
+  per_way_eq: ActiveFilter[][];
+  freq_start_hz: number;
+  freq_end_hz: number;
+  freq_points: number;
+  drive_voltage_rms: number;
+}

@@ -243,7 +243,10 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
                     Some(crossover::ActiveFilter::LR2LowPass { .. })
                 );
                 let lo = if is_hp {
-                    optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref)
+                    // Practical minimum: max of displacement-based limit and 2.5× driver Fs
+                    let f_disp = optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref);
+                    let f_fs = way.driver.fs_hz * 2.5;
+                    f_disp.max(f_fs)
                 } else {
                     20.0  // floor for LP filters
                 };
@@ -257,9 +260,10 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             optimizer::OptParam::WayGain { .. } => (-20.0, 20.0),
             optimizer::OptParam::WayDelay { .. } => (0.0, 0.1), // max 100ms delay
             optimizer::OptParam::CrossoverFreq { hp_way_idx, hp_filter_idx: _, .. } => {
-                // Min bound from HP driver's Xmax, max from optimization range
+                // Min bound: max of displacement limit and 2.5× Fs
                 let way = &project.ways[*hp_way_idx];
-                let lo = optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref);
+                let f_disp = optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref);
+                let lo = f_disp.max(way.driver.fs_hz * 2.5);
                 (lo.max(20.0), input.freq_max_hz)
             }
         }
@@ -317,8 +321,10 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
     };
 
     // Compute per-way min safe HP crossover frequency for UI display
+    // Uses practical floor: max(displacement limit, 2.5 × Fs)
     let min_safe_freq_hz: Vec<f64> = project.ways.iter().map(|w| {
-        optimizer::min_safe_freq_hz(w.driver.sd_m2, w.driver.xmax_m, target_spl_ref)
+        let f_disp = optimizer::min_safe_freq_hz(w.driver.sd_m2, w.driver.xmax_m, target_spl_ref);
+        f_disp.max(w.driver.fs_hz * 2.5)
     }).collect();
 
     let output = system_api::OptimizerResultJson {

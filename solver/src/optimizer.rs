@@ -243,7 +243,14 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
     }
 }
 
-/// Cost function: weighted mean squared error between system SPL and target curve.
+/// Cost function: weighted MSE + max-error penalty + smoothness penalty.
+///
+/// Three components:
+/// 1. Weighted mean squared error (existing)
+/// 2. Max-error penalty: penalizes the worst single-frequency deviation,
+///    preventing localized dips/peaks that MSE averages away
+/// 3. Smoothness penalty: penalizes rapid SPL changes between adjacent
+///    frequency points (large dSPL/df)
 fn cost(project: &SpeakerProject, config: &OptimizerConfig) -> f64 {
     let result = match solve_system(project) {
         Ok(r) => r,
@@ -252,6 +259,10 @@ fn cost(project: &SpeakerProject, config: &OptimizerConfig) -> f64 {
 
     let mut sum = 0.0;
     let mut total_weight = 0.0;
+    let mut max_abs_err = 0.0_f64;
+    let mut prev_spl: Option<f64> = None;
+    let mut smoothness_penalty = 0.0;
+
     for (i, &freq) in result.frequencies_hz.iter().enumerate() {
         if freq >= config.freq_min_hz && freq <= config.freq_max_hz {
             let target = config.target.target_at(freq);
@@ -264,10 +275,33 @@ fn cost(project: &SpeakerProject, config: &OptimizerConfig) -> f64 {
             };
             sum += weight * err * err;
             total_weight += weight;
+            max_abs_err = max_abs_err.max(err.abs());
+
+            // Smoothness: penalize large SPL jumps between adjacent in-band points
+            if let Some(prev) = prev_spl {
+                let delta = (result.system_spl_db[i] - prev).abs();
+                if delta > 1.0 {
+                    // Quadratic penalty for jumps > 1 dB between adjacent points
+                    smoothness_penalty += (delta - 1.0) * (delta - 1.0);
+                }
+            }
+            prev_spl = Some(result.system_spl_db[i]);
         }
     }
     if total_weight == 0.0 { return 1e12; }
+
+    // Component 1: weighted MSE
     let mut spl_cost = sum / total_weight;
+
+    // Component 2: max-error penalty — prevents localized dips/peaks
+    // Threshold at 3 dB: below that, no penalty. Above, quadratic growth.
+    if max_abs_err > 3.0 {
+        spl_cost += 2.0 * (max_abs_err - 3.0) * (max_abs_err - 3.0);
+    }
+
+    // Component 3: smoothness penalty (scaled by number of in-band points)
+    let n_points = (total_weight / 1.0).max(1.0); // approximate point count
+    spl_cost += 0.5 * smoothness_penalty / n_points;
 
     // Impedance floor penalty
     if let Some(z_min) = config.min_impedance_ohm {

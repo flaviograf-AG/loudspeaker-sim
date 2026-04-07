@@ -127,3 +127,172 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* Setup Wizard */
+.setup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.setup-wizard {
+  background: var(--graf-surface, #fff);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 560px;
+  width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.setup-wizard-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--graf-primary, #00809E);
+  margin-bottom: 24px;
+}
+
+.setup-section {
+  margin-bottom: 20px;
+}
+
+.setup-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--graf-warm-500, #8a8580);
+  margin-bottom: 8px;
+}
+
+.setup-topology-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.setup-topology-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px;
+  border: 2px solid var(--graf-border, #e8e4dc);
+  border-radius: 8px;
+  background: var(--graf-surface, #fff);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.setup-topology-btn:hover {
+  border-color: var(--graf-primary, #00809E);
+}
+
+.setup-topology-btn.active {
+  border-color: var(--graf-primary, #00809E);
+  background: color-mix(in srgb, var(--graf-primary, #00809E) 8%, transparent);
+}
+
+.setup-topology-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--graf-body-color, #2d2a26);
+}
+
+.setup-topology-desc {
+  font-size: 11px;
+  color: var(--graf-warm-500, #8a8580);
+  text-align: center;
+  margin-top: 2px;
+}
+
+.setup-ways-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-way-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-way-name {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 120px;
+  color: var(--graf-body-color, #2d2a26);
+}
+
+.setup-way-select {
+  flex: 1;
+  font-size: 13px;
+}
+
+.setup-start-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Accordion sections */
+.accordion-section {
+  border: 1px solid var(--graf-border, #e8e4dc);
+  border-radius: var(--graf-border-radius, 8px);
+  margin-bottom: var(--graf-spacing-sm, 8px);
+  background: var(--graf-surface, #fff);
+  overflow: hidden;
+}
+
+.accordion-section.accordion-expanded {
+  border-color: var(--graf-primary, #00809E);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--graf-font-size-sm, 14px);
+}
+
+.accordion-header:hover {
+  background: color-mix(in srgb, var(--graf-primary, #00809E) 5%, transparent);
+}
+
+.accordion-arrow {
+  font-size: 10px;
+  color: var(--graf-warm-400, #a09a94);
+  flex-shrink: 0;
+  width: 12px;
+}
+
+.accordion-title {
+  font-weight: 600;
+  color: var(--graf-primary, #00809E);
+  flex-shrink: 0;
+}
+
+.accordion-summary {
+  font-size: var(--graf-font-size-xs, 12px);
+  color: var(--graf-warm-500, #8a8580);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.accordion-body {
+  padding: 4px 12px 12px 12px;
+}

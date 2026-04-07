@@ -218,3 +218,13 @@ export interface SystemResult {
   system_group_delay_ms: number[];
   system_impedance_ohm: number[];
 }
+
+// System topology — decided in setup wizard, rarely changed
+export type SystemTopology = '1-way' | '2-way' | '2.5-way' | '3-way' | '3.5-way' | '4-way';
+
+// Describes the skeleton of a system before driver/enclosure details
+export interface WayTemplate {
+  name: string;
+  role: 'full-range' | 'woofer' | 'woofer-bass-only' | 'midrange' | 'tweeter' | 'sub';
+  defaultEnclosureType: EnclosureType;
+}

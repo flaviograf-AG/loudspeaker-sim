@@ -1,0 +1,122 @@
+import type { SystemTopology, WayTemplate, WayInput, EnclosureType, EnclosureConfig, ActiveFilter } from './types';
+
+export const TOPOLOGY_TEMPLATES: Record<SystemTopology, WayTemplate[]> = {
+  '1-way': [
+    { name: 'Full Range', role: 'full-range', defaultEnclosureType: 'Sealed' },
+  ],
+  '2-way': [
+    { name: 'Woofer', role: 'woofer', defaultEnclosureType: 'Sealed' },
+    { name: 'Tweeter', role: 'tweeter', defaultEnclosureType: 'Sealed' },
+  ],
+  '2.5-way': [
+    { name: 'Woofer', role: 'woofer', defaultEnclosureType: 'Sealed' },
+    { name: 'Woofer (bass)', role: 'woofer-bass-only', defaultEnclosureType: 'Sealed' },
+    { name: 'Tweeter', role: 'tweeter', defaultEnclosureType: 'Sealed' },
+  ],
+  '3-way': [
+    { name: 'Woofer', role: 'woofer', defaultEnclosureType: 'Sealed' },
+    { name: 'Midrange', role: 'midrange', defaultEnclosureType: 'Sealed' },
+    { name: 'Tweeter', role: 'tweeter', defaultEnclosureType: 'Sealed' },
+  ],
+  '3.5-way': [
+    { name: 'Woofer', role: 'woofer', defaultEnclosureType: 'Sealed' },
+    { name: 'Woofer (bass)', role: 'woofer-bass-only', defaultEnclosureType: 'Sealed' },
+    { name: 'Midrange', role: 'midrange', defaultEnclosureType: 'Sealed' },
+    { name: 'Tweeter', role: 'tweeter', defaultEnclosureType: 'Sealed' },
+  ],
+  '4-way': [
+    { name: 'Sub', role: 'sub', defaultEnclosureType: 'Vented' },
+    { name: 'Woofer', role: 'woofer', defaultEnclosureType: 'Sealed' },
+    { name: 'Midrange', role: 'midrange', defaultEnclosureType: 'Sealed' },
+    { name: 'Tweeter', role: 'tweeter', defaultEnclosureType: 'Sealed' },
+  ],
+};
+
+// Default driver params per role
+const DEFAULT_DRIVERS: Record<string, { fs_hz: number; re_ohm: number; le_h: number; qes: number; qms: number; vas_m3: number; sd_m2: number; xmax_m: number }> = {
+  'full-range': { fs_hz: 55, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.45, qms: 3.5, vas_m3: 15e-3, sd_m2: 132e-4, xmax_m: 5e-3 },
+  'woofer': { fs_hz: 37, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5, vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3 },
+  'woofer-bass-only': { fs_hz: 37, re_ohm: 6.5, le_h: 0.5e-3, qes: 0.42, qms: 3.5, vas_m3: 18e-3, sd_m2: 132e-4, xmax_m: 6e-3 },
+  'midrange': { fs_hz: 120, re_ohm: 6.0, le_h: 0.2e-3, qes: 0.45, qms: 3.0, vas_m3: 2e-3, sd_m2: 50e-4, xmax_m: 3e-3 },
+  'tweeter': { fs_hz: 800, re_ohm: 5.5, le_h: 0.05e-3, qes: 0.5, qms: 2.0, vas_m3: 0.5e-3, sd_m2: 8e-4, xmax_m: 1e-3 },
+  'sub': { fs_hz: 22, re_ohm: 3.5, le_h: 1.0e-3, qes: 0.38, qms: 5.0, vas_m3: 80e-3, sd_m2: 350e-4, xmax_m: 12e-3 },
+};
+
+// Default active filters per role for typical crossover points
+function defaultFilters(role: string, topology: SystemTopology): ActiveFilter[] {
+  switch (topology) {
+    case '1-way': return [];
+    case '2-way':
+      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 2500 }];
+      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 2500 }];
+      return [];
+    case '2.5-way':
+      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 2500 }];
+      if (role === 'woofer-bass-only') return [{ type: 'LR4LowPass', freq_hz: 500 }];
+      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 2500 }];
+      return [];
+    case '3-way':
+      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 500 }];
+      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
+      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
+      return [];
+    case '3.5-way':
+      if (role === 'woofer') return [{ type: 'LR4LowPass', freq_hz: 500 }];
+      if (role === 'woofer-bass-only') return [{ type: 'LR4LowPass', freq_hz: 200 }];
+      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
+      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
+      return [];
+    case '4-way':
+      if (role === 'sub') return [{ type: 'LR4LowPass', freq_hz: 80 }];
+      if (role === 'woofer') return [{ type: 'LR4HighPass', freq_hz: 80 }, { type: 'LR4LowPass', freq_hz: 500 }];
+      if (role === 'midrange') return [{ type: 'LR4HighPass', freq_hz: 500 }, { type: 'LR4LowPass', freq_hz: 3000 }];
+      if (role === 'tweeter') return [{ type: 'LR4HighPass', freq_hz: 3000 }];
+      return [];
+  }
+}
+
+// Default enclosure config per type
+export const DEFAULT_ENCLOSURES: Record<EnclosureType, EnclosureConfig> = {
+  Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
+  Vented: { type: 'Vented', volume_m3: 30e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7, port_shape: { type: 'Circular' } },
+  TransmissionLine: { type: 'TransmissionLine', length_m: 1.5, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 0.5, flow_resistivity_pa_s_m2: 3000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
+  Horn: { type: 'Horn', segments: [{ area_start_m2: 50e-4, area_end_m2: 500e-4, length_m: 0.5, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 5e-3, depth_m: 0.05, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2.0, num_tmm_segments: 20, stuffing_zones: [] },
+  Bandpass: { type: 'Bandpass', rear_volume_m3: 10e-3, front_volume_m3: 15e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
+  PassiveRadiator: { type: 'PassiveRadiator', volume_m3: 15e-3, pr_sd_m2: 132e-4, pr_cms: 1e-3, pr_mms_kg: 0.02, pr_rms: 1, ql: 7 },
+  OpenBaffle: { type: 'OpenBaffle', width_m: 0.3, height_m: 0.5, driver_offset_m: 0.1 },
+};
+
+/**
+ * Generate a complete WayInput[] from a topology + per-way enclosure overrides.
+ */
+export function buildWaysFromSetup(
+  topology: SystemTopology,
+  enclosureOverrides: EnclosureType[],
+): WayInput[] {
+  const templates = TOPOLOGY_TEMPLATES[topology];
+  return templates.map((tpl, i) => {
+    const encType = enclosureOverrides[i] ?? tpl.defaultEnclosureType;
+    return {
+      name: tpl.name,
+      driver: { ...DEFAULT_DRIVERS[tpl.role] },
+      enclosure: { ...DEFAULT_ENCLOSURES[encType] },
+      passive_filters: [],
+      active_filters: defaultFilters(tpl.role, topology),
+      gain_db: 0,
+      delay_s: 0,
+      inverted: false,
+      z_offset_m: 0,
+      enabled: true,
+    };
+  });
+}
+
+/** Enclosure types available per role (Horn/TL unlikely for tweeter) */
+export const ENCLOSURE_TYPES_FOR_ROLE: Record<string, EnclosureType[]> = {
+  'full-range': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'],
+  'woofer': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'],
+  'woofer-bass-only': ['Sealed', 'Vented', 'TransmissionLine', 'Bandpass', 'PassiveRadiator'],
+  'midrange': ['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'OpenBaffle'],
+  'tweeter': ['Sealed', 'Vented', 'Horn', 'OpenBaffle'],
+  'sub': ['Sealed', 'Vented', 'Bandpass', 'PassiveRadiator'],
+};

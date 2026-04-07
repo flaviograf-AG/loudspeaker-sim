@@ -8,6 +8,8 @@ import { NumericInput } from './NumericInput';
 interface Props {
   ways: WayInput[];
   onChange: (ways: WayInput[]) => void;
+  activeWayOverride?: number;
+  crossoverOnly?: boolean;
 }
 
 const DEFAULT_WOOFER: WayInput = {
@@ -66,8 +68,10 @@ function filterLabel(f: ActiveFilter): string {
   }
 }
 
-export function MultiWayEditor({ ways, onChange }: Props) {
-  const [activeWay, setActiveWay] = useState(0);
+export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnly }: Props) {
+  const [activeWayLocal, setActiveWayLocal] = useState(0);
+  const activeWay = activeWayOverride ?? activeWayLocal;
+  const setActiveWay = activeWayOverride !== undefined ? () => {} : setActiveWayLocal;
 
   const updateWay = (idx: number, updates: Partial<WayInput>) => {
     const newWays = [...ways];
@@ -97,65 +101,69 @@ export function MultiWayEditor({ ways, onChange }: Props) {
 
   return (
     <>
-      {/* Way tabs */}
-      <div className="btn-row" style={{ marginBottom: 8 }}>
-        {ways.map((w, i) => (
-          <button key={i}
-            className={`graf-btn graf-btn-sm ${i === activeWay ? 'graf-btn-primary' : 'graf-btn-outline'}`}
-            style={{ position: 'relative' }}
-            onClick={() => setActiveWay(i)}
-            title={`${w.name}${w.enabled ? '' : ' (disabled)'}`}
-          >
-            {w.name}{!w.enabled && ' ⊘'}
-          </button>
-        ))}
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={addWay} title="Add a new way">+</button>
-      </div>
-
-      {/* Way controls */}
-      <div className="section-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <input type="text" className="graf-form-control" style={{ width: 100, fontSize: 13, fontWeight: 600 }}
-            value={way.name} onChange={(e) => updateWay(activeWay, { name: e.target.value })} />
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
-              <input type="checkbox" checked={way.enabled}
-                onChange={(e) => updateWay(activeWay, { enabled: e.target.checked })} /> On
-            </label>
-            <label title="Invert polarity (180° phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
-              <input type="checkbox" checked={way.inverted}
-                onChange={(e) => updateWay(activeWay, { inverted: e.target.checked })} /> Inv
-            </label>
-            {ways.length > 1 && (
-              <button className="graf-btn graf-btn-sm" style={{ padding: '0 6px', color: 'var(--graf-danger)' }}
-                onClick={() => removeWay(activeWay)} title="Remove this way">✕</button>
-            )}
+      {!crossoverOnly && (
+        <>
+          {/* Way tabs */}
+          <div className="btn-row" style={{ marginBottom: 8 }}>
+            {ways.map((w, i) => (
+              <button key={i}
+                className={`graf-btn graf-btn-sm ${i === activeWay ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+                style={{ position: 'relative' }}
+                onClick={() => setActiveWay(i)}
+                title={`${w.name}${w.enabled ? '' : ' (disabled)'}`}
+              >
+                {w.name}{!w.enabled && ' \u2298'}
+              </button>
+            ))}
+            <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={addWay} title="Add a new way">+</button>
           </div>
-        </div>
 
-        <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
-          tooltip="Per-way level adjustment. Use to match sensitivity between drivers."
-          onChange={(v) => updateWay(activeWay, { gain_db: v })} />
-        <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="µs"
-          tooltip="Per-way time delay for alignment. 29 µs ≈ 1 cm acoustic path difference."
-          onChange={(v) => updateWay(activeWay, { delay_s: v / 1e6 })} />
-        <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
-          tooltip="Physical depth offset from reference plane. Positive = recessed. Adds acoustic path delay."
-          onChange={(v) => updateWay(activeWay, { z_offset_m: v / 100 })} />
-      </div>
+          {/* Way controls */}
+          <div className="section-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <input type="text" className="graf-form-control" style={{ width: 100, fontSize: 13, fontWeight: 600 }}
+                value={way.name} onChange={(e) => updateWay(activeWay, { name: e.target.value })} />
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={way.enabled}
+                    onChange={(e) => updateWay(activeWay, { enabled: e.target.checked })} /> On
+                </label>
+                <label title="Invert polarity (180 deg phase flip)" style={{ fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={way.inverted}
+                    onChange={(e) => updateWay(activeWay, { inverted: e.target.checked })} /> Inv
+                </label>
+                {ways.length > 1 && (
+                  <button className="graf-btn graf-btn-sm" style={{ padding: '0 6px', color: 'var(--graf-danger)' }}
+                    onClick={() => removeWay(activeWay)} title="Remove this way">x</button>
+                )}
+              </div>
+            </div>
 
-      {/* 1. Driver selection (the starting point of any design) */}
-      <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
-      <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+            <NumericInput label="Gain" value={way.gain_db} step={0.5} min={-20} max={20} unit="dB"
+              tooltip="Per-way level adjustment. Use to match sensitivity between drivers."
+              onChange={(v) => updateWay(activeWay, { gain_db: v })} />
+            <NumericInput label="Delay" value={way.delay_s * 1e6} step={10} min={0} unit="us"
+              tooltip="Per-way time delay for alignment. 29 us = 1 cm acoustic path difference."
+              onChange={(v) => updateWay(activeWay, { delay_s: v / 1e6 })} />
+            <NumericInput label="Z offset" value={way.z_offset_m * 100} step={0.5} min={-20} max={20} unit="cm"
+              tooltip="Physical depth offset from reference plane. Positive = recessed. Adds acoustic path delay."
+              onChange={(v) => updateWay(activeWay, { z_offset_m: v / 100 })} />
+          </div>
 
-      {/* 2. Enclosure for this way */}
-      <EnclosureInputs
-        config={way.enclosure}
-        driverVas={way.driver.vas_m3}
-        driverFs={way.driver.fs_hz}
-        driverQts={qts}
-        onChange={(enc: EnclosureConfig) => updateWay(activeWay, { enclosure: enc })}
-      />
+          {/* 1. Driver selection (the starting point of any design) */}
+          <PresetSelector onSelect={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+          <DriverInputs params={way.driver} onChange={(d: DriverParams) => updateWay(activeWay, { driver: d })} />
+
+          {/* 2. Enclosure for this way */}
+          <EnclosureInputs
+            config={way.enclosure}
+            driverVas={way.driver.vas_m3}
+            driverFs={way.driver.fs_hz}
+            driverQts={qts}
+            onChange={(enc: EnclosureConfig) => updateWay(activeWay, { enclosure: enc })}
+          />
+        </>
+      )}
 
       {/* 3. Active filters */}
       <div className="section-card">

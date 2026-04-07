@@ -32,6 +32,8 @@ interface Props {
   driverFs?: number;
   driverQts?: number;
   onChange: (config: EnclosureConfig) => void;
+  lockType?: boolean;
+  onChangeType?: () => void;
 }
 
 const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
@@ -45,7 +47,7 @@ const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
 };
 
 
-export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChange }: Props) {
+export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChange, lockType, onChangeType }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
 
@@ -82,30 +84,40 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
   return (
     <div className="section-card">
       <div className="section-title">Enclosure</div>
-      <div className="btn-row" style={{ marginBottom: 8 }}>
-        {(['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'] as EnclosureType[]).map((t) => {
-          const labels: Record<string, string> = {
-            Sealed: 'Sealed', Vented: 'Vented', TransmissionLine: 'T-Line',
-            Horn: 'Horn', Bandpass: 'BP', PassiveRadiator: 'PR', OpenBaffle: 'OB',
-          };
-          const tips: Record<string, string> = {
-            Sealed: 'Sealed (closed) box — simplest enclosure, 2nd-order HP rolloff',
-            Vented: 'Vented (bass reflex) box — port extends bass, 4th-order rolloff',
-            TransmissionLine: 'Transmission Line — acoustic waveguide behind driver, quarter-wave tuning',
-            Horn: 'Horn-loaded — flared waveguide increases sensitivity and controls directivity',
-            Bandpass: 'Bandpass — driver enclosed between two chambers, only port radiates',
-            PassiveRadiator: 'Passive Radiator — sealed box with a mass-loaded passive cone instead of a port',
-            OpenBaffle: 'Open Baffle — no box, driver on a flat panel, dipole radiation',
-          };
-          return (
-            <button key={t}
-              className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
-              onClick={() => switchType(t)}
-              title={tips[t]}
-            >{labels[t]}</button>
-          );
-        })}
-      </div>
+      {lockType ? (
+        <div style={{ fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <strong>{encType === 'TransmissionLine' ? 'T-Line' : encType === 'PassiveRadiator' ? 'PR' : encType === 'OpenBaffle' ? 'OB' : encType === 'Bandpass' ? 'BP' : encType}</strong>
+          {onChangeType && (
+            <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={onChangeType}
+              style={{ fontSize: 11, padding: '0 4px' }}>change</button>
+          )}
+        </div>
+      ) : (
+        <div className="btn-row" style={{ marginBottom: 8 }}>
+          {(['Sealed', 'Vented', 'TransmissionLine', 'Horn', 'Bandpass', 'PassiveRadiator', 'OpenBaffle'] as EnclosureType[]).map((t) => {
+            const labels: Record<string, string> = {
+              Sealed: 'Sealed', Vented: 'Vented', TransmissionLine: 'T-Line',
+              Horn: 'Horn', Bandpass: 'BP', PassiveRadiator: 'PR', OpenBaffle: 'OB',
+            };
+            const tips: Record<string, string> = {
+              Sealed: 'Sealed (closed) box — simplest enclosure, 2nd-order HP rolloff',
+              Vented: 'Vented (bass reflex) box — port extends bass, 4th-order rolloff',
+              TransmissionLine: 'Transmission Line — acoustic waveguide behind driver, quarter-wave tuning',
+              Horn: 'Horn-loaded — flared waveguide increases sensitivity and controls directivity',
+              Bandpass: 'Bandpass — driver enclosed between two chambers, only port radiates',
+              PassiveRadiator: 'Passive Radiator — sealed box with a mass-loaded passive cone instead of a port',
+              OpenBaffle: 'Open Baffle — no box, driver on a flat panel, dipole radiation',
+            };
+            return (
+              <button key={t}
+                className={`graf-btn graf-btn-sm ${encType === t ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+                onClick={() => switchType(t)}
+                title={tips[t]}
+              >{labels[t]}</button>
+            );
+          })}
+        </div>
+      )}
 
       {config.type === 'Sealed' && (
         <>

@@ -9,8 +9,10 @@
 //! Reference: Nelder, J.A. & Mead, R. "A Simplex Method for Function
 //! Minimization" (Computer Journal, 1965)
 
+use crate::constants::{P_REF, RHO_0};
 use crate::system::{solve_system, SpeakerProject};
 use crate::crossover::ActiveFilter;
+use std::f64::consts::PI;
 
 /// Target curve for the optimizer cost function.
 #[derive(Debug, Clone)]
@@ -43,6 +45,24 @@ impl TargetCurve {
             }
         }
     }
+}
+
+/// Compute minimum safe frequency for a driver at a given SPL.
+///
+/// Below this frequency, the driver's cone displacement exceeds Xmax
+/// when producing the target SPL at 1m (free-field piston model).
+///
+/// Reference: Beranek & Mellow, "Acoustics" — piston displacement
+/// x_peak = P_ref × 10^(SPL/20) / (π × ρ₀ × f² × Sd)
+pub fn min_safe_freq_hz(sd_m2: f64, xmax_m: f64, target_spl_db: f64) -> f64 {
+    if sd_m2 <= 0.0 || xmax_m <= 0.0 {
+        return 0.0; // no constraint if Xmax not specified
+    }
+    let p_target = P_REF * 10.0_f64.powf(target_spl_db / 20.0);
+    // x_peak = p / (π × ρ₀ × f² × Sd)  →  f = √(p / (π × ρ₀ × Sd × Xmax))
+    let f_sq = p_target / (PI * RHO_0 * sd_m2 * xmax_m);
+    if f_sq <= 0.0 { return 0.0; }
+    f_sq.sqrt()
 }
 
 /// Which parameter to optimize.
@@ -89,6 +109,8 @@ pub struct OptimizerConfig {
     pub displacement_penalty_weight: f64,
     /// Algorithm choice
     pub algorithm: Algorithm,
+    /// Per-parameter minimum bounds (same length as params, or empty for no bounds)
+    pub param_min_bounds: Vec<f64>,
 }
 
 /// Optimizer result.
@@ -138,13 +160,19 @@ pub fn apply_values_pub(project: &mut SpeakerProject, params: &[OptParam], value
     apply_values(project, params, values);
 }
 
-/// Apply parameter values back into the project.
+/// Apply parameter values back into the project, with optional per-param min bounds.
 fn apply_values(project: &mut SpeakerProject, params: &[OptParam], values: &[f64]) {
-    for (p, &v) in params.iter().zip(values.iter()) {
+    apply_values_bounded(project, params, values, &[]);
+}
+
+/// Apply parameter values with per-parameter minimum bounds.
+fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], values: &[f64], min_bounds: &[f64]) {
+    for (i, (p, &v)) in params.iter().zip(values.iter()).enumerate() {
+        let bound = min_bounds.get(i).copied().unwrap_or(0.0);
         match p {
             OptParam::FilterFreq { way_idx, filter_idx } => {
                 let filter = &mut project.ways[*way_idx].active_filters[*filter_idx];
-                let freq = v.max(10.0); // clamp to minimum 10 Hz
+                let freq = v.max(10.0).max(bound); // clamp to minimum 10 Hz and param bound
                 match filter {
                     ActiveFilter::LowPass1 { freq_hz } |
                     ActiveFilter::HighPass1 { freq_hz } |
@@ -249,7 +277,7 @@ pub fn optimize(
 
     let initial = extract_values(project, &config.params);
 
-    match config.algorithm {
+    let mut result = match config.algorithm {
         Algorithm::NelderMead => {
             nelder_mead(project, config, &initial)
         }
@@ -266,7 +294,7 @@ pub fn optimize(
 
             // Phase 2: NM polish from DE's best (1/3 of iterations)
             let mut polished_project = project.clone();
-            apply_values(&mut polished_project, &config.params, &de_values);
+            apply_values_bounded(&mut polished_project, &config.params, &de_values, &config.param_min_bounds);
             let mut nm_config = config.clone();
             nm_config.max_iterations = config.max_iterations - de_iters;
             nm_config.algorithm = Algorithm::NelderMead;
@@ -280,7 +308,18 @@ pub fn optimize(
                 cost_history: history,
             }
         }
+    };
+
+    // Clamp returned values to respect param_min_bounds
+    for (i, val) in result.values.iter_mut().enumerate() {
+        if let Some(&bound) = config.param_min_bounds.get(i) {
+            if bound > 0.0 && *val < bound {
+                *val = bound;
+            }
+        }
     }
+
+    result
 }
 
 /// Nelder-Mead simplex optimizer.
@@ -305,7 +344,7 @@ fn nelder_mead(
     // Evaluate cost at each vertex
     let mut costs: Vec<f64> = simplex.iter().map(|v| {
         let mut p = project.clone();
-        apply_values(&mut p, &config.params, v);
+        apply_values_bounded(&mut p, &config.params, v, &config.param_min_bounds);
         cost(&p, config)
     }).collect();
 
@@ -345,7 +384,7 @@ fn nelder_mead(
         // Reflection
         let reflected: Vec<f64> = (0..n).map(|j| centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j])).collect();
         let mut p = project.clone();
-        apply_values(&mut p, &config.params, &reflected);
+        apply_values_bounded(&mut p, &config.params, &reflected, &config.param_min_bounds);
         let reflected_cost = cost(&p, config);
 
         if reflected_cost < costs[order[n - 1]] && reflected_cost >= costs[order[0]] {
@@ -358,7 +397,7 @@ fn nelder_mead(
             // Expansion
             let expanded: Vec<f64> = (0..n).map(|j| centroid[j] + gamma * (reflected[j] - centroid[j])).collect();
             let mut p2 = project.clone();
-            apply_values(&mut p2, &config.params, &expanded);
+            apply_values_bounded(&mut p2, &config.params, &expanded, &config.param_min_bounds);
             let expanded_cost = cost(&p2, config);
 
             if expanded_cost < reflected_cost {
@@ -374,7 +413,7 @@ fn nelder_mead(
         // Contraction
         let contracted: Vec<f64> = (0..n).map(|j| centroid[j] + rho * (simplex[worst_idx][j] - centroid[j])).collect();
         let mut p3 = project.clone();
-        apply_values(&mut p3, &config.params, &contracted);
+        apply_values_bounded(&mut p3, &config.params, &contracted, &config.param_min_bounds);
         let contracted_cost = cost(&p3, config);
 
         if contracted_cost < costs[worst_idx] {
@@ -390,7 +429,7 @@ fn nelder_mead(
                 simplex[idx][j] = simplex[best_idx][j] + sigma * (simplex[idx][j] - simplex[best_idx][j]);
             }
             let mut ps = project.clone();
-            apply_values(&mut ps, &config.params, &simplex[idx]);
+            apply_values_bounded(&mut ps, &config.params, &simplex[idx], &config.param_min_bounds);
             costs[idx] = cost(&ps, config);
         }
     }
@@ -460,7 +499,7 @@ fn differential_evolution(
     // Evaluate initial population
     let mut costs: Vec<f64> = population.iter().map(|ind| {
         let mut proj = project.clone();
-        apply_values(&mut proj, &config.params, ind);
+        apply_values_bounded(&mut proj, &config.params, ind, &config.param_min_bounds);
         cost(&proj, config)
     }).collect();
 
@@ -486,7 +525,7 @@ fn differential_evolution(
 
             // Evaluate trial
             let mut proj = project.clone();
-            apply_values(&mut proj, &config.params, &trial);
+            apply_values_bounded(&mut proj, &config.params, &trial, &config.param_min_bounds);
             let trial_cost = cost(&proj, config);
 
             // Selection: keep better

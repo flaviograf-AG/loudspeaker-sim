@@ -212,6 +212,34 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
         _ => optimizer::FrequencyWeight::Uniform,
     };
 
+    // Compute per-parameter min bounds from driver displacement limits.
+    // For HP filter params, the minimum frequency is derived from Sd × Xmax.
+    let target_spl_ref = match &target {
+        optimizer::TargetCurve::Flat(db) => *db,
+        optimizer::TargetCurve::Slope { db_at_1khz, .. } => *db_at_1khz,
+        optimizer::TargetCurve::Custom(pts) => pts.get(0).map_or(86.0, |p| p.1),
+    };
+    let param_min_bounds: Vec<f64> = opt_params.iter().map(|p| {
+        match p {
+            optimizer::OptParam::FilterFreq { way_idx, filter_idx } => {
+                let way = &project.ways[*way_idx];
+                let is_hp = matches!(
+                    way.active_filters.get(*filter_idx),
+                    Some(crossover::ActiveFilter::HighPass1 { .. }) |
+                    Some(crossover::ActiveFilter::HighPass2 { .. }) |
+                    Some(crossover::ActiveFilter::LR4HighPass { .. }) |
+                    Some(crossover::ActiveFilter::LR2HighPass { .. })
+                );
+                if is_hp {
+                    optimizer::min_safe_freq_hz(way.driver.sd_m2, way.driver.xmax_m, target_spl_ref)
+                } else {
+                    0.0
+                }
+            }
+            _ => 0.0,
+        }
+    }).collect();
+
     let config = optimizer::OptimizerConfig {
         params: opt_params.clone(),
         target,
@@ -228,6 +256,7 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             "de" => optimizer::Algorithm::DifferentialEvolution,
             _ => optimizer::Algorithm::Hybrid,
         },
+        param_min_bounds,
     };
 
     let result = optimizer::optimize(&project, &config);
@@ -261,11 +290,17 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
         ..input.system
     };
 
+    // Compute per-way min safe HP crossover frequency for UI display
+    let min_safe_freq_hz: Vec<f64> = project.ways.iter().map(|w| {
+        optimizer::min_safe_freq_hz(w.driver.sd_m2, w.driver.xmax_m, target_spl_ref)
+    }).collect();
+
     let output = system_api::OptimizerResultJson {
         optimized_system: opt_system,
         final_cost: result.final_cost,
         iterations: result.iterations,
         cost_history: result.cost_history,
+        min_safe_freq_hz,
     };
 
     serde_json::to_string(&output)

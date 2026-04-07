@@ -21,7 +21,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [freqMax, setFreqMax] = useState(10000);
   const [maxIter, setMaxIter] = useState(100);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<{ cost: number; iterations: number; notes?: string[] } | null>(null);
+  const [result, setResult] = useState<{ cost: number; iterations: number; notes?: string[]; minSafeFreqs?: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleOptimize = () => {
@@ -63,7 +63,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         e_series: eSeries !== 'none' ? eSeries : undefined,
       });
 
-      setResult({ cost: optResult.final_cost, iterations: optResult.iterations });
+      setResult({ cost: optResult.final_cost, iterations: optResult.iterations, minSafeFreqs: optResult.min_safe_freq_hz });
 
       // Apply optimized ways back, converting negative gain to L-Pad
       const gainNotes: string[] = [];
@@ -179,6 +179,13 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       {result && (
         <div style={{ fontSize: 11, color: 'var(--graf-warm-600)', marginTop: 4 }}>
           Done in {result.iterations} iterations. Cost: {result.cost.toFixed(2)} dB²
+          {result.minSafeFreqs && result.minSafeFreqs.some(f => f > 0) && (
+            <div style={{ marginTop: 4, fontSize: 10, color: 'var(--graf-warm-500)' }}>
+              {result.minSafeFreqs.map((f, i) => f > 0 ? (
+                <div key={`sf${i}`}>⚡ {ways[i]?.name || `Way ${i+1}`}: min safe HP ≥ {Math.round(f)} Hz</div>
+              ) : null)}
+            </div>
+          )}
           {result.notes && result.notes.map((n, i) => (
             <div key={i} style={{ marginTop: 2, color: n.includes('active') ? 'var(--graf-danger)' : 'var(--graf-warm-500)' }}>
               → {n}

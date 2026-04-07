@@ -59,6 +59,7 @@ fn optimizer_reduces_cost() {
         impedance_penalty_weight: 10.0,
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::NelderMead,
+        param_min_bounds: vec![],
     };
 
     let result = optimize(&project, &config);
@@ -94,6 +95,7 @@ fn optimizer_finds_reasonable_crossover_frequency() {
         impedance_penalty_weight: 10.0,
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::NelderMead,
+        param_min_bounds: vec![],
     };
 
     let result = optimize(&project, &config);
@@ -131,6 +133,24 @@ fn target_curve_custom_interpolation() {
 }
 
 #[test]
+fn min_safe_freq_d2008_tweeter() {
+    // Scan-Speak D2008/851200: Sd=3.8cm², Xmax=0.5mm
+    let f = min_safe_freq_hz(0.00038, 0.5e-3, 87.0);
+    eprintln!("D2008 min safe freq @ 87dB: {:.0} Hz", f);
+    // Should be around 700-900 Hz — too dangerous for a 3/4" dome below this
+    assert!(f > 500.0, "f_min should be > 500 Hz for tiny tweeter, got {:.0}", f);
+    assert!(f < 1500.0, "f_min should be < 1500 Hz, got {:.0}", f);
+}
+
+#[test]
+fn min_safe_freq_woofer_is_low() {
+    // SB17NRX2C35-8: Sd=130cm², Xmax=6mm — large cone, lots of displacement
+    let f = min_safe_freq_hz(0.013, 6e-3, 87.0);
+    eprintln!("SB17NRX min safe freq @ 87dB: {:.0} Hz", f);
+    assert!(f < 100.0, "Woofer f_min should be very low, got {:.0}", f);
+}
+
+#[test]
 fn hybrid_converges() {
     let project = test_2way_project(1000.0, -5.0);
     let config = OptimizerConfig {
@@ -149,6 +169,7 @@ fn hybrid_converges() {
         impedance_penalty_weight: 10.0,
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::Hybrid,
+        param_min_bounds: vec![],
     };
     let result = optimize(&project, &config);
     eprintln!("Hybrid: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);
@@ -176,6 +197,7 @@ fn de_reduces_cost() {
         impedance_penalty_weight: 10.0,
         displacement_penalty_weight: 5.0,
         algorithm: Algorithm::DifferentialEvolution,
+        param_min_bounds: vec![],
     };
     let result = optimize(&project, &config);
     eprintln!("DE: {} iterations, final cost = {:.2}", result.iterations, result.final_cost);

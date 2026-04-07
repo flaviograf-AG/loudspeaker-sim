@@ -52,6 +52,7 @@ export interface OptimizerResult {
   final_cost: number;
   iterations: number;
   cost_history: number[];
+  min_safe_freq_hz?: number[];
 }
 
 export function runOptimizer(input: OptimizerInput): OptimizerResult {

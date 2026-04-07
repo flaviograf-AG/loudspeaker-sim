@@ -232,4 +232,7 @@ pub struct OptimizerResultJson {
     pub final_cost: f64,
     pub iterations: usize,
     pub cost_history: Vec<f64>,
+    /// Minimum safe HP crossover frequency per way (Hz), derived from Sd × Xmax
+    #[serde(default)]
+    pub min_safe_freq_hz: Vec<f64>,
 }

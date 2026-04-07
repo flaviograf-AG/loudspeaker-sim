@@ -1,4 +1,4 @@
-import type { SimulationInput, SystemInput, SystemTopology } from '../types';
+import type { SystemInput, SystemTopology } from '../types';
 
 const STORAGE_KEY = 'ls-designs';
 

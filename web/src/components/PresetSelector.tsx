@@ -80,6 +80,7 @@ export function PresetSelector({ onSelect, currentName }: Props) {
         <select
           className="graf-form-control graf-form-select"
           style={{ width: '100%' }}
+          title="Quick-select a common driver type with typical T/S parameters"
           defaultValue=""
           onChange={(e) => {
             const idx = parseInt(e.target.value);

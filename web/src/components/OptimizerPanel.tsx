@@ -158,10 +158,12 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         <label style={{ fontSize: 11 }}>Target:</label>
         <label style={{ fontSize: 11 }}>
           <input type="radio" name="targetMode" value="flat" checked={targetMode === 'flat'}
+            title="Flat target: constant SPL across all frequencies"
             onChange={() => setTargetMode('flat')} /> Flat
         </label>
         <label style={{ fontSize: 11 }}>
           <input type="radio" name="targetMode" value="slope" checked={targetMode === 'slope'}
+            title="Slope target: SPL tilts down at a given dB/octave (common for room compensation)"
             onChange={() => setTargetMode('slope')} /> Slope
         </label>
       </div>
@@ -176,6 +178,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>Weighting:</label>
         <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          title="How to weight errors across frequencies. Presence boost doubles the weight in the 1-5 kHz speech/detail region."
           value={freqWeight} onChange={e => setFreqWeight(e.target.value as 'uniform' | 'presence')}>
           <option value="uniform">Uniform</option>
           <option value="presence">Presence boost (1-5 kHz)</option>
@@ -193,6 +196,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>
           <input type="checkbox" checked={minImpedance !== null}
+            title="Enable minimum impedance constraint. Penalizes solutions where system impedance drops below the threshold."
             onChange={e => setMinImpedance(e.target.checked ? 3.2 : null)} /> Min Z
         </label>
         {minImpedance !== null && (
@@ -204,6 +208,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>Algorithm:</label>
         <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          title="Optimization algorithm. Hybrid runs DE for global search then NM for local polish. DE is better for complex systems, NM is faster for simple ones."
           value={algorithm} onChange={e => setAlgorithm(e.target.value as 'hybrid' | 'nm' | 'de')}>
           <option value="hybrid">Hybrid (recommended)</option>
           <option value="de">Differential Evolution</option>
@@ -213,6 +218,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>E-series:</label>
         <select className="graf-input" style={{ fontSize: 11, padding: '2px 4px', flex: 1 }}
+          title="After optimization, snap passive component values to standard E-series resistor/capacitor/inductor values. E24 (5% tolerance) is more precise than E12 (10%)."
           value={eSeries} onChange={e => setESeries(e.target.value as 'none' | 'E12' | 'E24')}>
           <option value="none">None</option>
           <option value="E12">E12 (10%)</option>

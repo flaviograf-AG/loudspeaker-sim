@@ -45,6 +45,7 @@ export function PerWayEqEditor({ filters, onChange }: Props) {
           <span style={{ flex: 1 }}>{filterLabel(f)}</span>
           {'freq_hz' in f && (
             <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }}
+              title="Filter center/corner frequency (Hz)"
               value={f.freq_hz} step={100} min={10}
               onChange={(e) => {
                 const next = [...filters];
@@ -54,6 +55,7 @@ export function PerWayEqEditor({ filters, onChange }: Props) {
           )}
           {'gain_db' in f && (
             <input type="number" className="graf-form-control" style={{ width: 55, fontSize: 11 }}
+              title="Gain in dB (positive = boost, negative = cut)"
               value={f.gain_db} step={0.5}
               onChange={(e) => {
                 const next = [...filters];
@@ -63,6 +65,7 @@ export function PerWayEqEditor({ filters, onChange }: Props) {
           )}
           {'db' in f && (
             <input type="number" className="graf-form-control" style={{ width: 55, fontSize: 11 }}
+              title="Gain in dB"
               value={f.db} step={0.5}
               onChange={(e) => {
                 const next = [...filters];
@@ -75,6 +78,7 @@ export function PerWayEqEditor({ filters, onChange }: Props) {
         </div>
       ))}
       <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
+        title="Add a per-way EQ filter (PEQ, shelf, allpass, gain, polarity invert)"
         value="" onChange={(e) => {
           const idx = parseInt(e.target.value);
           if (!isNaN(idx)) {

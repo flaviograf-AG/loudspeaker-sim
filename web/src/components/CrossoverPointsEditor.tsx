@@ -55,6 +55,7 @@ export function CrossoverPointsEditor({ points, ways, onChange }: Props) {
               <select
                 className="graf-form-control"
                 style={{ fontSize: 12, width: 130 }}
+                title="Filter slope/order. LR4 (24 dB/oct) is the most common for hi-fi crossovers."
                 value={pt.slope}
                 onChange={(e) => updatePoint(i, { slope: e.target.value as CrossoverSlope })}
               >

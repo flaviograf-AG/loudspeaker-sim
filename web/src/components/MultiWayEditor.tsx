@@ -122,6 +122,7 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
           <div className="section-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <input type="text" className="graf-form-control" style={{ width: 100, fontSize: 13, fontWeight: 600 }}
+                title="Display name for this way (e.g. Woofer, Tweeter)"
                 value={way.name} onChange={(e) => updateWay(activeWay, { name: e.target.value })} />
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
@@ -173,6 +174,7 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
             <span style={{ flex: 1 }}>{filterLabel(f)}</span>
             {'freq_hz' in f && (
               <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }}
+                title="Filter frequency (Hz). For crossover filters, this is the -3 dB or -6 dB point."
                 value={f.freq_hz} step={100} min={10}
                 onChange={(e) => {
                   const filters = [...way.active_filters];
@@ -188,6 +190,7 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
           </div>
         ))}
         <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
+          title="Add an active filter stage to this way's signal chain"
           value="" onChange={(e) => {
             const idx = parseInt(e.target.value);
             if (!isNaN(idx)) {
@@ -224,31 +227,31 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
               </div>
               {'ohms' in pf && !('farads' in pf) && !('henries' in pf) && (
                 <div className="param-row"><span className="param-label">R</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.ohms.toFixed(2))} step={0.1}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Resistance in ohms" value={parseFloat(pf.ohms.toFixed(2))} step={0.1}
                     onChange={(e) => updatePf({ ...pf, ohms: parseFloat(e.target.value) || pf.ohms } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
               )}
               {'henries' in pf && (
                 <div className="param-row"><span className="param-label">L</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.henries * 1e3).toFixed(3))} step={0.01}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Inductance in millihenries" value={parseFloat((pf.henries * 1e3).toFixed(3))} step={0.01}
                     onChange={(e) => updatePf({ ...pf, henries: (parseFloat(e.target.value) || 0) / 1e3 } as PassiveFilter)} /><span className="param-unit">mH</span></div>
               )}
               {'dcr_ohms' in pf && (
                 <div className="param-row"><span className="param-label">DCR</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.dcr_ohms.toFixed(2))} step={0.1}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="DC resistance of the inductor winding" value={parseFloat(pf.dcr_ohms.toFixed(2))} step={0.1}
                     onChange={(e) => updatePf({ ...pf, dcr_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
               )}
               {'farads' in pf && (
                 <div className="param-row"><span className="param-label">C</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.farads * 1e6).toFixed(2))} step={0.1}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Capacitance in microfarads" value={parseFloat((pf.farads * 1e6).toFixed(2))} step={0.1}
                     onChange={(e) => updatePf({ ...pf, farads: (parseFloat(e.target.value) || 0) / 1e6 } as PassiveFilter)} /><span className="param-unit">µF</span></div>
               )}
               {'series_ohms' in pf && (
                 <>
                   <div className="param-row"><span className="param-label">R ser</span>
-                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.series_ohms.toFixed(2))} step={0.1}
+                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Series resistor in L-pad attenuator" value={parseFloat(pf.series_ohms.toFixed(2))} step={0.1}
                       onChange={(e) => updatePf({ ...pf, series_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
                   <div className="param-row"><span className="param-label">R shnt</span>
-                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.shunt_ohms.toFixed(2))} step={0.1}
+                    <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Shunt resistor in L-pad attenuator" value={parseFloat(pf.shunt_ohms.toFixed(2))} step={0.1}
                       onChange={(e) => updatePf({ ...pf, shunt_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">Ω</span></div>
                 </>
               )}
@@ -447,31 +450,31 @@ export function PassiveCrossoverEditor({ way, onUpdate, crossoverFreq }: {
             </div>
             {'ohms' in pf && !('farads' in pf) && !('henries' in pf) && (
               <div className="param-row"><span className="param-label">R</span>
-                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.ohms.toFixed(2))} step={0.1}
+                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Resistance in ohms" value={parseFloat(pf.ohms.toFixed(2))} step={0.1}
                   onChange={(e) => updatePf({ ...pf, ohms: parseFloat(e.target.value) || pf.ohms } as PassiveFilter)} /><span className="param-unit">ohm</span></div>
             )}
             {'henries' in pf && (
               <div className="param-row"><span className="param-label">L</span>
-                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.henries * 1e3).toFixed(3))} step={0.01}
+                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Inductance in millihenries" value={parseFloat((pf.henries * 1e3).toFixed(3))} step={0.01}
                   onChange={(e) => updatePf({ ...pf, henries: (parseFloat(e.target.value) || 0) / 1e3 } as PassiveFilter)} /><span className="param-unit">mH</span></div>
             )}
             {'dcr_ohms' in pf && (
               <div className="param-row"><span className="param-label">DCR</span>
-                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.dcr_ohms.toFixed(2))} step={0.1}
+                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="DC resistance of the inductor winding" value={parseFloat(pf.dcr_ohms.toFixed(2))} step={0.1}
                   onChange={(e) => updatePf({ ...pf, dcr_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">ohm</span></div>
             )}
             {'farads' in pf && (
               <div className="param-row"><span className="param-label">C</span>
-                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat((pf.farads * 1e6).toFixed(2))} step={0.1}
+                <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Capacitance in microfarads" value={parseFloat((pf.farads * 1e6).toFixed(2))} step={0.1}
                   onChange={(e) => updatePf({ ...pf, farads: (parseFloat(e.target.value) || 0) / 1e6 } as PassiveFilter)} /><span className="param-unit">uF</span></div>
             )}
             {'series_ohms' in pf && (
               <>
                 <div className="param-row"><span className="param-label">R ser</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.series_ohms.toFixed(2))} step={0.1}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Series resistor in L-pad attenuator" value={parseFloat(pf.series_ohms.toFixed(2))} step={0.1}
                     onChange={(e) => updatePf({ ...pf, series_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">ohm</span></div>
                 <div className="param-row"><span className="param-label">R shnt</span>
-                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} value={parseFloat(pf.shunt_ohms.toFixed(2))} step={0.1}
+                  <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }} title="Shunt resistor in L-pad attenuator" value={parseFloat(pf.shunt_ohms.toFixed(2))} step={0.1}
                     onChange={(e) => updatePf({ ...pf, shunt_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)} /><span className="param-unit">ohm</span></div>
               </>
             )}

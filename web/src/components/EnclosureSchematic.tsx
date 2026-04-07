@@ -77,13 +77,14 @@ export function EnclosureSchematic({ config, driverSd }: Props) {
   }
 
   if (config.type === 'TransmissionLine') {
-    // Folded pipe representation
-    const pipeW = 180;
+    // Folded pipe: driver at left wall firing left (toward listener),
+    // pipe extends to the right and folds downward, mouth at pipe end.
+    const pipeW = 170;
     const pipeH = 20;
     const folds = Math.max(1, config.num_folds || 1);
     const foldH = Math.min(100, 90 / folds);
-    const startX = 50;
-    const startY = 20;
+    const startX = 55;
+    const startY = 22;
     const segments: ReactElement[] = [];
 
     for (let i = 0; i < Math.min(folds + 1, 4); i++) {
@@ -94,7 +95,6 @@ export function EnclosureSchematic({ config, driverSd }: Props) {
         <rect key={`seg${i}`} x={Math.min(x, x + w)} y={y} width={Math.abs(w)} height={pipeH}
           fill="#e8f4f8" stroke="#00809E" strokeWidth={1} rx={2} />
       );
-      // Stuffing fill gradient
       if (config.stuffing_density_kg_m3 > 0) {
         segments.push(
           <rect key={`stuff${i}`} x={Math.min(x, x + w) + 2} y={y + 2} width={Math.abs(w) - 4} height={pipeH - 4}
@@ -103,17 +103,33 @@ export function EnclosureSchematic({ config, driverSd }: Props) {
       }
     }
 
+    // Driver at left wall of first segment, cone pointing LEFT (toward listener)
     const driverPos = config.driver_position || 0;
     const driverX = startX + driverPos * pipeW;
+
+    // Mouth position: end of last segment
+    const lastFold = Math.min(folds, 3);
+    const mouthY = startY + lastFold * (foldH + 5) + pipeH / 2;
+    const mouthX = lastFold % 2 === 0 ? startX + pipeW : startX;
+    const mouthArrow = lastFold % 2 === 0 ? '→' : '←';
 
     return (
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ minHeight: 80, background: '#fafafa', borderRadius: 4, border: '1px solid var(--graf-warm-200)' }}>
         {segments}
-        {driverSymbol(driverX, startY + pipeH / 2, Math.min(pipeH, driverSize))}
-        <text x={W / 2} y={H - 5} fontSize={9} textAnchor="middle" fill="#333">
-          T-Line {(config.length_m * 100).toFixed(0)}cm {config.num_folds > 0 ? `(${config.num_folds} folds)` : ''}
+        {/* Driver: cone faces left (toward listener), shown as mirrored symbol */}
+        <g transform={`translate(${driverX}, ${startY + pipeH / 2}) scale(-1,1)`}>
+          {driverSymbol(0, 0, Math.min(pipeH, driverSize))}
+        </g>
+        {/* Arrow showing front radiation direction */}
+        <text x={driverX - 18} y={startY + pipeH / 2 + 3} fontSize={8} fill="#333" textAnchor="end">← front</text>
+        {/* Mouth label at pipe terminus */}
+        <text x={mouthX + (lastFold % 2 === 0 ? 5 : -5)} y={mouthY + 3}
+          fontSize={8} fill="#00809E" textAnchor={lastFold % 2 === 0 ? 'start' : 'end'}>
+          {mouthArrow} mouth
         </text>
-        {config.open_end && <text x={startX + pipeW + 5} y={startY + pipeH / 2 + 3} fontSize={8} fill="#00809E">→ mouth</text>}
+        <text x={W / 2} y={H - 5} fontSize={9} textAnchor="middle" fill="#333">
+          T-Line {(config.length_m * 100).toFixed(0)}cm {config.num_folds > 0 ? ` (${config.num_folds} folds)` : ''}
+        </text>
       </svg>
     );
   }

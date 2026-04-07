@@ -246,7 +246,7 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
         freq_weight,
         freq_min_hz: input.freq_min_hz,
         freq_max_hz: input.freq_max_hz,
-        max_iterations: input.max_iterations,
+        max_iterations: input.max_iterations.min(system_api::MAX_ITERATIONS_CAP),
         tolerance: 0.01,
         min_impedance_ohm: input.min_impedance_ohm,
         impedance_penalty_weight: 10.0,

@@ -225,6 +225,9 @@ fn default_algorithm() -> String { "hybrid".to_string() }
 
 fn default_max_iter() -> usize { 100 }
 
+/// Hard cap to prevent browser tab freeze (WASM runs on main thread)
+pub const MAX_ITERATIONS_CAP: usize = 500;
+
 /// JSON-serializable optimizer result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizerResultJson {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { runOptimizer } from '../solver/wasm-bridge';
 import { NumericInput } from './NumericInput';
 import type { WayInput, SystemInput } from '../types';
@@ -21,8 +21,22 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [freqMax, setFreqMax] = useState(10000);
   const [maxIter, setMaxIter] = useState(100);
   const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [result, setResult] = useState<{ cost: number; iterations: number; notes?: string[]; minSafeFreqs?: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Elapsed timer during optimization
+  useEffect(() => {
+    if (running) {
+      setElapsed(0);
+      timerRef.current = setInterval(() => setElapsed(e => e + 0.1), 100);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [running]);
 
   const handleOptimize = () => {
     setRunning(true);
@@ -136,8 +150,8 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         tooltip="Upper frequency bound for optimization."
         onChange={setFreqMax} />
       <NumericInput label="Max iter" value={maxIter} step={50} min={10} max={500}
-        tooltip="Maximum optimizer iterations. More = potentially better result but slower."
-        onChange={(v) => setMaxIter(Math.round(v))} />
+        tooltip="Maximum optimizer iterations (capped at 500). More = better result but slower."
+        onChange={(v) => setMaxIter(Math.min(500, Math.round(v)))} />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>
           <input type="checkbox" checked={minImpedance !== null}
@@ -174,7 +188,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         disabled={running}
         title="Run optimizer to tune filter frequencies and per-way gains"
       >
-        {running ? 'Optimizing...' : 'Optimize'}
+        {running ? `Optimizing... ${elapsed.toFixed(1)}s` : 'Optimize'}
       </button>
       {result && (
         <div style={{ fontSize: 11, color: 'var(--graf-warm-600)', marginTop: 4 }}>

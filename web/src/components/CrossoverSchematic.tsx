@@ -94,11 +94,17 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
   const elements: ReactElement[] = [];
   let x = 40;
 
-  // Input terminal label
+  // Amplifier terminal with +/- labels
   elements.push(
     <g key="input">
-      <text x={8} y={Y_MID + 4} fontSize={11} fill="#666" fontWeight={600}>IN</text>
-      <line x1={24} y1={Y_MID} x2={x} y2={Y_MID} stroke="#333" strokeWidth={1.2} />
+      <rect x={2} y={Y_MID - 18} width={30} height={36} rx={3} fill="#f5f0eb" stroke="#333" strokeWidth={1.5} />
+      <text x={17} y={Y_MID - 5} fontSize={7} textAnchor="middle" fill="#333" fontWeight={700}>AMP</text>
+      <text x={17} y={Y_MID + 10} fontSize={7} textAnchor="middle" fill="#c0392b" fontWeight={700}>+</text>
+      <line x1={32} y1={Y_MID} x2={x} y2={Y_MID} stroke="#333" strokeWidth={1.2} />
+      {/* Negative terminal to ground */}
+      <line x1={17} y1={Y_MID + 18} x2={17} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />
+      <text x={24} y={Y_BOT - 16} fontSize={7} fill="#666" fontWeight={500}>&minus;</text>
+      {groundSymbol(17, Y_BOT - 10)}
     </g>
   );
 

@@ -46,7 +46,7 @@ const DEFAULT_DRIVERS: Record<string, { fs_hz: number; re_ohm: number; le_h: num
 export const DEFAULT_ENCLOSURES: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
   Vented: { type: 'Vented', volume_m3: 30e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7, port_shape: { type: 'Circular' } },
-  TransmissionLine: { type: 'TransmissionLine', length_m: 1.5, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 0.5, flow_resistivity_pa_s_m2: 3000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
+  TransmissionLine: { type: 'TransmissionLine', length_m: 1.5, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 0, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
   Horn: { type: 'Horn', segments: [{ area_start_m2: 50e-4, area_end_m2: 500e-4, length_m: 0.5, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 5e-3, depth_m: 0.05, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2.0, num_tmm_segments: 20, stuffing_zones: [] },
   Bandpass: { type: 'Bandpass', rear_volume_m3: 10e-3, front_volume_m3: 15e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
   PassiveRadiator: { type: 'PassiveRadiator', volume_m3: 15e-3, pr_sd_m2: 132e-4, pr_cms: 1e-3, pr_mms_kg: 0.02, pr_rms: 1, ql: 7 },

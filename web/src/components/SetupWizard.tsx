@@ -7,13 +7,13 @@ interface Props {
   initialTopology?: SystemTopology;
 }
 
-const TOPOLOGY_LABELS: Record<SystemTopology, { label: string; desc: string }> = {
-  '1-way': { label: '1-Way', desc: 'Full-range single driver' },
-  '2-way': { label: '2-Way', desc: 'Woofer + tweeter' },
-  '2.5-way': { label: '2.5-Way', desc: '2 woofers (one bass-only) + tweeter' },
-  '3-way': { label: '3-Way', desc: 'Woofer + midrange + tweeter' },
-  '3.5-way': { label: '3.5-Way', desc: '2 woofers (one bass-only) + mid + tweeter' },
-  '4-way': { label: '4-Way', desc: 'Sub + woofer + midrange + tweeter' },
+const TOPOLOGY_LABELS: Record<SystemTopology, { label: string; desc: string; tip: string }> = {
+  '1-way': { label: '1-Way', desc: 'Full-range single driver', tip: 'Single full-range driver covering the entire frequency range. Simplest design — great for desktop monitors and practice.' },
+  '2-way': { label: '2-Way', desc: 'Woofer + tweeter', tip: 'Most common speaker design. Woofer handles bass/midrange, tweeter handles highs. One crossover point (typically 2-3 kHz).' },
+  '2.5-way': { label: '2.5-Way', desc: '2 woofers (one bass-only) + tweeter', tip: 'Like a 2-way but with a second woofer that only plays bass. Adds bass output without changing the midrange character.' },
+  '3-way': { label: '3-Way', desc: 'Woofer + midrange + tweeter', tip: 'Dedicated driver for each frequency band. Two crossover points. Better performance but more complex crossover design.' },
+  '3.5-way': { label: '3.5-Way', desc: '2 woofers (one bass-only) + mid + tweeter', tip: 'A 3-way with an additional bass-only woofer for extended low-frequency output. Common in tower/floorstanding speakers.' },
+  '4-way': { label: '4-Way', desc: 'Sub + woofer + midrange + tweeter', tip: 'Full frequency range with dedicated subwoofer. Three crossover points. Maximum control over each band at the cost of crossover complexity.' },
 };
 
 const ENCLOSURE_LABELS: Record<EnclosureType, string> = {
@@ -65,6 +65,7 @@ export function SetupWizard({ onComplete, initialTopology }: Props) {
                 key={t}
                 className={`setup-topology-btn ${topology === t ? 'active' : ''}`}
                 onClick={() => handleTopologyChange(t)}
+                title={TOPOLOGY_LABELS[t].tip}
               >
                 <span className="setup-topology-label">{TOPOLOGY_LABELS[t].label}</span>
                 <span className="setup-topology-desc">{TOPOLOGY_LABELS[t].desc}</span>

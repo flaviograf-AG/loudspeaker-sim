@@ -39,7 +39,7 @@ interface Props {
 const DEFAULT_CONFIGS: Record<EnclosureType, EnclosureConfig> = {
   Sealed: { type: 'Sealed', volume_m3: 18e-3, ql: 7 },
   Vented: { type: 'Vented', volume_m3: 25e-3, port_area_m2: 20e-4, port_length_m: 0.15, num_ports: 1, port_flanged: true, ql: 7, port_shape: { type: 'Circular' } },
-  TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 5000, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
+  TransmissionLine: { type: 'TransmissionLine', length_m: 2.0, area_driver_m2: 132e-4, area_mouth_m2: 132e-4, num_segments: 20, stuffing_density_kg_m3: 5, flow_resistivity_pa_s_m2: 0, open_end: true, driver_position: 0, taper_profile: { type: 'Straight' }, stuffing_zones: [], mouth_termination: { type: 'Flush' }, num_folds: 0 },
   Horn: { type: 'Horn', segments: [{ area_start_m2: 132e-4, area_end_m2: 2000e-4, length_m: 0.60, profile: { type: 'Exponential' }, cutoff_hz: 200 }], rear_chamber: { type: 'Sealed', volume_m3: 10e-3, depth_m: 0.15, flow_resistivity_pa_s_m2: 0, lining_thickness_m: 0, ql: 7 }, throat_chamber: null, radiation_angle_sr: 2 * Math.PI, num_tmm_segments: 30, stuffing_zones: [] },
   Bandpass: { type: 'Bandpass', rear_volume_m3: 15e-3, front_volume_m3: 20e-3, port_area_m2: 20e-4, port_length_m: 0.12, port_flanged: true, rear_ql: 7, front_ql: 7 },
   PassiveRadiator: { type: 'PassiveRadiator', volume_m3: 20e-3, pr_sd_m2: 200e-4, pr_cms: 1.0e-3, pr_mms_kg: 0.050, pr_rms: 1.0, ql: 7 },
@@ -297,11 +297,11 @@ export function EnclosureInputs({ config, driverVas, driverFs, driverQts, onChan
           <div className="section-subtitle" style={{ marginTop: 8 }}>Stuffing</div>
           {config.stuffing_zones.length === 0 ? (
             <>
-              <NumericInput label="Density" value={config.stuffing_density_kg_m3} step={1} min={0} unit="kg/m³"
-                tooltip="Global stuffing density — converted to flow resistivity via Rf≈1000×density when flow res. is 0. Typical polyester: 5-15 kg/m³."
-                onChange={(v) => onChange({ ...config, stuffing_density_kg_m3: v })} />
+              <NumericInput label="Density" value={config.stuffing_density_kg_m3} step={0.5} min={0} unit="kg/m³"
+                tooltip="Global stuffing density. Polyester: 5-15 kg/m³. Automatically sets flow resistivity (Rf = 1000 × density)."
+                onChange={(v) => onChange({ ...config, stuffing_density_kg_m3: v, flow_resistivity_pa_s_m2: v > 0 ? 1000 * v : 0 })} />
               <NumericInput label="Flow res." value={config.flow_resistivity_pa_s_m2} step={500} min={0} unit="Pa·s/m²"
-                tooltip="Specific airflow resistivity of stuffing material. Polyester fill: 3500-8000. Fiberglass: 10000-40000. 0 = derive from density."
+                tooltip="Specific airflow resistivity. Polyester: 3500-8000. Fiberglass: 10000-40000. Auto-set from density, or override manually."
                 onChange={(v) => onChange({ ...config, flow_resistivity_pa_s_m2: v })} />
               <button className="graf-btn graf-btn-sm graf-btn-outline" style={{ marginTop: 4 }}
                 title="Switch to per-zone stuffing — define different stuffing densities along the line length"

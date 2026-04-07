@@ -336,6 +336,7 @@ function App() {
               <PassiveCrossoverEditor
                 way={way}
                 onUpdate={(updates) => updateWay(safeActiveWay, updates)}
+                crossoverFreq={crossoverPoints.find(pt => pt.low_way_index === safeActiveWay || pt.high_way_index === safeActiveWay)?.freq_hz}
               />
             </AccordionSection>
 

@@ -414,12 +414,14 @@ export function MultiWayEditor({ ways, onChange, activeWayOverride, crossoverOnl
 }
 
 /** Standalone passive crossover editor for a single way */
-export function PassiveCrossoverEditor({ way, onUpdate }: {
+export function PassiveCrossoverEditor({ way, onUpdate, crossoverFreq }: {
   way: WayInput;
   onUpdate: (updates: Partial<WayInput>) => void;
+  crossoverFreq?: number;
 }) {
   const re = way.driver.re_ohm || 8;
   const le = way.driver.le_h || 0.5e-3;
+  const defaultFreq = crossoverFreq ?? 3000;
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -477,20 +479,13 @@ export function PassiveCrossoverEditor({ way, onUpdate }: {
         );
       })}
 
-      {/* Passive wizard */}
-      <div className="param-row" title="Crossover frequency for passive wizard">
-        <span className="param-label">Xover freq</span>
-        <input type="number" className="graf-form-control" id="passive-xover-freq"
-          style={{ width: 70, fontSize: 11 }} defaultValue={3000} step={100} min={100} />
-        <span className="param-unit">Hz</span>
-      </div>
+      {/* Passive wizard — uses crossover frequency from active crossover points */}
       <select className="graf-form-control" style={{ width: '100%', fontSize: 12, marginTop: 4 }}
-        value="" title="Add a passive crossover component or topology"
+        value="" title={`Add passive component (using ${defaultFreq} Hz from crossover points)`}
         onChange={(e) => {
           const preset = e.target.value;
           if (!preset) return;
-          const xoverInput = document.getElementById('passive-xover-freq') as HTMLInputElement;
-          const xoverFreq = parseFloat(xoverInput?.value) || 3000;
+          const xoverFreq = defaultFreq;
           const wc = 2 * Math.PI * xoverFreq;
           let newFilters: PassiveFilter[] = [];
 

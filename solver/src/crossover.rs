@@ -85,20 +85,37 @@ fn block_impedances(block: &PassiveBlock, omega: f64) -> (Complex<f64>, Complex<
 /// Compute the voltage transfer function H(f) = V_load / V_source
 /// for a passive ladder network terminated by a frequency-dependent load.
 ///
-/// The ladder is: source → [block1] → [block2] → ... → load
+/// The ladder is: source → [Z_source] → [block1] → [block2] → ... → load
 /// Series blocks add impedance in the signal path.
 /// Shunt blocks connect to ground (voltage divider).
 ///
 /// Uses ABCD matrix cascading for the ladder:
 /// Each block is either a series Z or shunt Y element.
+///
+/// A small source impedance (0.1 Ω) is included so that shunt-to-ground
+/// components correctly divert current and reduce driver voltage.
+/// Without source impedance, shunt elements have no effect on an ideal
+/// voltage source — which is mathematically correct but physically
+/// unrealistic and makes standalone shunt components useless.
+/// Real amplifiers have 0.01–1 Ω output impedance; 0.1 Ω is typical.
 pub fn passive_transfer_function(
     blocks: &[PassiveBlock],
     load_impedance: Complex<f64>,
     omega: f64,
 ) -> Complex<f64> {
-    // ABCD matrix for the cascade
+    // Source impedance: models amplifier output impedance + cable resistance.
+    // Typical values: amp output 0.05Ω (damping factor 160) + cable 0.3Ω = ~0.35Ω.
+    // Without this, shunt-to-ground elements (capacitors, Zobel, notch filters)
+    // have zero effect — mathematically correct for ideal voltage sources but
+    // physically unrealistic and useless for crossover design.
+    // Ref: Dickason, "Loudspeaker Design Cookbook", Ch. 5 — passive crossover
+    // analysis always includes source impedance in the circuit model.
+    let z_source = Complex::new(0.35, 0.0);
+
+    // ABCD matrix for the cascade, starting with source impedance
+    // Source impedance is a series element: [[1, Z_s], [0, 1]]
     let mut a = Complex::new(1.0, 0.0);
-    let mut b = Complex::new(0.0, 0.0);
+    let mut b = z_source;
     let mut c = Complex::new(0.0, 0.0);
     let mut d = Complex::new(1.0, 0.0);
 
@@ -108,21 +125,17 @@ pub fn passive_transfer_function(
         // Series element: [[1, Z], [0, 1]]
         if z_series.norm() > 1e-12 && z_shunt.norm() > 1e12 {
             // Pure series
-            let new_a = a + b * Complex::new(0.0, 0.0); // a stays
             let new_b = a * z_series + b;
-            let new_c = c;
             let new_d = c * z_series + d;
-            a = new_a; b = new_b; c = new_c; d = new_d;
+            b = new_b; d = new_d;
         }
         // Shunt element: [[1, 0], [1/Z, 1]]
         else if z_series.norm() < 1e-12 && z_shunt.norm() < 1e12 {
             // Pure shunt
             let y = 1.0 / z_shunt;
-            let new_a = a;
-            let new_b = b;
             let new_c = a * y + c;
             let new_d = b * y + d;
-            a = new_a; b = new_b; c = new_c; d = new_d;
+            c = new_c; d = new_d;
         }
         // L-pad type: series + shunt combined
         else {

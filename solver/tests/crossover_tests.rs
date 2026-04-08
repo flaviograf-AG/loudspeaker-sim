@@ -15,9 +15,11 @@ fn resistive_load(ohms: f64) -> Complex<f64> {
 // ============================================================
 
 #[test]
-fn no_filter_unity_transfer() {
+fn no_filter_near_unity_transfer() {
+    // With 0.35Ω source impedance into 8Ω load: H = 8 / (8 + 0.35) ≈ 0.9581
+    // This ~0.37 dB drop models real amplifier+cable impedance and is negligible.
     let h = passive_transfer_function(&[], resistive_load(8.0), 2000.0);
-    assert_relative_eq!(h.norm(), 1.0, epsilon = 1e-10);
+    assert_relative_eq!(h.norm(), 8.0 / 8.35, epsilon = 1e-10);
 }
 
 #[test]

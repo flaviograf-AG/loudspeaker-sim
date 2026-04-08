@@ -183,3 +183,69 @@ fn two_way_measured_system_with_crossover() {
     assert!(spl_500 > 87.0 && spl_500 < 93.0,
         "Below crossover, woofer dominates at ~90 dB, got {:.1}", spl_500);
 }
+
+#[test]
+fn passive_filter_affects_measured_data_system() {
+    // 1-way system with flat 90 dB measured data.
+    // Without passive filter: SPL should be ~90 dB everywhere.
+    // With a series inductor (1st-order LP): SPL should roll off at high frequencies.
+    use loudspeaker_solver::crossover::PassiveBlock;
+
+    let base_way = Way {
+        name: "Woofer (measured)".into(),
+        driver: dummy_driver(),
+        enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 18e-3, ql: 7.0 }),
+        passive_filters: vec![],
+        active_filters: vec![],
+        gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+        measured: Some(flat_90db_measured()),
+    };
+
+    // Without passive filter
+    let project_no_filter = SpeakerProject {
+        ways: vec![base_way.clone()],
+        freq_start_hz: 100.0,
+        freq_end_hz: 10000.0,
+        freq_points: 100,
+        drive_voltage_rms: 2.83,
+    };
+    let result_no = solve_system(&project_no_filter).unwrap();
+
+    // With a series inductor (1st-order LP, ~0.5 mH, rolls off above ~2 kHz with 8 ohm load)
+    let mut way_with_filter = base_way;
+    way_with_filter.passive_filters = vec![
+        PassiveBlock::SeriesL { henries: 0.5e-3, dcr_ohms: 0.1 },
+    ];
+    let project_with_filter = SpeakerProject {
+        ways: vec![way_with_filter],
+        freq_start_hz: 100.0,
+        freq_end_hz: 10000.0,
+        freq_points: 100,
+        drive_voltage_rms: 2.83,
+    };
+    let result_yes = solve_system(&project_with_filter).unwrap();
+
+    // At ~5 kHz, the inductor should attenuate significantly
+    let idx_5k = result_no.frequencies_hz.iter()
+        .position(|&f| f >= 5000.0)
+        .unwrap();
+    let spl_no_5k = result_no.system_spl_db[idx_5k];
+    let spl_yes_5k = result_yes.system_spl_db[idx_5k];
+
+    eprintln!("Passive filter + measured: SPL@5kHz without={:.1}, with={:.1}, diff={:.1} dB",
+        spl_no_5k, spl_yes_5k, spl_no_5k - spl_yes_5k);
+
+    // Expect >5 dB of attenuation at 5 kHz from the series inductor
+    assert!(spl_no_5k - spl_yes_5k > 5.0,
+        "Series inductor should attenuate >5 dB at 5 kHz, got {:.1} dB difference",
+        spl_no_5k - spl_yes_5k);
+
+    // At 200 Hz, very little change (inductor is negligible at low frequencies)
+    let idx_200 = result_no.frequencies_hz.iter()
+        .position(|&f| f >= 200.0)
+        .unwrap();
+    let diff_200 = (result_no.system_spl_db[idx_200] - result_yes.system_spl_db[idx_200]).abs();
+    eprintln!("Passive filter + measured: diff@200Hz = {:.1} dB (expect <1)", diff_200);
+    assert!(diff_200 < 1.0,
+        "At 200 Hz, inductor should have minimal effect, got {:.1} dB diff", diff_200);
+}

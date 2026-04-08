@@ -4,10 +4,18 @@
 Browser-based loudspeaker enclosure + crossover simulator. Combines Hornresp (enclosure modeling) and XSim (crossover design) functionality in a single web app. Live at **https://ls.graf.me.uk**.
 
 ## Architecture
-- `solver/` — Rust crate compiled to WASM (wasm-pack). 16 modules, 85+ tests. Also builds as a CLI binary.
+- `solver/` — Rust crate compiled to WASM (wasm-pack). 16 modules, 100 tests. Also builds as a CLI binary.
 - `web/` — React 19 + Vite + TypeScript frontend. ECharts for plots, GDS for styling.
 - Static deploy to ls.graf.me.uk (OVH VPS, Nginx, Cloudflare proxy). Zero server dependencies.
 - WASM API: `simulate(json)` for single-driver, `simulate_system(json)` for multi-way, `optimize_system(json)` for crossover optimization.
+
+### State Management (v2)
+- **Single source of truth:** `DesignState` in `types/index.ts` — topology, ways, crossover points, per-way EQ, freq range
+- **`active_filters` are never stored** — always computed via `buildSolverInput()` in `compute.ts`
+- **One-way data flow:** `DesignState` → `buildSolverInput()` → `SystemInput` → WASM solver → results → plots
+- **Undo/redo:** `useUndoRedo<DesignState>` hook wraps the entire state
+- **URL sync:** `useUrlSync` encodes `DesignState` to URL hash (`#v2=...`)
+- **Save/load:** `SaveLoad.tsx` serializes `DesignState` directly to `ls-designs-v2` localStorage key (auto-migrates v1 saves)
 
 ## Build Commands
 ```bash
@@ -61,21 +69,26 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 ## Frontend Components
 | Component | Purpose |
 |-----------|---------|
-| `App.tsx` | Root — mode toggle (Single/Multi-Way), undo/redo, URL state |
+| `App.tsx` | Root — DesignState single source of truth, accordion sidebar, way tabs |
+| `compute.ts` | `buildSolverInput()` — assembles active_filters from crossover points + EQ |
+| `WayEditor.tsx` | Per-way: preset selector, driver inputs, FRD/ZMA import |
+| `CrossoverPanel.tsx` | Crossover points editor, per-way controls, EQ, passive wizard |
+| `PassiveWizard.tsx` | Passive crossover topology presets (1st-4th order, Zobel, L-pad, notch) |
+| `SystemPanel.tsx` | Freq range, optimizer, save/load, export, compare, undo/redo |
+| `SaveLoad.tsx` | localStorage persistence + JSON import/export (v2 format, migrates v1) |
 | `FrequencyPlot.tsx` | ECharts log-axis chart with dual Y-axis, cross-chart linking |
 | `PlotArea.tsx` | SPL + impedance + displacement + port velocity + group delay + phase |
 | `SystemPlotArea.tsx` | System SPL + filter transfer + impedance + group delay, min-Z warning |
 | `DriverInputs.tsx` | T/S parameter inputs with derived readouts (Qts, Bl, sensitivity) |
 | `EnclosureInputs.tsx` | 7 enclosure types, alignment presets, computed readouts |
 | `PresetSelector.tsx` | 571-driver searchable database |
-| `MultiWayEditor.tsx` | Way tabs, active/passive filter editors, crossover frequency wizard |
+| `NumericInput.tsx` | Number input with local draft state (no mid-type fighting) |
 | `CrossoverSchematic.tsx` | SVG circuit diagram for passive crossover |
 | `EnclosureSchematic.tsx` | SVG cross-section for all enclosure types |
 | `SchematicPanel.tsx` | Collapsible bottom panel for schematics |
 | `OptimizerPanel.tsx` | Nelder-Mead optimizer UI with target SPL |
 | `BiquadExport.tsx` | miniDSP-compatible DSP coefficient export |
 | `ImportOverlay.tsx` | FRD/ZMA file import + plot overlay |
-| `SaveLoadControls.tsx` | localStorage + JSON import/export |
 | `ExportControls.tsx` | FRD/ZMA/CSV export with real acoustic phase |
 
 ## IP Rules
@@ -98,17 +111,20 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 - URL hash state encoding for shareable design links
 
 ## Testing
-- `cargo test` in solver/ — 85+ tests across 16 test files
+- `cargo test` in solver/ — 100 tests across 16 test files
 - Cross-validated against QSpeakers C++ solver (vented port phase fix verified)
 - Analytical validation tests (sealed Fc/Qtc, vented dual peaks, port velocity)
 - Alignment presets verified against simulation output
 - Optimizer tests: cost reduction from 229→3 in 41 iterations
+- E2E Puppeteer tests: 46 tests covering topology changes, driver editing, crossover, undo/redo, URL state, save/load
 
 ## Design Docs
 - Design: `docs/plans/2026-04-05-loudspeaker-sim-design.md`
 - Plan: `docs/plans/2026-04-05-loudspeaker-sim-v01-plan.md`
 - Revised roadmap: `docs/plans/2026-04-06-revised-roadmap.md`
 - Gap-closing plan: `docs/plans/2026-04-06-gap-closing-plan.md`
+- UI rewrite v2 design: `docs/plans/2026-04-08-ui-rewrite-v2.md`
+- UI rewrite v2 plan: `docs/plans/2026-04-08-ui-rewrite-v2-plan.md`
 - Feature audits: `docs/feature-audit-hornresp-xsim.md`, `docs/qspeakers-comparison.md`
 - LLM variable inventory: `docs/LLM-VARIABLE-INVENTORY.md`
 - References: `docs/REFERENCES.md`

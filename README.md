@@ -47,17 +47,22 @@ Live at **[ls.graf.me.uk](https://ls.graf.me.uk)**
 ### Workflow Features
 - Undo/Redo (Ctrl+Z/Y, 50-step history)
 - Comparison snapshots (overlay before/after)
-- FRD/ZMA file import with plot overlay
+- FRD/ZMA file import per way (measured driver data replaces T/S simulation)
 - FRD/ZMA/CSV export with real acoustic phase
-- JSON design save/load + import/export
-- URL state encoding (shareable design links)
+- JSON design save/load + import/export (auto-migrates legacy formats)
+- URL state encoding (shareable design links, `#v2=` format)
 - CLI binary for automation/LLM integration
 
 ## Architecture
 
 ```
-solver/          Rust crate compiled to WASM (16 modules, 85+ tests)
+solver/          Rust crate → WASM (16 modules, 100 tests)
 web/             React 19 + Vite + TypeScript frontend
+  compute.ts     buildSolverInput() — DesignState → SystemInput (one-way, pure)
+  App.tsx        DesignState single source of truth, accordion sidebar
+  WayEditor      Driver + preset + FRD/ZMA per way
+  CrossoverPanel Crossover points + per-way EQ + passive wizard
+  SystemPanel    Freq range + optimizer + save/load + export
 ```
 
 ## Build

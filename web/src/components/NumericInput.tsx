@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface NumericInputProps {
   label: string;
@@ -14,17 +14,32 @@ interface NumericInputProps {
 export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, onChange }: NumericInputProps) {
   const [draft, setDraft] = useState(formatVal(value));
   const [focused, setFocused] = useState(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // Sync from parent when not focused (undo, external change)
   useEffect(() => {
     if (!focused) setDraft(formatVal(value));
   }, [value, focused]);
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setDraft(raw);
+
+    // Fire onChange immediately for valid numbers (live chart updates)
+    // but don't fire for partial input like "3." or empty string
+    const n = parseFloat(raw);
+    if (!isNaN(n) && isFinite(n) && raw !== '' && !raw.endsWith('.')) {
+      const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, n));
+      onChangeRef.current(clamped);
+    }
+  };
+
   const commit = () => {
     const n = parseFloat(draft);
     if (!isNaN(n) && isFinite(n)) {
       const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, n));
-      onChange(clamped);
+      onChangeRef.current(clamped);
       setDraft(formatVal(clamped));
     } else {
       setDraft(formatVal(value)); // revert bad input
@@ -44,7 +59,7 @@ export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, 
         style={{ width: 90 }}
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); commit(); }}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={handleChange}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
       />
       {unit && <span className="param-unit">{unit}</span>}

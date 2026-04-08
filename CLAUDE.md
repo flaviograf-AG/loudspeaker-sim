@@ -118,7 +118,9 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 - Alignment presets verified against simulation output
 - Optimizer tests: cost reduction from 229→3 in 41 iterations
 - FRD/ZMA tests: measured data bypass, passive filters with FRD, 2-way measured crossover
-- Playwright E2E tests: `cd web && npx playwright test` — 20 tests covering driver params, enclosure, passive/active crossover, per-way controls, system controls, and FRD mode
+- Playwright E2E tests: `cd web && npx playwright test` — 26 tests:
+  - 20 orchestration tests (driver params, enclosure, crossover, way controls, system controls, FRD mode)
+  - 6 real scenario tests with numerical assertions (2-way sealed + LR4, vented bass reflex, 3-way system, FRD+ZMA, mixed T/S+FRD, sealed-vs-vented comparison)
 - All systems (including 1-way) route through `solve_system` — `solve_simulation` is only called internally
 
 ## Design Docs

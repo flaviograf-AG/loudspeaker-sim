@@ -86,7 +86,7 @@ function App() {
 
   // Expose solver result for E2E tests
   useEffect(() => {
-    (window as Record<string, unknown>).__solverResult = systemResult;
+    (window as unknown as Record<string, unknown>).__solverResult = systemResult;
   }, [systemResult]);
 
   // WASM init

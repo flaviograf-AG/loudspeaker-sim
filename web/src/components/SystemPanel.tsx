@@ -124,7 +124,7 @@ export function SystemPanel({
             }}>Share</button>
         </div>
         {snapshots.map((s, i) => (
-          <div key={i} style={{ fontSize: 11, color: 'var(--graf-warm-500)' }}>
+          <div key={`snap-${s.name}-${i}`} style={{ fontSize: 11, color: 'var(--graf-warm-500)' }}>
             {s.name}
             <button className="graf-btn graf-btn-sm" style={{ padding: '0 3px', fontSize: 9, marginLeft: 4 }}
               onClick={() => onSetSnapshots(snapshots.filter((_, j) => j !== i))}>x</button>

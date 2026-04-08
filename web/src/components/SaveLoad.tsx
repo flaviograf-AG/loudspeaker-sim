@@ -78,12 +78,15 @@ interface SaveLoadProps {
 export function SaveLoad({ design, onLoad }: SaveLoadProps) {
   const [designs, setDesigns] = useState<SavedDesign[]>(loadDesigns);
   const [showList, setShowList] = useState(false);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveName, setSaveName] = useState('');
 
   const handleSave = () => {
-    const name = prompt('Design name:');
-    if (!name) return;
-    saveDesignToStorage(name, design);
+    if (!saveName.trim()) return;
+    saveDesignToStorage(saveName.trim(), design);
     setDesigns(loadDesigns());
+    setSaveName('');
+    setShowSaveInput(false);
   };
 
   const handleDelete = (idx: number) => {
@@ -166,7 +169,8 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
     <div className="section-card">
       <div className="section-title">Designs</div>
       <div className="btn-row">
-        <button className="graf-btn graf-btn-sm graf-btn-outline" onClick={handleSave}
+        <button className="graf-btn graf-btn-sm graf-btn-outline"
+          onClick={() => setShowSaveInput(!showSaveInput)}
           title="Save current design to browser localStorage">
           <span className="material-symbols-outlined" style={{ fontSize: 16, verticalAlign: -3 }}>save</span> Save
         </button>
@@ -179,10 +183,28 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
         <button className="graf-btn graf-btn-sm graf-btn-ghost" onClick={handleImport}
           title="Import a design from a JSON file">Import</button>
       </div>
+      {showSaveInput && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
+          <input
+            type="text"
+            className="graf-form-control"
+            style={{ flex: 1, fontSize: 12 }}
+            placeholder="Design name"
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setShowSaveInput(false); }}
+            autoFocus
+          />
+          <button className="graf-btn graf-btn-sm graf-btn-primary" onClick={handleSave}
+            disabled={!saveName.trim()}>Save</button>
+          <button className="graf-btn graf-btn-sm graf-btn-ghost"
+            onClick={() => setShowSaveInput(false)}>Cancel</button>
+        </div>
+      )}
       {showList && designs.length > 0 && (
         <ul style={{ fontSize: 12, margin: '8px 0 0', paddingLeft: 16, listStyle: 'none' }}>
           {designs.map((d, i) => (
-            <li key={i} style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <li key={`design-${d.name}-${d.timestamp}`} style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
               <button className="graf-btn graf-btn-sm graf-btn-primary" onClick={() => { onLoad(d.design); setShowList(false); }}>
                 {d.name}
               </button>

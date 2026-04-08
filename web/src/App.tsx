@@ -48,6 +48,10 @@ function App() {
   const design = designUndo.value;
   const setDesign = designUndo.set;
 
+  // Ref for stable callbacks — avoids recreating every render
+  const designRef = useRef(design);
+  designRef.current = design;
+
   // URL sync
   useUrlSync(design);
 
@@ -94,26 +98,29 @@ function App() {
   }, [activeWay, design.ways.length]);
   const way = design.ways[safeActiveWay];
 
-  // --- Update helpers ---
+  // --- Stable update helpers (use designRef to avoid closure over design) ---
   const updateWay = useCallback((idx: number, updates: Partial<WayDesign>) => {
+    const d = designRef.current;
     setDesign({
-      ...design,
-      ways: design.ways.map((w, i) => i === idx ? { ...w, ...updates } : w),
+      ...d,
+      ways: d.ways.map((w, i) => i === idx ? { ...w, ...updates } : w),
     });
-  }, [design, setDesign]);
+  }, [setDesign]);
 
   const updateCrossoverPoints = useCallback((points: CrossoverPoint[]) => {
-    setDesign({ ...design, crossover_points: points });
-  }, [design, setDesign]);
+    setDesign({ ...designRef.current, crossover_points: points });
+  }, [setDesign]);
 
   const updatePerWayEq = useCallback((wayIndex: number, eq: ActiveFilter[]) => {
-    const newEq = [...design.per_way_eq];
+    const d = designRef.current;
+    const newEq = [...d.per_way_eq];
     newEq[wayIndex] = eq;
-    setDesign({ ...design, per_way_eq: newEq });
-  }, [design, setDesign]);
+    setDesign({ ...d, per_way_eq: newEq });
+  }, [setDesign]);
 
   // Setup wizard callback — converts WayInput[] to DesignState
   const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[]) => {
+    const d = designRef.current;
     const points = defaultCrossoverPoints(topo);
     setDesign({
       version: 2,
@@ -133,15 +140,15 @@ function App() {
       })),
       crossover_points: points,
       per_way_eq: ways.map(() => []),
-      freq_start_hz: design.freq_start_hz,
-      freq_end_hz: design.freq_end_hz,
-      freq_points: design.freq_points,
-      drive_voltage_rms: design.drive_voltage_rms,
+      freq_start_hz: d.freq_start_hz,
+      freq_end_hz: d.freq_end_hz,
+      freq_points: d.freq_points,
+      drive_voltage_rms: d.drive_voltage_rms,
     });
     setShowSetup(false);
     setActiveWay(0);
     setActiveSection('driver');
-  }, [design, setDesign]);
+  }, [setDesign]);
 
   // Sidebar resize
   const onDragStart = useCallback((e: React.MouseEvent) => {
@@ -160,11 +167,11 @@ function App() {
     ? design.crossover_points.map(pt => `${pt.freq_hz}Hz ${pt.slope}`).join(', ')
     : 'No crossover';
 
-  // Way summary helpers (inline, no dependency on WayInput type)
+  // Way summary helpers
   const driverSummary = (w: WayDesign) => {
     const d = w.driver;
     const qts = ((d.qes * d.qms) / (d.qes + d.qms)).toFixed(2);
-    return `${w.preset_name || 'Custom'} · ${d.fs_hz}Hz · ${d.re_ohm}\u03A9 · Qts ${qts}`;
+    return `${w.preset_name || 'Custom'} \u00B7 ${d.fs_hz}Hz \u00B7 ${d.re_ohm}\u03A9 \u00B7 Qts ${qts}`;
   };
   const enclosureSummary = (w: WayDesign) => {
     const enc = w.enclosure;
@@ -203,7 +210,19 @@ function App() {
     <div className="app-layout">
       {showSetup && <SetupWizard onComplete={handleSetupComplete} initialTopology={design.topology} />}
 
-      <div className="sidebar-drag-handle" style={{ left: sidebarWidth - 3 }} onMouseDown={onDragStart} />
+      <div
+        className="sidebar-drag-handle"
+        style={{ left: sidebarWidth - 3 }}
+        onMouseDown={onDragStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') setSidebarWidth(w => Math.max(260, w - 10));
+          if (e.key === 'ArrowRight') setSidebarWidth(w => Math.min(500, w + 10));
+        }}
+      />
       <aside className="app-sidebar" style={{ width: sidebarWidth }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
@@ -223,7 +242,7 @@ function App() {
         {design.ways.length > 1 && (
           <div className="btn-row" style={{ marginBottom: 8 }}>
             {design.ways.map((w, i) => (
-              <button key={i}
+              <button key={`way-${w.name}-${i}`}
                 className={`graf-btn graf-btn-sm ${i === safeActiveWay ? 'graf-btn-primary' : 'graf-btn-outline'}`}
                 onClick={() => setActiveWay(i)}
                 title={`${w.name}${w.enabled ? '' : ' (disabled)'}`}
@@ -309,7 +328,7 @@ function App() {
                 singleResult={singleResult}
                 systemResult={systemResult}
                 isMultiWay={isMultiWay}
-                onUpdateDesign={(updates) => setDesign({ ...design, ...updates })}
+                onUpdateDesign={(updates) => setDesign({ ...designRef.current, ...updates })}
                 onSetDesign={setDesign}
                 overlay={overlay}
                 onSetOverlay={setOverlay}

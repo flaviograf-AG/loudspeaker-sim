@@ -1,79 +1,108 @@
 # Loudspeaker Simulator — TODO
 
-> **Last updated:** 2026-04-07
-> **Current state:** 16 Rust modules, 85+ tests, 7 enclosure types, crossover engine, multi-way system, 571 drivers, CLI binary. Live at https://ls.graf.me.uk
+> **Last updated:** 2026-04-08
+> **Current state:** 16 Rust modules, 100 tests, 7 enclosure types, crossover engine, multi-way system, 571 drivers, CLI binary. UI rewrite v2 deployed. Live at https://ls.graf.me.uk
 
 ---
 
-## Completed
+## Next Up: Optimizer v3 — Passive Component Tuning + Parameter Locks
 
-- [x] S2: Analytical validation (9 tests) + UI wins (impedance phase, group delay, cross-chart linking, port calc)
-- [x] S3: Extended TL (driver offset, tapers, stuffing zones, folds)
-- [x] Bug fixes: Ql losses, group delay formula, full Bradbury, input validation, TL perf, vented port phase
-- [x] S4: Horn solver (6 profiles), bandpass, passive radiator, open baffle
-- [x] S4: Tooltips on all inputs, computed readouts, per-zone stuffing editor, simulation settings
-- [x] S4: Driver database (571 drivers from 30+ vendors — QSpeakers + curated + scraped)
-- [x] S5: Crossover engine (passive ABCD ladder, 16 active filter types, component presets)
-- [x] S5: Multi-way system solver + UI (way tabs, filter editor, system SPL overlay)
-- [x] S5: Optimizer (Nelder-Mead) + UI
-- [x] S6: CLI binary (stdin JSON → stdout JSON)
-- [x] S6: LLM variable inventory document
-- [x] S7: Alignment presets (sealed BW/Bessel/Cheby, vented B4/QB3/SC4/EBS)
-- [x] S7: Additional filter types (LR2, shelving, Linkwitz Transform, Ke semi-inductance)
-- [x] S7: Biquad DSP export (miniDSP compatible)
-- [x] S7: Acoustic phase plot + FRD export with real phase
-- [x] S7: Slot/rectangular ports + E-series rounding
-- [x] S7: FRD/ZMA file import + overlay on plots
-- [x] S7: Passive crossover topology library (15 presets, 1st-4th order)
-- [x] S7: SVG crossover schematic diagram
-- [x] S7: SVG enclosure cross-section schematic
-- [x] S7: Filter transfer function plot + min impedance warning
-- [x] S7: Undo/redo (Ctrl+Z/Y) + comparison snapshots
-- [x] S7: URL state encoding (shareable design links)
-- [x] S7: Resizable sidebar with drag handle
-- [x] S7: Complete tooltip coverage
-- [x] S7: Parabolic + Le Cléac'h horn profiles
-- [x] SEO: Full OG + Twitter Card + Schema.org structured data
-- [x] Cross-validation: vented port phase verified vs QSpeakers C++ source
+### Context
+The optimizer currently tunes active filter frequencies and per-way gains. It does NOT modify passive component values (L, C, R). Users want to design a passive crossover topology, then let the optimizer refine the component values while keeping certain parameters fixed (e.g., crossover frequency).
+
+### What to build
+
+**A. Passive component optimization** — new `OptParam` variants:
+- `PassiveL { way_idx, filter_idx }` — optimizes inductor henries
+- `PassiveC { way_idx, filter_idx }` — optimizes capacitor farads
+- `PassiveR { way_idx, filter_idx }` — optimizes resistor ohms
+- Bounds: L 0.01-10 mH, C 0.1-100 µF, R 0.1-50 Ω
+
+**B. Parameter lock/fix toggle** — user marks any optimizable parameter as "fixed":
+- `fixed: bool` field on each `OptParamJson` (default false)
+- Fixed params excluded before passing to optimizer
+- Primary use case: lock crossover freq, optimize gains + passive values
+- UI: lock icon toggle next to each parameter
+
+### Files to modify
+- `solver/src/optimizer.rs` — OptParam enum, extract/apply, bounds
+- `solver/src/system_api.rs` — OptParamJson variants + fixed field
+- `solver/src/lib.rs` — wire fixed param filtering
+- `web/src/components/OptimizerPanel.tsx` — param list UI with lock toggles
+
+### Tests
+- Passive L/C/R extraction and application
+- Fixed params excluded from optimization
+- Optimizer with passive params converges
+- E2E: lock crossover freq, run optimizer, verify freq unchanged
+
+### Reference
+- Existing optimizer plan: `docs/plans/2026-04-07-optimizer-v2.md` (Tasks 1-6 all done)
+- User requirements: memory `project_optimizer_v2_requirements.md`
 
 ---
 
-## Remaining — Priority 1 (High Impact)
+## Completed (2026-04-08 session)
 
-- [ ] **Scrapling driver DB enrichment** — bulk import from loudspeakerdatabase.com (6000+ drivers) via MCP
-- [ ] **More manufacturer drivers** — scrape remaining sites (Sica, LaVoce, Mundorf AMT, Parts Express)
-- [ ] **Tapped horn** — driver mid-horn injection (topology change needed)
-- [ ] **GitHub Actions CI/CD** — build WASM + frontend on push, auto-deploy
+- [x] **UI Rewrite v2** — DesignState single source of truth, clean component tree
+  - App.tsx: 574→250 lines, accordion sidebar, way tabs
+  - New: WayEditor, CrossoverPanel, PassiveWizard, SystemPanel, SaveLoad
+  - Deleted: MultiWayEditor, SaveLoadControls, useUrlState, useDesignStore, WaySummary
+  - compute.ts: buildSolverInput() — one-way pure function, no reverse path
+  - NumericInput: local draft state + live onChange on every keystroke
+  - Save/load: v2 format with auto-migration from v1
+  - SetupWizard: preserved with DesignState conversion
+  - Stable callbacks via designRef pattern
+  - Accessibility: sidebar drag handle keyboard support
+  - 46 E2E Puppeteer tests passing
+  - 100 solver tests passing
+  - Deployed to ls.graf.me.uk
 
-## Remaining — Priority 2 (Medium)
+---
 
-- [ ] **Extended Le model UI** — expose Ke field in driver inputs with toggle
-- [ ] **Off-axis / directivity / polar pattern** — piston directivity model
-- [ ] **Impulse / step response** — inverse FFT (solver function exists, needs UI)
+## Previously Completed
+
+- [x] S2-S7: All original development (see git history)
+- [x] Optimizer v2: target curves, DE algorithm, constraints, E-series, Two-Phase, L-Pad
+- [x] FRD/ZMA solver bridge — measured driver data for system simulation
+- [x] 571 driver database from 30+ manufacturers
+- [x] CLI binary for automation/LLM integration
+
+---
+
+## Backlog — Priority 1
+
+- [ ] **Scrapling driver DB enrichment** — bulk import from loudspeakerdatabase.com (6000+ drivers)
+- [ ] **Tapped horn** — driver mid-horn injection
+- [ ] **GitHub Actions CI/CD** — build + auto-deploy on push
+
+## Backlog — Priority 2
+
+- [ ] **Extended Le model UI** — expose Ke field with toggle
+- [ ] **Off-axis / directivity** — piston directivity model
+- [ ] **Impulse / step response UI** — solver function exists, needs plot
 - [ ] **Dark mode** — GDS dark section variants
 - [ ] **Mobile responsive** — sidebar collapses to bottom drawer
-- [ ] **Keyboard shortcuts** — Ctrl+S save, Ctrl+N new
+- [ ] **Inline styles → CSS classes** — for responsive/theming
 
-## Remaining — Priority 3 (Future)
+## Backlog — Priority 3
 
-- [ ] **Full MNA netlist** — arbitrary circuit topology (not just ladder)
-- [ ] **3D/CAD enclosure export** — OpenSCAD or SVG cutting templates
-- [ ] **Power dissipation per component** — heat in each resistor
-- [ ] **Driver parameter entry from measurement** — impedance sweep → T/S extraction
-- [ ] **Room gain overlay** — listening room EQ compensation
-- [ ] **Nd multi-driver composite** — series/parallel driver arrays within one way
-- [ ] **Lossy Le UI** — full Thorborg 4-parameter impedance model
-- [ ] **FIR / linear-phase filters** — for DSP targets
-- [ ] **LTspice integration** — export crossover as SPICE netlist
+- [ ] Full MNA netlist (arbitrary circuit topology)
+- [ ] 3D/CAD enclosure export
+- [ ] Power dissipation per component
+- [ ] Driver parameter extraction from impedance measurement
+- [ ] Room gain overlay
+- [ ] Series/parallel driver arrays
+- [ ] FIR/linear-phase filter targets
+- [ ] LTspice netlist export
 
 ---
 
 ## Lessons Learned
 
 - Validate through code, not external tools — Hornresp/XSim are references, not oracles
-- Study reference code (QSpeakers C++, Hornresp data format) BEFORE designing
-- Port phase sign matters — vented box port output subtracts from driver (u_driver - u_port)
-- Ql = high R = low loss (not the other way around)
-- CSS `resize: horizontal` is unreliable — use JavaScript drag handles instead
-- Group delay = -dφ/dω (numerical differentiation), NOT phase/ω (phase delay)
-- Full Bradbury: k_c = k₀×√(1+Rf/jωρ₀), not just k₀ - jα
+- Port phase sign matters — vented port subtracts from driver (u_driver - u_port)
+- NumericInput must fire onChange on every keystroke, not just blur — charts must update live
+- E2E tests must use real Puppeteer clicks, never page.evaluate(() => el.click())
+- When rewriting a component, compare ALL interaction patterns against the old version
+- Don't claim "N tests passing" as proof — test the thing the user actually does

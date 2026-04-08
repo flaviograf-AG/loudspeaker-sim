@@ -102,15 +102,15 @@ pub fn passive_transfer_function(
     blocks: &[PassiveBlock],
     load_impedance: Complex<f64>,
     omega: f64,
+    source_impedance_ohm: f64,
 ) -> Complex<f64> {
     // Source impedance: models amplifier output impedance + cable resistance.
-    // Typical values: amp output 0.05Ω (damping factor 160) + cable 0.3Ω = ~0.35Ω.
     // Without this, shunt-to-ground elements (capacitors, Zobel, notch filters)
     // have zero effect — mathematically correct for ideal voltage sources but
     // physically unrealistic and useless for crossover design.
     // Ref: Dickason, "Loudspeaker Design Cookbook", Ch. 5 — passive crossover
     // analysis always includes source impedance in the circuit model.
-    let z_source = Complex::new(0.35, 0.0);
+    let z_source = Complex::new(source_impedance_ohm, 0.0);
 
     // ABCD matrix for the cascade, starting with source impedance
     // Source impedance is a series element: [[1, Z_s], [0, 1]]

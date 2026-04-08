@@ -108,91 +108,103 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
     </g>
   );
 
-  for (const pf of filters) {
+  for (let fi = 0; fi < filters.length; fi++) {
+    const pf = filters[fi];
+    const bp = !!pf.bypassed;
+    // Collect block elements, then wrap in <g> with bypass styling if needed
+    const blockElems: ReactElement[] = [];
+
     // --- Series components (horizontal, on signal path) ---
     if (pf.type === 'SeriesL') {
-      elements.push(drawInductor(x + 4, Y_MID, fmtL(pf.henries)));
-      elements.push(<line key={`w${x}`} x1={x + 40} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawInductor(x + 4, Y_MID, fmtL(pf.henries)));
+      blockElems.push(<line key={`w${x}`} x1={x + 40} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SERIES_W;
     } else if (pf.type === 'SeriesC') {
-      elements.push(drawCapacitor(x, Y_MID, fmtC(pf.farads)));
-      elements.push(<line key={`w${x}`} x1={x + 36} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawCapacitor(x, Y_MID, fmtC(pf.farads)));
+      blockElems.push(<line key={`w${x}`} x1={x + 36} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SERIES_W;
     } else if (pf.type === 'SeriesR') {
-      elements.push(drawResistor(x, Y_MID, fmtR(pf.ohms)));
-      elements.push(<line key={`w${x}`} x1={x + 48} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x, Y_MID, fmtR(pf.ohms)));
+      blockElems.push(<line key={`w${x}`} x1={x + 48} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SERIES_W;
 
     // --- Shunt components (vertical, branching to ground) ---
     } else if (pf.type === 'ShuntC') {
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 8} stroke="#333" strokeWidth={1.2} />);
-      elements.push(drawCapacitor(x, Y_MID + 8, fmtC(pf.farads), true));
-      elements.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 33} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
-      elements.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 8} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawCapacitor(x, Y_MID + 8, fmtC(pf.farads), true));
+      blockElems.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 33} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SHUNT_GAP;
 
     } else if (pf.type === 'ShuntL') {
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 8} stroke="#333" strokeWidth={1.2} />);
-      elements.push(drawInductor(x, Y_MID + 8, fmtL(pf.henries), true));
-      elements.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 44} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
-      elements.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 8} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawInductor(x, Y_MID + 8, fmtL(pf.henries), true));
+      blockElems.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 44} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SHUNT_GAP;
 
     } else if (pf.type === 'ShuntR') {
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 6} stroke="#333" strokeWidth={1.2} />);
-      elements.push(drawResistor(x, Y_MID + 6, fmtR(pf.ohms), true));
-      elements.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 46} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
-      elements.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`jn${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 6} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x, Y_MID + 6, fmtR(pf.ohms), true));
+      blockElems.push(<line key={`vg${x}`} x1={x} y1={Y_MID + 46} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(<line key={`ws${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SHUNT_GAP;
 
     // --- L-Pad: series R then shunt R, proper circuit ---
     } else if (pf.type === 'LPad') {
       // Series resistor
-      elements.push(drawResistor(x, Y_MID, `${fmtR(pf.series_ohms)}`));
+      blockElems.push(drawResistor(x, Y_MID, `${fmtR(pf.series_ohms)}`));
       x += 52;
       // Junction + shunt resistor
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`lj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 6} stroke="#333" strokeWidth={1.2} />);
-      elements.push(drawResistor(x, Y_MID + 6, `${fmtR(pf.shunt_ohms)}`, true));
-      elements.push(<line key={`lg${x}`} x1={x} y1={Y_MID + 46} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`lj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 6} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x, Y_MID + 6, `${fmtR(pf.shunt_ohms)}`, true));
+      blockElems.push(<line key={`lg${x}`} x1={x} y1={Y_MID + 46} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
       // "L-Pad" label
-      elements.push(<text key={`lpl${x}`} x={x - 20} y={Y_TOP - 2} fontSize={9} textAnchor="middle" fill="#8e44ad" fontWeight={600}>L-PAD</text>);
-      elements.push(<line key={`lw${x}`} x1={x} y1={Y_MID} x2={x + 16} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<text key={`lpl${x}`} x={x - 20} y={Y_TOP - 2} fontSize={9} textAnchor="middle" fill="#8e44ad" fontWeight={600}>L-PAD</text>);
+      blockElems.push(<line key={`lw${x}`} x1={x} y1={Y_MID} x2={x + 16} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += 16;
 
     // --- Zobel: R + C in series, shunted to ground ---
     } else if (pf.type === 'ZobelShunt') {
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`zj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 4} stroke="#333" strokeWidth={1.2} />);
-      elements.push(drawResistor(x, Y_MID + 4, fmtR(pf.ohms), true));
-      elements.push(drawCapacitor(x, Y_MID + 46, fmtC(pf.farads), true));
-      elements.push(<line key={`zg${x}`} x1={x} y1={Y_MID + 71} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
-      elements.push(<text key={`zt${x}`} x={x + 16} y={Y_MID + 52} fontSize={9} fill="#8e44ad" fontWeight={600}>Zobel</text>);
-      elements.push(<line key={`zw${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`zj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 4} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x, Y_MID + 4, fmtR(pf.ohms), true));
+      blockElems.push(drawCapacitor(x, Y_MID + 46, fmtC(pf.farads), true));
+      blockElems.push(<line key={`zg${x}`} x1={x} y1={Y_MID + 71} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(<text key={`zt${x}`} x={x + 16} y={Y_MID + 52} fontSize={9} fill="#8e44ad" fontWeight={600}>Zobel</text>);
+      blockElems.push(<line key={`zw${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SHUNT_GAP;
 
     // --- Notch filters: show RLC detail ---
     } else if (pf.type === 'NotchShunt' || pf.type === 'NotchSeries') {
       const isShunt = pf.type === 'NotchShunt';
-      elements.push(dot(x, Y_MID));
-      elements.push(<line key={`nj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 4} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`nj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 4} stroke="#333" strokeWidth={1.2} />);
       // Draw R, L, C stacked vertically
-      elements.push(drawResistor(x, Y_MID + 4, fmtR(pf.ohms), true));
-      elements.push(drawInductor(x, Y_MID + 46, fmtL(pf.henries), true));
-      elements.push(drawCapacitor(x, Y_MID + 82, fmtC(pf.farads), true));
-      elements.push(<line key={`ng${x}`} x1={x} y1={Y_MID + 107} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
-      elements.push(groundSymbol(x, Y_BOT - 10));
-      elements.push(<text key={`nt${x}`} x={x + 16} y={Y_TOP - 2} fontSize={9} fill="#e67e22" fontWeight={600}>{isShunt ? 'Notch∥' : 'Notch—'}</text>);
-      elements.push(<line key={`nw${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x, Y_MID + 4, fmtR(pf.ohms), true));
+      blockElems.push(drawInductor(x, Y_MID + 46, fmtL(pf.henries), true));
+      blockElems.push(drawCapacitor(x, Y_MID + 82, fmtC(pf.farads), true));
+      blockElems.push(<line key={`ng${x}`} x1={x} y1={Y_MID + 107} x2={x} y2={Y_BOT - 10} stroke="#666" strokeWidth={0.8} />);
+      blockElems.push(groundSymbol(x, Y_BOT - 10));
+      blockElems.push(<text key={`nt${x}`} x={x + 16} y={Y_TOP - 2} fontSize={9} fill="#e67e22" fontWeight={600}>{isShunt ? 'Notch\u2225' : 'Notch\u2014'}</text>);
+      blockElems.push(<line key={`nw${x}`} x1={x} y1={Y_MID} x2={x + SHUNT_GAP} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SHUNT_GAP;
+    }
+
+    // Wrap block elements — bypassed blocks get reduced opacity + dashed outline
+    if (bp) {
+      elements.push(<g key={`bp${fi}`} opacity={0.3} strokeDasharray="4 2">{blockElems}</g>);
+    } else {
+      elements.push(...blockElems);
     }
   }
 

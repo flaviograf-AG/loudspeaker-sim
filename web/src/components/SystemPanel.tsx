@@ -44,6 +44,9 @@ export function SystemPanel({
         <NumericInput label="Points" value={design.freq_points} step={100} min={50} max={2000}
           tooltip="Frequency points."
           onChange={(v) => onUpdateDesign({ freq_points: Math.round(v) })} />
+        <NumericInput label="Source R" value={design.source_impedance_ohm} step={0.05} min={0} max={10} unit="Ω"
+          tooltip="Amplifier output impedance + cable resistance. Affects passive crossover behavior. Typical: 0.1-0.5Ω (solid state), 1-4Ω (tube amp)."
+          onChange={(v) => onUpdateDesign({ source_impedance_ohm: v })} />
       </div>
 
       {/* Optimizer */}

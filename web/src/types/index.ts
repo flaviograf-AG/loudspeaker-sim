@@ -152,34 +152,34 @@ export type EnclosureType = 'Sealed' | 'Vented' | 'TransmissionLine' | 'Horn' | 
 // Multi-way system types (matches Rust system_api.rs)
 
 export type PassiveFilter =
-  | { type: 'SeriesR'; ohms: number }
-  | { type: 'SeriesL'; henries: number; dcr_ohms: number }
-  | { type: 'SeriesC'; farads: number }
-  | { type: 'ShuntR'; ohms: number }
-  | { type: 'ShuntL'; henries: number; dcr_ohms: number }
-  | { type: 'ShuntC'; farads: number }
-  | { type: 'ZobelShunt'; ohms: number; farads: number }
-  | { type: 'LPad'; series_ohms: number; shunt_ohms: number }
-  | { type: 'NotchShunt'; ohms: number; henries: number; farads: number }
-  | { type: 'NotchSeries'; ohms: number; henries: number; farads: number };
+  | { type: 'SeriesR'; ohms: number; bypassed?: boolean }
+  | { type: 'SeriesL'; henries: number; dcr_ohms: number; bypassed?: boolean }
+  | { type: 'SeriesC'; farads: number; bypassed?: boolean }
+  | { type: 'ShuntR'; ohms: number; bypassed?: boolean }
+  | { type: 'ShuntL'; henries: number; dcr_ohms: number; bypassed?: boolean }
+  | { type: 'ShuntC'; farads: number; bypassed?: boolean }
+  | { type: 'ZobelShunt'; ohms: number; farads: number; bypassed?: boolean }
+  | { type: 'LPad'; series_ohms: number; shunt_ohms: number; bypassed?: boolean }
+  | { type: 'NotchShunt'; ohms: number; henries: number; farads: number; bypassed?: boolean }
+  | { type: 'NotchSeries'; ohms: number; henries: number; farads: number; bypassed?: boolean };
 
 export type ActiveFilter =
-  | { type: 'LowPass1'; freq_hz: number }
-  | { type: 'HighPass1'; freq_hz: number }
-  | { type: 'LowPass2'; freq_hz: number; q: number }
-  | { type: 'HighPass2'; freq_hz: number; q: number }
-  | { type: 'LR4LowPass'; freq_hz: number }
-  | { type: 'LR4HighPass'; freq_hz: number }
-  | { type: 'PEQ'; freq_hz: number; q: number; gain_db: number }
-  | { type: 'AllPass1'; freq_hz: number }
-  | { type: 'AllPass2'; freq_hz: number; q: number }
-  | { type: 'LR2LowPass'; freq_hz: number }
-  | { type: 'LR2HighPass'; freq_hz: number }
-  | { type: 'ShelfLow'; freq_hz: number; gain_db: number }
-  | { type: 'ShelfHigh'; freq_hz: number; gain_db: number }
-  | { type: 'LinkwitzTransform'; fo: number; qo: number; fp: number; qp: number }
-  | { type: 'Gain'; db: number }
-  | { type: 'Invert' };
+  | { type: 'LowPass1'; freq_hz: number; bypassed?: boolean }
+  | { type: 'HighPass1'; freq_hz: number; bypassed?: boolean }
+  | { type: 'LowPass2'; freq_hz: number; q: number; bypassed?: boolean }
+  | { type: 'HighPass2'; freq_hz: number; q: number; bypassed?: boolean }
+  | { type: 'LR4LowPass'; freq_hz: number; bypassed?: boolean }
+  | { type: 'LR4HighPass'; freq_hz: number; bypassed?: boolean }
+  | { type: 'PEQ'; freq_hz: number; q: number; gain_db: number; bypassed?: boolean }
+  | { type: 'AllPass1'; freq_hz: number; bypassed?: boolean }
+  | { type: 'AllPass2'; freq_hz: number; q: number; bypassed?: boolean }
+  | { type: 'LR2LowPass'; freq_hz: number; bypassed?: boolean }
+  | { type: 'LR2HighPass'; freq_hz: number; bypassed?: boolean }
+  | { type: 'ShelfLow'; freq_hz: number; gain_db: number; bypassed?: boolean }
+  | { type: 'ShelfHigh'; freq_hz: number; gain_db: number; bypassed?: boolean }
+  | { type: 'LinkwitzTransform'; fo: number; qo: number; fp: number; qp: number; bypassed?: boolean }
+  | { type: 'Gain'; db: number; bypassed?: boolean }
+  | { type: 'Invert'; bypassed?: boolean };
 
 export interface WayInput {
   name: string;
@@ -200,6 +200,7 @@ export interface WayInput {
     impedance_ohm: number[];
     impedance_phase_deg: number[];
   };
+  source_impedance_ohm?: number;
 }
 
 export interface SystemInput {
@@ -280,4 +281,6 @@ export interface DesignState {
   freq_end_hz: number;
   freq_points: number;
   drive_voltage_rms: number;
+  /** Amplifier output impedance + cable resistance (Ω). Default 0.35. */
+  source_impedance_ohm: number;
 }

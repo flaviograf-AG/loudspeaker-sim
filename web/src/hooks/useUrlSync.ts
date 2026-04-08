@@ -30,7 +30,7 @@ export function decodeFromUrl(): DesignState | null {
     try {
       const json = decodeURIComponent(escape(atob(hash.slice(4))));
       const parsed = JSON.parse(json);
-      if (parsed.version === 2) return parsed;
+      if (parsed.version === 2) return { source_impedance_ohm: 0.35, ...parsed };
     } catch { /* fall through */ }
   }
 

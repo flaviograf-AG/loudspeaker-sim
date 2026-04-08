@@ -109,9 +109,12 @@ pub struct WayJson {
     pub enabled: bool,
     #[serde(default)]
     pub measured: Option<MeasuredDriverData>,
+    #[serde(default = "default_source_impedance")]
+    pub source_impedance_ohm: f64,
 }
 
 fn default_true() -> bool { true }
+fn default_source_impedance() -> f64 { 0.35 }
 
 /// JSON-serializable system input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,6 +162,7 @@ impl SystemInputJson {
                 z_offset_m: w.z_offset_m,
                 enabled: w.enabled,
                 measured: w.measured.clone(),
+                source_impedance_ohm: w.source_impedance_ohm,
             }).collect(),
             freq_start_hz: self.freq_start_hz,
             freq_end_hz: self.freq_end_hz,

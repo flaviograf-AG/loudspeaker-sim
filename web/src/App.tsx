@@ -151,6 +151,7 @@ function App() {
       freq_end_hz: d.freq_end_hz,
       freq_points: d.freq_points,
       drive_voltage_rms: d.drive_voltage_rms,
+      source_impedance_ohm: d.source_impedance_ohm,
     });
     setShowSetup(false);
     setActiveWay(0);

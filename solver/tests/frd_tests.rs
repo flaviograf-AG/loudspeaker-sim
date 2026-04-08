@@ -52,6 +52,7 @@ fn measured_data_bypasses_ts_simulation() {
             z_offset_m: 0.0,
             enabled: true,
             measured: Some(flat_90db_measured()),
+            source_impedance_ohm: 0.35,
         }],
         freq_start_hz: 100.0,
         freq_end_hz: 10000.0,
@@ -105,6 +106,7 @@ fn measured_data_with_no_zma_uses_re_fallback() {
             z_offset_m: 0.0,
             enabled: true,
             measured: Some(measured),
+            source_impedance_ohm: 0.35,
         }],
         freq_start_hz: 100.0,
         freq_end_hz: 10000.0,
@@ -137,6 +139,7 @@ fn two_way_measured_system_with_crossover() {
                 active_filters: vec![ActiveFilter::LR4LowPass { freq_hz: 2000.0 }],
                 gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
                 measured: Some(flat_90db_measured()),
+                source_impedance_ohm: 0.35,
             },
             Way {
                 name: "Tweeter".into(),
@@ -149,6 +152,7 @@ fn two_way_measured_system_with_crossover() {
                 active_filters: vec![ActiveFilter::LR4HighPass { freq_hz: 2000.0 }],
                 gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
                 measured: Some(flat_90db_measured()),
+                source_impedance_ohm: 0.35,
             },
         ],
         freq_start_hz: 200.0,
@@ -199,6 +203,7 @@ fn passive_filter_affects_measured_data_system() {
         active_filters: vec![],
         gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
         measured: Some(flat_90db_measured()),
+        source_impedance_ohm: 0.35,
     };
 
     // Without passive filter

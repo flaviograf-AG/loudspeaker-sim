@@ -43,6 +43,10 @@ pub struct Way {
     pub enabled: bool,
     /// Measured FRD/ZMA data. When Some, bypasses T/S+enclosure simulation.
     pub measured: Option<MeasuredDriverData>,
+    /// Source impedance (Ω): amplifier output impedance + cable resistance.
+    /// Affects passive crossover behavior — especially shunt components.
+    /// Ref: Dickason, "Loudspeaker Design Cookbook", Ch. 5
+    pub source_impedance_ohm: f64,
 }
 
 /// Complete multi-way speaker project.
@@ -179,7 +183,7 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
             let h_passive = if way.passive_filters.is_empty() {
                 Complex::new(1.0, 0.0)
             } else {
-                passive_transfer_function(&way.passive_filters, z_driver, omega)
+                passive_transfer_function(&way.passive_filters, z_driver, omega, way.source_impedance_ohm)
             };
 
             // Active filter cascade

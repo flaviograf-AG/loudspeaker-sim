@@ -47,6 +47,7 @@ function migrateLegacyDesigns(): SavedDesign[] {
           freq_end_hz: sys.freq_end_hz,
           freq_points: sys.freq_points,
           drive_voltage_rms: sys.drive_voltage_rms,
+          source_impedance_ohm: 0.35,
         },
       };
     });
@@ -117,7 +118,7 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
         try {
           const parsed = JSON.parse(reader.result as string);
           if (parsed.version === 2 && Array.isArray(parsed.ways) && parsed.ways.length > 0) {
-            onLoad(parsed);
+            onLoad({ source_impedance_ohm: 0.35, ...parsed });
           } else if ('system' in parsed && 'topology' in parsed) {
             // Migrate v1 format: { topology, system }
             const { points, perWayEq } = extractCrossoverPoints(parsed.system.ways);
@@ -137,6 +138,7 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
               freq_end_hz: parsed.system.freq_end_hz,
               freq_points: parsed.system.freq_points,
               drive_voltage_rms: parsed.system.drive_voltage_rms,
+              source_impedance_ohm: 0.35,
             });
           } else if ('driver' in parsed) {
             // Migrate legacy single-driver format
@@ -152,6 +154,7 @@ export function SaveLoad({ design, onLoad }: SaveLoadProps) {
               per_way_eq: [[]],
               freq_start_hz: parsed.freq_start_hz, freq_end_hz: parsed.freq_end_hz,
               freq_points: parsed.freq_points, drive_voltage_rms: parsed.drive_voltage_rms,
+              source_impedance_ohm: 0.35,
             });
           } else {
             alert('Unrecognized file format');

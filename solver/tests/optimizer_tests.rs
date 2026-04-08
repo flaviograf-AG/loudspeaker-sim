@@ -19,6 +19,7 @@ fn test_2way_project(xover_freq: f64, tweeter_gain: f64) -> SpeakerProject {
                 active_filters: vec![ActiveFilter::LR4LowPass { freq_hz: xover_freq }],
                 gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
                 measured: None,
+                source_impedance_ohm: 0.35,
             },
             Way {
                 name: "Tweeter".into(),
@@ -31,6 +32,7 @@ fn test_2way_project(xover_freq: f64, tweeter_gain: f64) -> SpeakerProject {
                 active_filters: vec![ActiveFilter::LR4HighPass { freq_hz: xover_freq }],
                 gain_db: tweeter_gain, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
                 measured: None,
+                source_impedance_ohm: 0.35,
             },
         ],
         freq_start_hz: 200.0,

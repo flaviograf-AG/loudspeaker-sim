@@ -18,7 +18,7 @@ fn resistive_load(ohms: f64) -> Complex<f64> {
 fn no_filter_near_unity_transfer() {
     // With 0.35Ω source impedance into 8Ω load: H = 8 / (8 + 0.35) ≈ 0.9581
     // This ~0.37 dB drop models real amplifier+cable impedance and is negligible.
-    let h = passive_transfer_function(&[], resistive_load(8.0), 2000.0);
+    let h = passive_transfer_function(&[], resistive_load(8.0), 2000.0, 0.35);
     assert_relative_eq!(h.norm(), 8.0 / 8.35, epsilon = 1e-10);
 }
 
@@ -26,8 +26,9 @@ fn no_filter_near_unity_transfer() {
 fn series_resistor_voltage_divider() {
     // 8Ω series R + 8Ω load = 0.5 voltage division
     let blocks = vec![PassiveBlock::SeriesR { ohms: 8.0 }];
-    let h = passive_transfer_function(&blocks, resistive_load(8.0), 1000.0);
-    assert_relative_eq!(h.norm(), 0.5, epsilon = 0.01);
+    let h = passive_transfer_function(&blocks, resistive_load(8.0), 1000.0, 0.35);
+    // 8Ω load / (8Ω series + 8Ω load + 0.35Ω source) ≈ 0.489
+    assert_relative_eq!(h.norm(), 8.0 / 16.35, epsilon = 0.01);
 }
 
 #[test]
@@ -39,7 +40,7 @@ fn butterworth2_lp_minus_3db_at_crossover() {
         PassiveBlock::ShuntC { farads: c },
     ];
     let omega_c = 2.0 * std::f64::consts::PI * 3000.0;
-    let h = passive_transfer_function(&blocks, resistive_load(8.0), omega_c);
+    let h = passive_transfer_function(&blocks, resistive_load(8.0), omega_c, 0.35);
 
     eprintln!("BW2 LP at crossover: |H| = {:.4} ({:.2} dB)", h.norm(), 20.0 * h.norm().log10());
     // Loaded Butterworth: actual attenuation at design frequency is ~-4.8 dB (0.577)
@@ -57,7 +58,7 @@ fn butterworth2_hp_minus_3db_at_crossover() {
         PassiveBlock::ShuntL { henries: l, dcr_ohms: 0.0 },
     ];
     let omega_c = 2.0 * std::f64::consts::PI * 3000.0;
-    let h = passive_transfer_function(&blocks, resistive_load(8.0), omega_c);
+    let h = passive_transfer_function(&blocks, resistive_load(8.0), omega_c, 0.35);
 
     eprintln!("BW2 HP at crossover: |H| = {:.4} ({:.2} dB)", h.norm(), 20.0 * h.norm().log10());
     assert!(h.norm() > 0.3 && h.norm() < 0.8,
@@ -79,13 +80,13 @@ fn zobel_flattens_impedance_effect() {
         PassiveBlock::SeriesL { henries: rl, dcr_ohms: 0.0 },
         PassiveBlock::ShuntC { farads: cl },
     ];
-    let h_no_zobel = passive_transfer_function(&blocks_no_zobel, z_load_10k, omega_10k);
+    let h_no_zobel = passive_transfer_function(&blocks_no_zobel, z_load_10k, omega_10k, 0.35);
 
     // With Zobel across the driver
     let (r_z, c_z) = presets::zobel(re, le);
     let z_zobel = Complex::new(r_z, 0.0) + 1.0 / (Complex::new(0.0, 1.0) * omega_10k * c_z);
     let z_combined = (z_load_10k * z_zobel) / (z_load_10k + z_zobel); // parallel
-    let h_with_zobel = passive_transfer_function(&blocks_no_zobel, z_combined, omega_10k);
+    let h_with_zobel = passive_transfer_function(&blocks_no_zobel, z_combined, omega_10k, 0.35);
 
     eprintln!("At 10kHz: no Zobel |H|={:.4}, with Zobel |H|={:.4}",
         h_no_zobel.norm(), h_with_zobel.norm());
@@ -164,6 +165,7 @@ fn single_way_system_matches_direct_simulation() {
             z_offset_m: 0.0,
             enabled: true,
             measured: None,
+            source_impedance_ohm: 0.35,
         }],
         freq_start_hz: 20.0,
         freq_end_hz: 20000.0,
@@ -196,6 +198,7 @@ fn inverted_way_cancels() {
                 passive_filters: vec![], active_filters: vec![],
                 gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
                 measured: None,
+                source_impedance_ohm: 0.35,
             },
             Way {
                 name: "Inverted".into(),
@@ -204,6 +207,7 @@ fn inverted_way_cancels() {
                 passive_filters: vec![], active_filters: vec![],
                 gain_db: 0.0, delay_s: 0.0, inverted: true, z_offset_m: 0.0, enabled: true,
                 measured: None,
+                source_impedance_ohm: 0.35,
             },
         ],
         freq_start_hz: 100.0,
@@ -218,4 +222,28 @@ fn inverted_way_cancels() {
     let max_spl = sys.system_spl_db.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     eprintln!("Inverted cancellation: max system SPL = {:.1} dB (should be near -inf)", max_spl);
     assert!(max_spl < 20.0, "Inverted way should cancel, max SPL = {:.1}", max_spl);
+}
+
+#[test]
+fn source_impedance_affects_shunt_component() {
+    // Higher source impedance should increase shunt cap effect (more voltage drop
+    // across source R when shunt diverts current).
+    // Ref: Dickason, "Loudspeaker Design Cookbook", Ch. 5
+    let blocks = vec![PassiveBlock::ShuntC { farads: 10e-6 }];
+    let load = resistive_load(8.0);
+    let omega = 2.0 * std::f64::consts::PI * 5000.0;
+
+    let h_low_r = passive_transfer_function(&blocks, load, omega, 0.1);
+    let h_high_r = passive_transfer_function(&blocks, load, omega, 2.0);
+
+    eprintln!("Shunt C at 5kHz: |H| with 0.1Ω = {:.4}, with 2.0Ω = {:.4}",
+        h_low_r.norm(), h_high_r.norm());
+
+    assert!(h_high_r.norm() < h_low_r.norm(),
+        "Higher source R should increase shunt cap effect: {:.3} vs {:.3}",
+        h_high_r.norm(), h_low_r.norm());
+
+    let diff_db = 20.0 * (h_low_r.norm() / h_high_r.norm()).log10();
+    eprintln!("Difference: {:.1} dB", diff_db);
+    assert!(diff_db > 1.0, "Expected >1 dB difference, got {:.1}", diff_db);
 }

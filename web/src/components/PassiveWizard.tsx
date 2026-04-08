@@ -75,9 +75,13 @@ export function PassiveWizard({ crossoverFreq, driverRe, driverLe, passiveFilter
         const removePf = () => onApply(passiveFilters.filter((_, j) => j !== i));
 
         return (
-          <div key={i} style={{ border: '1px solid var(--graf-warm-200)', borderRadius: 4, padding: '3px 6px', marginBottom: 3, fontSize: 11 }}>
+          <div key={i} style={{ border: '1px solid var(--graf-warm-200)', borderRadius: 4, padding: '3px 6px', marginBottom: 3, fontSize: 11, opacity: pf.bypassed ? 0.4 : 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{pf.type.replace('Series', 'Ser ').replace('Shunt', 'Shnt ').replace('Zobel', 'Zobel ').replace('NotchShunt', 'P.Notch').replace('NotchSeries', 'S.Notch')}</strong>
+              <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                <input type="checkbox" checked={!pf.bypassed} title={pf.bypassed ? 'Enable this component' : 'Bypass this component'}
+                  onChange={() => updatePf({ ...pf, bypassed: !pf.bypassed } as PassiveFilter)} />
+                <strong>{pf.type.replace('Series', 'Ser ').replace('Shunt', 'Shnt ').replace('Zobel', 'Zobel ').replace('NotchShunt', 'P.Notch').replace('NotchSeries', 'S.Notch')}</strong>
+              </label>
               <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 9 }} onClick={removePf}>x</button>
             </div>
             {'ohms' in pf && !('farads' in pf) && !('henries' in pf) && (

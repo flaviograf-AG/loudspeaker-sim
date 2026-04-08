@@ -41,8 +41,16 @@ export function PerWayEqEditor({ filters, onChange }: Props) {
         </div>
       )}
       {filters.map((f, i) => (
-        <div key={i} className="param-row" style={{ fontSize: 12 }}>
-          <span style={{ flex: 1 }}>{filterLabel(f)}</span>
+        <div key={i} className="param-row" style={{ fontSize: 12, opacity: f.bypassed ? 0.4 : 1 }}>
+          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flex: 1 }}>
+            <input type="checkbox" checked={!f.bypassed} title={f.bypassed ? 'Enable this filter' : 'Bypass this filter'}
+              onChange={() => {
+                const next = [...filters];
+                next[i] = { ...f, bypassed: !f.bypassed } as ActiveFilter;
+                onChange(next);
+              }} />
+            {filterLabel(f)}
+          </label>
           {'freq_hz' in f && (
             <input type="number" className="graf-form-control" style={{ width: 70, fontSize: 11 }}
               title="Filter center/corner frequency (Hz)"

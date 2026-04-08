@@ -12,6 +12,8 @@ Browser-based loudspeaker enclosure + crossover simulator. Combines Hornresp (en
 ### State Management (v2)
 - **Single source of truth:** `DesignState` in `types/index.ts` — topology, ways, crossover points, per-way EQ, freq range
 - **`active_filters` are never stored** — always computed via `buildSolverInput()` in `compute.ts`
+- **Filter bypass:** `bypassed?: boolean` on PassiveFilter/ActiveFilter. `buildSolverInput()` strips bypassed blocks before sending to WASM.
+- **Source impedance:** `source_impedance_ohm` in DesignState (default 0.35Ω), passed to each way in solver input
 - **One-way data flow:** `DesignState` → `buildSolverInput()` → `SystemInput` → WASM solver → results → plots
 - **Undo/redo:** `useUndoRedo<DesignState>` hook wraps the entire state
 - **URL sync:** `useUrlSync` encodes `DesignState` to URL hash (`#v2=...`)
@@ -32,7 +34,7 @@ cd web && npm run build
 cd solver && cargo build --release --bin loudspeaker-solver
 
 # Development
-cd solver && cargo test                    # run solver tests (100+ tests)
+cd solver && cargo test                    # run solver tests (102 tests)
 cd solver && cargo test -- --nocapture     # with output
 cd web && npm run dev                      # Vite dev server (needs WASM built first)
 cd web && npx tsc --noEmit                 # TypeScript check only
@@ -112,15 +114,17 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 - URL hash state encoding for shareable design links
 
 ## Testing
-- `cargo test` in solver/ — 100+ tests across 16 test files
+- `cargo test` in solver/ — 102 tests across 16 test files
 - Cross-validated against QSpeakers C++ solver (vented port phase fix verified)
 - Analytical validation tests (sealed Fc/Qtc, vented dual peaks, port velocity)
 - Alignment presets verified against simulation output
 - Optimizer tests: cost reduction from 229→3 in 41 iterations
 - FRD/ZMA tests: measured data bypass, passive filters with FRD, 2-way measured crossover
-- Playwright E2E tests: `cd web && npx playwright test` — 26 tests:
+- Source impedance test: different source R produces different shunt component effect
+- Playwright E2E tests: `cd web && npx playwright test` — 45 tests:
   - 20 orchestration tests (driver params, enclosure, crossover, way controls, system controls, FRD mode)
   - 6 real scenario tests with numerical assertions (2-way sealed + LR4, vented bass reflex, 3-way system, FRD+ZMA, mixed T/S+FRD, sealed-vs-vented comparison)
+  - 19 passive component coverage tests (every component type verified to affect SPL)
 - All systems (including 1-way) route through `solve_system` — `solve_simulation` is only called internally
 
 ## Design Docs

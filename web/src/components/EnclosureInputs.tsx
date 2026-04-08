@@ -37,10 +37,12 @@ interface Props {
   onChange: (config: EnclosureConfig) => void;
   lockType?: boolean;
   onChangeType?: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 
-export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType }: Props) {
+export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType, disabled, disabledReason }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
 
@@ -78,6 +80,22 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
     readouts = [
       { label: 'λ/4', value: `${qw.toFixed(1)} Hz`, tip: 'Quarter-wave frequency — the fundamental resonance of the line. Bass output peaks near this frequency.' },
     ];
+  }
+
+  if (disabled) {
+    return (
+      <div className="section-card" data-testid="enclosure-disabled">
+        <div className="section-title">Enclosure</div>
+        <div style={{
+          padding: '8px 12px', marginBottom: 8, borderRadius: 6,
+          background: 'var(--graf-warm-100)', color: 'var(--graf-warm-600)',
+          fontSize: 12, lineHeight: 1.5,
+        }}>
+          <strong style={{ display: 'block', marginBottom: 2 }}>Measured data active</strong>
+          {disabledReason || 'Enclosure model bypassed — using measured FRD response.'}
+        </div>
+      </div>
+    );
   }
 
   return (

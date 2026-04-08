@@ -300,6 +300,8 @@ function App() {
                 onChange={(enc) => updateWay(safeActiveWay, { enclosure: enc })}
                 lockType
                 onChangeType={() => setShowSetup(true)}
+                disabled={!!way.measured}
+                disabledReason="Enclosure model bypassed — using measured FRD response."
               />
             </AccordionSection>
 

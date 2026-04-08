@@ -6,7 +6,6 @@ import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
 import { buildSolverInput, defaultDesign } from './compute';
 import { defaultCrossoverPoints } from './crossover';
-import { PlotArea } from './components/PlotArea';
 import { SystemPlotArea } from './components/SystemPlotArea';
 import { EnclosureInputs } from './components/EnclosureInputs';
 import { type OverlayData } from './components/ImportOverlay';
@@ -21,7 +20,7 @@ import type { SimulationInput, DesignState, WayDesign, WayInput, CrossoverPoint,
 function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [sidebarWidth, setSidebarWidth] = useState(350);
   const dragging = useRef(false);
 
   // Setup wizard
@@ -59,8 +58,17 @@ function App() {
   const solverInput = useMemo(() => buildSolverInput(design), [design]);
   const isMultiWay = design.ways.length > 1;
 
-  // Single-driver input for 1-way systems
-  const singleInput: SimulationInput | null = !isMultiWay && solverInput.ways[0]
+  // Always use system solver — it handles passive filters, active filters,
+  // measured data, gain, delay, inversion. The single-driver solver doesn't.
+  const { result: systemResult, error: systemError } = useSystemSolver(
+    solverInput,
+    ready
+  );
+
+  // Supplementary single-driver solve for 1-way: displacement, port velocity.
+  // Only when NOT using measured data (measured data has no displacement info).
+  const needsSupplement = !isMultiWay && !design.ways[0]?.measured;
+  const supplementInput: SimulationInput | null = needsSupplement && solverInput.ways[0]
     ? {
         driver: solverInput.ways[0].driver,
         enclosure: solverInput.ways[0].enclosure,
@@ -70,17 +78,11 @@ function App() {
         drive_voltage_rms: solverInput.drive_voltage_rms,
       }
     : null;
-
-  // Solvers
-  const { result: singleResult, error: singleError } = useSolver(
-    singleInput ?? { driver: solverInput.ways[0].driver, enclosure: solverInput.ways[0].enclosure, freq_start_hz: 10, freq_end_hz: 20000, freq_points: 500, drive_voltage_rms: 2.83 },
-    ready && singleInput !== null
+  const { result: supplementResult } = useSolver(
+    supplementInput ?? { driver: solverInput.ways[0].driver, enclosure: solverInput.ways[0].enclosure, freq_start_hz: 10, freq_end_hz: 20000, freq_points: 500, drive_voltage_rms: 2.83 },
+    ready && supplementInput !== null
   );
-  const { result: systemResult, error: systemError } = useSystemSolver(
-    isMultiWay ? solverInput : null,
-    ready
-  );
-  const error = isMultiWay ? systemError : singleError;
+  const error = systemError;
 
   // WASM init
   useEffect(() => {
@@ -226,8 +228,8 @@ function App() {
       <aside className="app-sidebar" style={{ width: sidebarWidth }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-          <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', display: 'flex', alignItems: 'center', gap: 8, margin: 0, whiteSpace: 'nowrap' }}>
-            <img src="/favicon/favicon.svg" alt="LS" width={28} height={28} />
+          <h1 style={{ fontSize: 'var(--graf-font-size-lg, 18px)', color: 'var(--graf-primary)', display: 'flex', alignItems: 'center', gap: 8, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <img src="/favicon/favicon.svg" alt="LS" width={28} height={28} style={{ flexShrink: 0 }} />
             Loudspeaker Sim
           </h1>
           <button
@@ -325,7 +327,6 @@ function App() {
               <SystemPanel
                 design={design}
                 solverInput={solverInput}
-                singleResult={singleResult}
                 systemResult={systemResult}
                 isMultiWay={isMultiWay}
                 onUpdateDesign={(updates) => setDesign({ ...designRef.current, ...updates })}
@@ -347,10 +348,13 @@ function App() {
 
       <main className="app-main" style={{ display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {isMultiWay
-            ? <SystemPlotArea result={systemResult} />
-            : <PlotArea result={singleResult} xmaxMm={way ? way.driver.xmax_m * 1000 : 6} overlay={overlay} snapshots={snapshots} />
-          }
+          <SystemPlotArea
+            result={systemResult}
+            supplement={supplementResult}
+            xmaxMm={way ? way.driver.xmax_m * 1000 : 6}
+            overlay={overlay}
+            snapshots={snapshots}
+          />
         </div>
         {way && (
           <SchematicPanel

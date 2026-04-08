@@ -6,12 +6,11 @@ import { BiquadExport } from './BiquadExport';
 import { ImportOverlay, type OverlayData } from './ImportOverlay';
 import { extractCrossoverPoints } from '../crossover';
 import { encodeDesignUrl } from '../hooks/useUrlSync';
-import type { DesignState, SystemInput, SimulationResult, SystemResult } from '../types';
+import type { DesignState, SystemInput, SystemResult } from '../types';
 
 interface SystemPanelProps {
   design: DesignState;
   solverInput: SystemInput;
-  singleResult: SimulationResult | null;
   systemResult: SystemResult | null;
   isMultiWay: boolean;
   onUpdateDesign: (updates: Partial<DesignState>) => void;
@@ -24,7 +23,7 @@ interface SystemPanelProps {
 }
 
 export function SystemPanel({
-  design, solverInput, singleResult, systemResult, isMultiWay,
+  design, solverInput, systemResult, isMultiWay,
   onUpdateDesign, onSetDesign, overlay, onSetOverlay,
   snapshots, onSetSnapshots, designUndo,
 }: SystemPanelProps) {
@@ -79,7 +78,18 @@ export function SystemPanel({
       <SaveLoad design={design} onLoad={onSetDesign} />
 
       {/* Export */}
-      {!isMultiWay && <ExportControls result={singleResult} />}
+      {!isMultiWay && systemResult && systemResult.ways[0] && (
+        <ExportControls result={{
+          frequencies_hz: systemResult.frequencies_hz,
+          spl_db: systemResult.system_spl_db,
+          impedance_ohm: systemResult.system_impedance_ohm,
+          impedance_phase_deg: systemResult.frequencies_hz.map(() => 0),
+          acoustic_phase_deg: systemResult.frequencies_hz.map(() => 0),
+          cone_displacement_mm: [],
+          group_delay_ms: systemResult.system_group_delay_ms,
+          port_velocity_ms: null,
+        }} />
+      )}
       {isMultiWay && (
         <div className="section-card">
           <div className="section-title">Export</div>
@@ -99,10 +109,9 @@ export function SystemPanel({
           <button className="graf-btn graf-btn-sm graf-btn-outline"
             title="Save current SPL curve as a comparison snapshot"
             onClick={() => {
-              const result = isMultiWay ? systemResult : singleResult;
-              if (result) {
-                const freqs = 'frequencies_hz' in result ? result.frequencies_hz : [];
-                const spl = 'system_spl_db' in result ? result.system_spl_db : ('spl_db' in result ? result.spl_db : []);
+              if (systemResult) {
+                const freqs = systemResult.frequencies_hz;
+                const spl = systemResult.system_spl_db;
                 const name = `Snap ${snapshots.length + 1}`;
                 onSetSnapshots([...snapshots, { name, spl: [...spl], freqs: [...freqs] }]);
               }

@@ -91,8 +91,8 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
           background: 'var(--graf-warm-100)', color: 'var(--graf-warm-600)',
           fontSize: 12, lineHeight: 1.5,
         }}>
-          <strong style={{ display: 'block', marginBottom: 2 }}>Measured data active</strong>
-          {disabledReason || 'Enclosure model bypassed — using measured FRD response.'}
+          <strong style={{ display: 'block', marginBottom: 2 }}>Using measured FRD</strong>
+          {disabledReason || 'Enclosure settings have no effect — the measurement already includes the enclosure.'}
         </div>
       </div>
     );

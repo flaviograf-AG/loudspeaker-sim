@@ -271,7 +271,7 @@ function App() {
             FRD: {way.measured.spl_db.length > 0 ? `${way.measured.spl_db.length} pts` : 'none'}
             {' | '}
             ZMA: {way.measured.impedance_ohm.length > 0 ? `${way.measured.impedance_ohm.length} pts` : 'none'}
-            {' \u2014 measured data active (T/S bypassed)'}
+            {' \u2014 using measured response (enclosure effect included in FRD)'}
           </div>
         )}
 
@@ -307,7 +307,7 @@ function App() {
                 lockType
                 onChangeType={() => setShowSetup(true)}
                 disabled={!!way.measured}
-                disabledReason="Enclosure model bypassed — using measured FRD response."
+                disabledReason="Using measured FRD. Enclosure settings have no effect — the measurement already includes the enclosure."
               />
             </AccordionSection>
 

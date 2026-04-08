@@ -32,10 +32,11 @@ cd web && npm run build
 cd solver && cargo build --release --bin loudspeaker-solver
 
 # Development
-cd solver && cargo test                    # run solver tests (85+ tests)
+cd solver && cargo test                    # run solver tests (100+ tests)
 cd solver && cargo test -- --nocapture     # with output
 cd web && npm run dev                      # Vite dev server (needs WASM built first)
 cd web && npx tsc --noEmit                 # TypeScript check only
+cd web && npx playwright test              # Playwright E2E tests (needs dev server or auto-starts)
 
 # Deploy (after building both)
 scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
@@ -111,12 +112,14 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 - URL hash state encoding for shareable design links
 
 ## Testing
-- `cargo test` in solver/ — 100 tests across 16 test files
+- `cargo test` in solver/ — 100+ tests across 16 test files
 - Cross-validated against QSpeakers C++ solver (vented port phase fix verified)
 - Analytical validation tests (sealed Fc/Qtc, vented dual peaks, port velocity)
 - Alignment presets verified against simulation output
 - Optimizer tests: cost reduction from 229→3 in 41 iterations
-- E2E Puppeteer tests: 46 tests covering topology changes, driver editing, crossover, undo/redo, URL state, save/load
+- FRD/ZMA tests: measured data bypass, passive filters with FRD, 2-way measured crossover
+- Playwright E2E tests: `cd web && npx playwright test` — 20 tests covering driver params, enclosure, passive/active crossover, per-way controls, system controls, and FRD mode
+- All systems (including 1-way) route through `solve_system` — `solve_simulation` is only called internally
 
 ## Design Docs
 - Design: `docs/plans/2026-04-05-loudspeaker-sim-design.md`

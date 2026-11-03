@@ -24,4 +24,10 @@ test.describe('Driver parameter changes update charts', () => {
       await setNumericInput(page, 'Vas', '25');
     });
   });
+
+  test('changing physical Mms (Mass) bidirectionally updates Fs and SPL chart', async ({ page }) => {
+    await expectChartChange(page, async () => {
+      await setNumericInput(page, 'Mms (Mass)', '28');
+    });
+  });
 });

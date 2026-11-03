@@ -95,3 +95,34 @@ fn identity_cascade_is_noop() {
         }
     }
 }
+
+#[test]
+fn characteristic_impedance_with_stuffing_increases_magnitude() {
+    let omega = 2.0 * std::f64::consts::PI * 100.0;
+    let rho0 = 1.2041;
+    let c0 = 343.21;
+    let area = 0.01;
+    let z_lossless = characteristic_impedance_stuffed(omega, rho0, c0, area, 0.0);
+    let z_stuffed = characteristic_impedance_stuffed(omega, rho0, c0, area, 5000.0);
+    assert!(
+        z_stuffed.norm() > z_lossless.norm(),
+        "Porous stuffing increases effective density and characteristic impedance magnitude"
+    );
+}
+
+#[test]
+fn piston_radiation_impedance_asymptotes_to_z0_at_high_ka() {
+    let rho0 = 1.2041;
+    let c0 = 343.21;
+    let area = 0.05; // 500 cm²
+    let z0 = rho0 * c0 / area;
+
+    // Low frequency (20 Hz, ka << 1): Re(Z_rad) << Z0
+    let z_low = piston_radiation_impedance(2.0 * std::f64::consts::PI * 20.0, rho0, c0, area, 2.0 * std::f64::consts::PI);
+    assert!(z_low.re < 0.05 * z0);
+
+    // High frequency (10 kHz, ka >> 1): Re(Z_rad) -> Z0, Im(Z_rad) -> 0
+    let z_high = piston_radiation_impedance(2.0 * std::f64::consts::PI * 10000.0, rho0, c0, area, 2.0 * std::f64::consts::PI);
+    assert_relative_eq!(z_high.re, z0, epsilon = 0.05 * z0);
+    assert!(z_high.im.abs() < 0.1 * z0);
+}

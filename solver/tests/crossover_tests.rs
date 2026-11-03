@@ -247,3 +247,55 @@ fn source_impedance_affects_shunt_component() {
     eprintln!("Difference: {:.1} dB", diff_db);
     assert!(diff_db > 1.0, "Expected >1 dB difference, got {:.1}", diff_db);
 }
+
+#[test]
+fn passive_2way_system_impedance_does_not_halve_across_band() {
+    // A 2-way passive speaker with 2nd-order Butterworth LP on woofer and HP on tweeter
+    // at 2500 Hz should maintain ~6-8 Ω impedance in low and high passbands instead of
+    // reporting 2 bare drivers in parallel (~3 Ω everywhere).
+    let (l_lp, c_lp) = presets::butterworth2_lp(2500.0, 6.5);
+    let (c_hp, l_hp) = presets::butterworth2_hp(2500.0, 6.5);
+
+    let project = SpeakerProject {
+        ways: vec![
+            Way {
+                name: "Woofer".into(),
+                driver: woofer_driver(),
+                enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 18e-3, ql: 7.0 }),
+                passive_filters: vec![
+                    PassiveBlock::SeriesL { henries: l_lp, dcr_ohms: 0.2 },
+                    PassiveBlock::ShuntC { farads: c_lp },
+                ],
+                active_filters: vec![],
+                gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+                measured: None, source_impedance_ohm: 0.1,
+            },
+            Way {
+                name: "Tweeter".into(),
+                driver: DriverParams {
+                    fs_hz: 700.0, re_ohm: 6.0, le_h: 0.04e-3, qes: 0.6, qms: 3.0,
+                    vas_m3: 0.05e-3, sd_m2: 7.0e-4, xmax_m: 1.0e-3, ke: 0.0,
+                },
+                enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 0.2e-3, ql: 7.0 }),
+                passive_filters: vec![
+                    PassiveBlock::SeriesC { farads: c_hp },
+                    PassiveBlock::ShuntL { henries: l_hp, dcr_ohms: 0.2 },
+                ],
+                active_filters: vec![],
+                gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+                measured: None, source_impedance_ohm: 0.1,
+            },
+        ],
+        freq_start_hz: 100.0,
+        freq_end_hz: 15000.0,
+        freq_points: 100,
+        drive_voltage_rms: 2.83,
+    };
+
+    let sys = solve_system(&project).unwrap();
+    // At 200 Hz (woofer passband, tweeter blocked by series C), system impedance > 5.5 Ω
+    let z_200 = sys.system_impedance_ohm[10];
+    assert!(z_200 > 5.5, "Passive 2-way impedance at low freq should be > 5.5 Ω, got {:.2}", z_200);
+    // Filtered tweeter excursion at 100 Hz should be strongly attenuated by passive HP
+    assert!(sys.ways[1].cone_displacement_mm[0] < 0.05, "Tweeter low-freq excursion should be filtered");
+}

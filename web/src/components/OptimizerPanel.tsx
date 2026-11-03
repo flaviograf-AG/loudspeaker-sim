@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { runOptimizer } from '../solver/wasm-bridge';
 import { NumericInput } from './NumericInput';
 import type { WayInput, SystemInput } from '../types';
@@ -7,6 +7,12 @@ interface Props {
   ways: WayInput[];
   sysParams: { freq_start_hz: number; freq_end_hz: number; freq_points: number; drive_voltage_rms: number };
   onApply: (ways: WayInput[]) => void;
+}
+
+interface CandidateParam {
+  key: string;
+  label: string;
+  payload: Record<string, unknown>;
 }
 
 export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
@@ -20,6 +26,8 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   const [freqMin, setFreqMin] = useState(200);
   const [freqMax, setFreqMax] = useState(10000);
   const [maxIter, setMaxIter] = useState(100);
+  const [lockedKeys, setLockedKeys] = useState<Record<string, boolean>>({});
+  const [showLocks, setShowLocks] = useState(false);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -38,68 +46,129 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [running]);
 
+  // Discover all optimizable parameters (active crossovers, EQ, passive L/C/R, and per-way gains/L-Pads)
+  const candidateParams = useMemo((): CandidateParam[] => {
+    const list: CandidateParam[] = [];
+    const enabledWays = ways.map((w, i) => ({ ...w, idx: i })).filter(w => w.enabled);
+
+    // 1. Active filter crossover pairs and standalone active filters
+    const linkedHpFilters = new Set<string>();
+    for (let i = 0; i < enabledWays.length - 1; i++) {
+      const lo = enabledWays[i];
+      const hi = enabledWays[i + 1];
+      const lpIdx = lo.active_filters.findIndex(f =>
+        f.type === 'LR4LowPass' || f.type === 'LR2LowPass' || f.type === 'LowPass1' || f.type === 'LowPass2');
+      const hpIdx = hi.active_filters.findIndex(f =>
+        f.type === 'LR4HighPass' || f.type === 'LR2HighPass' || f.type === 'HighPass1' || f.type === 'HighPass2');
+      if (lpIdx >= 0 && hpIdx >= 0) {
+        list.push({
+          key: `xo:${lo.idx}:${lpIdx}:${hi.idx}:${hpIdx}`,
+          label: `${lo.name}↔${hi.name} Active XO Freq`,
+          payload: {
+            type: 'CrossoverFreq',
+            lp_way_idx: lo.idx, lp_filter_idx: lpIdx,
+            hp_way_idx: hi.idx, hp_filter_idx: hpIdx,
+          },
+        });
+        linkedHpFilters.add(`${hi.idx}:${hpIdx}`);
+        for (let fi = 0; fi < lo.active_filters.length; fi++) {
+          if (fi !== lpIdx) {
+            list.push({
+              key: `af:${lo.idx}:${fi}`,
+              label: `${lo.name} Active Filter #${fi + 1}`,
+              payload: { type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi },
+            });
+          }
+        }
+      } else {
+        lo.active_filters.forEach((_, fi) => {
+          list.push({
+            key: `af:${lo.idx}:${fi}`,
+            label: `${lo.name} Active Filter #${fi + 1}`,
+            payload: { type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi },
+          });
+        });
+      }
+    }
+    if (enabledWays.length > 0) {
+      const last = enabledWays[enabledWays.length - 1];
+      last.active_filters.forEach((_, fi) => {
+        if (!linkedHpFilters.has(`${last.idx}:${fi}`)) {
+          list.push({
+            key: `af:${last.idx}:${fi}`,
+            label: `${last.name} Active Filter #${fi + 1}`,
+            payload: { type: 'FilterFreq', way_idx: last.idx, filter_idx: fi },
+          });
+        }
+      });
+    }
+
+    // 2. Passive RLC components (SeriesL, ShuntL, SeriesC, ShuntC)
+    enabledWays.forEach((w) => {
+      w.passive_filters.forEach((pf, fi) => {
+        if (pf.type === 'SeriesL' || pf.type === 'ShuntL') {
+          list.push({
+            key: `pl:${w.idx}:${fi}`,
+            label: `${w.name} ${pf.type} (${(pf.henries * 1000).toFixed(2)} mH)`,
+            payload: { type: 'PassiveL', way_idx: w.idx, filter_idx: fi },
+          });
+        } else if (pf.type === 'SeriesC' || pf.type === 'ShuntC') {
+          list.push({
+            key: `pc:${w.idx}:${fi}`,
+            label: `${w.name} ${pf.type} (${(pf.farads * 1e6).toFixed(1)} µF)`,
+            payload: { type: 'PassiveC', way_idx: w.idx, filter_idx: fi },
+          });
+        } else if (pf.type === 'SeriesR' || pf.type === 'ShuntR') {
+          list.push({
+            key: `pr:${w.idx}:${fi}`,
+            label: `${w.name} ${pf.type} (${pf.ohms.toFixed(1)} Ω)`,
+            payload: { type: 'PassiveR', way_idx: w.idx, filter_idx: fi },
+          });
+        }
+      });
+    });
+
+    // 3. Level matching: WayGain or LPadAttenuation
+    enabledWays.forEach((w, i) => {
+      const hasPassiveLadder = w.passive_filters.length > 0 && w.active_filters.length === 0;
+      if ((algorithm === 'twophase' || hasPassiveLadder) && i > 0) {
+        list.push({
+          key: `lpad:${w.idx}`,
+          label: `${w.name} L-Pad Attenuation`,
+          payload: { type: 'LPadAttenuation', way_idx: w.idx },
+        });
+      } else {
+        list.push({
+          key: `gain:${w.idx}`,
+          label: `${w.name} Gain (dB)`,
+          payload: { type: 'WayGain', way_idx: w.idx },
+        });
+      }
+    });
+
+    return list;
+  }, [ways, algorithm]);
+
   const handleOptimize = () => {
     setRunning(true);
     setError(null);
     setResult(null);
 
-    // Build params: link adjacent LP/HP as crossover points, optimize gains
-    const params: Record<string, unknown>[] = [];
-    const enabledWays = ways.map((w, i) => ({ ...w, idx: i })).filter(w => w.enabled);
+    const activeParams = candidateParams
+      .filter((c) => !lockedKeys[c.key])
+      .map((c) => c.payload);
 
-    // Find LP/HP pairs between adjacent ways and link them
-    const linkedHpFilters = new Set<string>(); // "wayIdx:filterIdx" keys already linked
-    for (let i = 0; i < enabledWays.length - 1; i++) {
-      const lo = enabledWays[i];
-      const hi = enabledWays[i + 1];
-      // Find LP filter in lower way
-      const lpIdx = lo.active_filters.findIndex(f =>
-        f.type === 'LR4LowPass' || f.type === 'LR2LowPass' || f.type === 'LowPass1' || f.type === 'LowPass2');
-      // Find HP filter in higher way
-      const hpIdx = hi.active_filters.findIndex(f =>
-        f.type === 'LR4HighPass' || f.type === 'LR2HighPass' || f.type === 'HighPass1' || f.type === 'HighPass2');
-      if (lpIdx >= 0 && hpIdx >= 0) {
-        params.push({
-          type: 'CrossoverFreq',
-          lp_way_idx: lo.idx, lp_filter_idx: lpIdx,
-          hp_way_idx: hi.idx, hp_filter_idx: hpIdx,
-        });
-        linkedHpFilters.add(`${hi.idx}:${hpIdx}`);
-        // Don't add independent FilterFreq for linked filters
-        // but do add other filters (PEQ, allpass, etc.)
-        for (let fi = 0; fi < lo.active_filters.length; fi++) {
-          if (fi !== lpIdx) params.push({ type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi });
-        }
-      } else {
-        // No linkable pair — add all filters independently
-        lo.active_filters.forEach((_, fi) => {
-          params.push({ type: 'FilterFreq', way_idx: lo.idx, filter_idx: fi });
-        });
-      }
-    }
-    // Last enabled way: add non-linked filters
-    if (enabledWays.length > 0) {
-      const last = enabledWays[enabledWays.length - 1];
-      last.active_filters.forEach((_, fi) => {
-        if (!linkedHpFilters.has(`${last.idx}:${fi}`)) {
-          params.push({ type: 'FilterFreq', way_idx: last.idx, filter_idx: fi });
-        }
-      });
-    }
-    // Level matching: WayGain for Hybrid/DE/NM, LPadAttenuation for TwoPhase
-    enabledWays.forEach((w, i) => {
-      if (algorithm === 'twophase' && i > 0) {
-        params.push({ type: 'LPadAttenuation', way_idx: w.idx });
-      } else {
-        params.push({ type: 'WayGain', way_idx: w.idx });
-      }
-    });
-
-    if (params.length === 0) {
-      setError('No optimizable parameters — add active filters to ways');
+    if (activeParams.length === 0) {
+      setError('No unlocked parameters to optimize — unlock at least one parameter.');
       setRunning(false);
       return;
     }
+
+    // If optimizing passive L/C/R directly, use Hybrid (DE + NM) instead of TwoPhase
+    const hasPassiveLC = activeParams.some(
+      (p) => p.type === 'PassiveL' || p.type === 'PassiveC' || p.type === 'PassiveR'
+    );
+    const effectiveAlgo = hasPassiveLC && algorithm === 'twophase' ? 'hybrid' : algorithm;
 
     try {
       const target = targetMode === 'flat'
@@ -108,31 +177,29 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
       const systemInput: SystemInput = { ways, ...sysParams };
       const optResult = runOptimizer({
         system: systemInput,
-        params,
+        params: activeParams,
         target,
         freq_min_hz: freqMin,
         freq_max_hz: freqMax,
         max_iterations: maxIter,
         freq_weight: freqWeight !== 'uniform' ? freqWeight : undefined,
         min_impedance_ohm: minImpedance ?? undefined,
-        algorithm,
+        algorithm: effectiveAlgo,
         e_series: eSeries !== 'none' ? eSeries : undefined,
       });
 
       setResult({ cost: optResult.final_cost, iterations: optResult.iterations, minSafeFreqs: optResult.min_safe_freq_hz });
 
-      // Apply optimized ways back — L-Pad values come from solver directly
       const gainNotes: string[] = [];
       onApply(optResult.optimized_system.ways.map((ow, i) => {
         const way = {
           ...ways[i],
           active_filters: ow.active_filters,
-          passive_filters: ow.passive_filters, // includes solver-optimized L-Pad
+          passive_filters: ow.passive_filters,
           gain_db: ow.gain_db,
           delay_s: ow.delay_s,
         };
 
-        // Report L-Pad values
         const lpad = ow.passive_filters.find(f => f.type === 'LPad');
         if (lpad && 'series_ohms' in lpad && 'shunt_ohms' in lpad) {
           const atten = 20 * Math.log10(1 + (lpad.series_ohms as number) / ways[i].driver.re_ohm);
@@ -154,7 +221,52 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
 
   return (
     <div className="section-card">
-      <div className="section-title">Optimizer</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div className="section-title" style={{ margin: 0 }}>Optimizer</div>
+        <button
+          className="graf-btn graf-btn-sm graf-btn-ghost"
+          style={{ fontSize: 10, padding: '1px 5px' }}
+          onClick={() => setShowLocks(!showLocks)}
+          title="Lock or unlock individual crossover frequencies, passive L/C/R components, or gains"
+        >
+          {showLocks ? 'Hide Locks' : `Params (${candidateParams.filter(c => !lockedKeys[c.key]).length}/${candidateParams.length})`}
+        </button>
+      </div>
+
+      {showLocks && candidateParams.length > 0 && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 4,
+            padding: '4px 6px',
+            marginBottom: 6,
+            maxHeight: 130,
+            overflowY: 'auto',
+            fontSize: 10,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 3, color: '#475569' }}>
+            Checked = Optimize · Unchecked = Locked:
+          </div>
+          {candidateParams.map((cp) => (
+            <label
+              key={cp.key}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, cursor: 'pointer' }}
+            >
+              <input
+                type="checkbox"
+                checked={!lockedKeys[cp.key]}
+                onChange={(e) =>
+                  setLockedKeys((prev) => ({ ...prev, [cp.key]: !e.target.checked }))
+                }
+              />
+              <span>{cp.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
         <label style={{ fontSize: 11 }}>Target:</label>
         <label style={{ fontSize: 11 }}>
@@ -232,7 +344,7 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
         style={{ width: '100%', marginTop: 4 }}
         onClick={handleOptimize}
         disabled={running}
-        title="Run optimizer to tune filter frequencies and per-way gains"
+        title="Run optimizer to tune filter frequencies, passive L/C/R values, and per-way gains"
       >
         {running ? `Optimizing... ${elapsed.toFixed(1)}s` : 'Optimize'}
       </button>

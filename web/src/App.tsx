@@ -4,10 +4,14 @@ import { useUrlSync, decodeFromUrl } from './hooks/useUrlSync';
 import { initSolver } from './solver/wasm-bridge';
 import { useSolver } from './hooks/useSolver';
 import { useSystemSolver } from './hooks/useSystemSolver';
-import { buildSolverInput, defaultDesign } from './compute';
+import { buildSolverInput, defaultDesign, computeGoldenCabinetDimensions } from './compute';
+import { computeDefaultEnclosure } from './systemSetup';
 import { defaultCrossoverPoints } from './crossover';
+import type { CoaxialDriverPreset } from './presets/drivers_db';
 import { SystemPlotArea } from './components/SystemPlotArea';
 import { EnclosureInputs } from './components/EnclosureInputs';
+import { CabinetCalculator, getEnclosureVolumeLiters } from './components/CabinetCalculator';
+import { SharedSystemBar, type WorkspaceTab } from './components/SharedSystemBar';
 import { type OverlayData } from './components/ImportOverlay';
 import { SchematicPanel } from './components/SchematicPanel';
 import { AccordionSection } from './components/AccordionSection';
@@ -15,20 +19,30 @@ import { WayEditor } from './components/WayEditor';
 import { CrossoverPanel } from './components/CrossoverPanel';
 import { SystemPanel } from './components/SystemPanel';
 import { SetupWizard } from './components/SetupWizard';
-import type { SimulationInput, DesignState, WayDesign, WayInput, CrossoverPoint, ActiveFilter, SystemTopology } from './types';
+import type {
+  SimulationInput,
+  DesignState,
+  WayDesign,
+  WayInput,
+  CrossoverPoint,
+  ActiveFilter,
+  SystemTopology,
+  CabinetDimensions,
+} from './types';
 
 function App() {
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(350);
+  const [sidebarWidth, setSidebarWidth] = useState(370);
   const dragging = useRef(false);
 
   // Setup wizard
   const [showSetup, setShowSetup] = useState(true);
 
-  // Accordion + way selection (ephemeral UI state)
+  // Accordion + way selection + workspace tab (ephemeral UI state)
   const [activeWay, setActiveWay] = useState(0);
   const [activeSection, setActiveSection] = useState<'driver' | 'enclosure' | 'crossover' | 'system'>('driver');
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('workbench');
 
   // Overlay (imported FRD/ZMA for plot comparison)
   const [overlay, setOverlay] = useState<OverlayData>({ frd: null, zma: null });
@@ -59,14 +73,13 @@ function App() {
   const isMultiWay = design.ways.length > 1;
 
   // Always use system solver — it handles passive filters, active filters,
-  // measured data, gain, delay, inversion. The single-driver solver doesn't.
+  // measured data, gain, delay, inversion, and per-way excursion/port velocity.
   const { result: systemResult, error: systemError } = useSystemSolver(
     solverInput,
     ready
   );
 
-  // Supplementary single-driver solve for 1-way: displacement, port velocity.
-  // Only when NOT using measured data (measured data has no displacement info).
+  // Supplementary single-driver solve for 1-way fallback
   const needsSupplement = !isMultiWay && !design.ways[0]?.measured;
   const supplementInput: SimulationInput | null = needsSupplement && solverInput.ways[0]
     ? {
@@ -105,33 +118,113 @@ function App() {
   }, [activeWay, design.ways.length]);
   const way = design.ways[safeActiveWay];
 
-  // --- Stable update helpers (use designRef to avoid closure over design) ---
-  const updateWay = useCallback((idx: number, updates: Partial<WayDesign>) => {
-    const d = designRef.current;
-    setDesign({
-      ...d,
-      ways: d.ways.map((w, i) => i === idx ? { ...w, ...updates } : w),
-    });
+  // --- Stable update helpers (keep designRef.current synchronously updated so back-to-back calls compose) ---
+  const commitDesign = useCallback((next: DesignState) => {
+    designRef.current = next;
+    setDesign(next);
   }, [setDesign]);
 
+  const updateWay = useCallback((idx: number, updates: Partial<WayDesign>) => {
+    const d = designRef.current;
+    const nextWays = d.ways.map((w, i) => (i === idx ? { ...w, ...updates } : w));
+    let nextCabinet = d.cabinet;
+    // If primary woofer enclosure volume changed and cabinet sync is enabled, update shared cabinet dimensions
+    if (idx === 0 && updates.enclosure && (!d.cabinet || d.cabinet.sync_with_enclosure)) {
+      const volL = getEnclosureVolumeLiters(updates.enclosure);
+      if (volL > 0) {
+        nextCabinet = computeGoldenCabinetDimensions(
+          volL,
+          d.cabinet?.wall_thickness_mm ?? 18,
+          d.cabinet?.bracing_volume_l ?? 0.8,
+          d.cabinet?.driver_displacement_l ?? 0.5
+        );
+      }
+    }
+    commitDesign({
+      ...d,
+      cabinet: nextCabinet,
+      ways: nextWays,
+    });
+  }, [commitDesign]);
+
+  const updateDesign = useCallback((updates: Partial<DesignState>) => {
+    commitDesign({ ...designRef.current, ...updates });
+  }, [commitDesign]);
+
+  const updateCabinet = useCallback((cab: CabinetDimensions) => {
+    commitDesign({ ...designRef.current, cabinet: cab });
+  }, [commitDesign]);
+
   const updateCrossoverPoints = useCallback((points: CrossoverPoint[]) => {
-    setDesign({ ...designRef.current, crossover_points: points });
-  }, [setDesign]);
+    commitDesign({ ...designRef.current, crossover_points: points });
+  }, [commitDesign]);
 
   const updatePerWayEq = useCallback((wayIndex: number, eq: ActiveFilter[]) => {
     const d = designRef.current;
     const newEq = [...d.per_way_eq];
     newEq[wayIndex] = eq;
-    setDesign({ ...d, per_way_eq: newEq });
-  }, [setDesign]);
+    commitDesign({ ...d, per_way_eq: newEq });
+  }, [commitDesign]);
+
+  // Configure a complete 2-Way Coaxial system from a coaxial driver preset
+  const handleApplyCoaxial2Way = useCallback((coax: CoaxialDriverPreset) => {
+    const d = designRef.current;
+    const lfEnclosure = computeDefaultEnclosure(coax.lf_entry.params, 'Vented');
+    const hfEnclosure = computeDefaultEnclosure(coax.hf_section.driver_params, 'Sealed');
+    const primaryVolL = getEnclosureVolumeLiters(lfEnclosure);
+    commitDesign({
+      ...d,
+      topology: '2-way',
+      cabinet: computeGoldenCabinetDimensions(Math.max(1, primaryVolL), 18, 0.8, 0.5),
+      ways: [
+        {
+          name: `${coax.model} LF`,
+          driver: { ...coax.lf_entry.params },
+          enclosure: lfEnclosure,
+          passive_filters: [],
+          gain_db: 0,
+          delay_s: 0,
+          inverted: false,
+          z_offset_m: 0,
+          enabled: true,
+          preset_name: `${coax.vendor} ${coax.model}`,
+        },
+        {
+          name: `${coax.model} HF`,
+          driver: { ...coax.hf_section.driver_params },
+          enclosure: hfEnclosure,
+          passive_filters: [],
+          gain_db: 0,
+          delay_s: 0,
+          inverted: false,
+          z_offset_m: 0,
+          enabled: true,
+          preset_name: coax.hf_section.model,
+        },
+      ],
+      crossover_points: [
+        {
+          low_way_index: 0,
+          high_way_index: 1,
+          freq_hz: coax.hf_section.recommended_crossover_hz,
+          slope: 'LR4',
+        },
+      ],
+      per_way_eq: [[], []],
+    });
+    setActiveWay(0);
+  }, [commitDesign]);
 
   // Setup wizard callback — converts WayInput[] to DesignState
   const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[]) => {
     const d = designRef.current;
     const points = defaultCrossoverPoints(topo);
+    const primaryVolL = ways[0] ? getEnclosureVolumeLiters(ways[0].enclosure) : 18;
     setDesign({
       version: 2,
       topology: topo,
+      crossover_mode: 'active',
+      cabinet: computeGoldenCabinetDimensions(Math.max(1, primaryVolL), 18, 0.8, 0.5),
       ways: ways.map(w => ({
         name: w.name,
         driver: w.driver,
@@ -163,17 +256,25 @@ function App() {
     e.preventDefault();
     dragging.current = true;
     const onMove = (ev: MouseEvent) => {
-      if (dragging.current) setSidebarWidth(Math.min(500, Math.max(260, ev.clientX)));
+      if (dragging.current) setSidebarWidth(Math.min(520, Math.max(280, ev.clientX)));
     };
     const onUp = () => { dragging.current = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }, []);
 
+  // Switch active section automatically when user clicks a focused workspace tab
+  const handleWorkspaceTabChange = (tab: WorkspaceTab) => {
+    setWorkspaceTab(tab);
+    if (tab === 'enclosure') setActiveSection('enclosure');
+    else if (tab === 'crossover') setActiveSection('crossover');
+  };
+
   // Crossover summary for accordion
+  const modeLabel = (design.crossover_mode ?? 'active').toUpperCase();
   const xoverSummary = design.crossover_points.length > 0
-    ? design.crossover_points.map(pt => `${pt.freq_hz}Hz ${pt.slope}`).join(', ')
-    : 'No crossover';
+    ? `${modeLabel}: ` + design.crossover_points.map(pt => `${pt.freq_hz}Hz ${pt.slope}`).join(', ')
+    : `${modeLabel}: No crossover`;
 
   // Way summary helpers
   const driverSummary = (w: WayDesign) => {
@@ -188,11 +289,23 @@ function App() {
       case 'Vented': return `Vented ${(enc.volume_m3 * 1000).toFixed(1)}L`;
       case 'TransmissionLine': return `T-Line ${(enc.length_m * 100).toFixed(0)}cm`;
       case 'Horn': return `Horn ${enc.segments.length} seg`;
-      case 'Bandpass': return `BP ${(enc.rear_volume_m3 * 1000).toFixed(1)}+${(enc.front_volume_m3 * 1000).toFixed(1)}L`;
+      case 'Bandpass': return `BP${enc.order === 6 ? '6' : '4'} ${(enc.rear_volume_m3 * 1000).toFixed(1)}+${(enc.front_volume_m3 * 1000).toFixed(1)}L`;
       case 'PassiveRadiator': return `PR ${(enc.volume_m3 * 1000).toFixed(1)}L`;
       case 'OpenBaffle': return `OB ${(enc.width_m * 100).toFixed(0)}\u00D7${(enc.height_m * 100).toFixed(0)}cm`;
     }
   };
+
+  const currentCabinet: CabinetDimensions = useMemo(
+    () =>
+      design.cabinet ??
+      computeGoldenCabinetDimensions(
+        way ? Math.max(1, getEnclosureVolumeLiters(way.enclosure)) : 18,
+        18,
+        0.8,
+        0.5
+      ),
+    [design.cabinet, way]
+  );
 
   if (initError) {
     return (
@@ -227,8 +340,8 @@ function App() {
         aria-label="Resize sidebar"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') setSidebarWidth(w => Math.max(260, w - 10));
-          if (e.key === 'ArrowRight') setSidebarWidth(w => Math.min(500, w + 10));
+          if (e.key === 'ArrowLeft') setSidebarWidth(w => Math.max(280, w - 10));
+          if (e.key === 'ArrowRight') setSidebarWidth(w => Math.min(520, w + 10));
         }}
       />
       <aside className="app-sidebar" style={{ width: sidebarWidth }}>
@@ -287,13 +400,14 @@ function App() {
               <WayEditor
                 way={way}
                 onUpdate={(updates) => updateWay(safeActiveWay, updates)}
+                onApplyCoaxial2Way={handleApplyCoaxial2Way}
               />
             </AccordionSection>
 
             <AccordionSection
               title="Enclosure"
               summary={enclosureSummary(way)}
-              expanded={activeSection === 'enclosure'}
+              expanded={activeSection === 'enclosure' || workspaceTab === 'enclosure'}
               onToggle={() => setActiveSection(activeSection === 'enclosure' ? 'system' : 'enclosure')}
             >
               <EnclosureInputs
@@ -304,17 +418,44 @@ function App() {
                 driverQts={(way.driver.qes * way.driver.qms) / (way.driver.qes + way.driver.qms)}
                 hpCrossoverHz={design.crossover_points.find(pt => pt.high_way_index === safeActiveWay)?.freq_hz}
                 onChange={(enc) => updateWay(safeActiveWay, { enclosure: enc })}
-                lockType
+                lockType={false}
                 onChangeType={() => setShowSetup(true)}
                 disabled={!!way.measured}
-                disabledReason="Using measured FRD. Enclosure settings have no effect — the measurement already includes the enclosure."
+                disabledReason="Measured data active — using measured FRD. Enclosure settings have no effect — the measurement already includes the enclosure."
               />
+              {!way.measured && way.enclosure.type !== 'OpenBaffle' && (
+                <CabinetCalculator
+                  enclosure={way.enclosure}
+                  driver={way.driver}
+                  cabinet={currentCabinet}
+                  onUpdateCabinet={updateCabinet}
+                  onUpdateEnclosureVolume={(volume_m3) => {
+                    const d = designRef.current;
+                    const currentWay = d.ways[safeActiveWay];
+                    if (
+                      currentWay &&
+                      (currentWay.enclosure.type === 'Sealed' ||
+                        currentWay.enclosure.type === 'Vented' ||
+                        currentWay.enclosure.type === 'PassiveRadiator')
+                    ) {
+                      commitDesign({
+                        ...d,
+                        ways: d.ways.map((w, idx) =>
+                          idx === safeActiveWay
+                            ? { ...w, enclosure: { ...currentWay.enclosure, volume_m3 } }
+                            : w
+                        ),
+                      });
+                    }
+                  }}
+                />
+              )}
             </AccordionSection>
 
             <AccordionSection
               title="Crossover"
               summary={xoverSummary}
-              expanded={activeSection === 'crossover'}
+              expanded={activeSection === 'crossover' || workspaceTab === 'crossover'}
               onToggle={() => setActiveSection(activeSection === 'crossover' ? 'system' : 'crossover')}
             >
               <CrossoverPanel
@@ -323,13 +464,14 @@ function App() {
                 onUpdatePoints={updateCrossoverPoints}
                 onUpdateEq={updatePerWayEq}
                 onUpdateWay={updateWay}
+                onUpdateDesign={updateDesign}
               />
             </AccordionSection>
 
             <AccordionSection
               title="System"
-              summary="Settings, export, compare"
-              expanded={activeSection === 'system'}
+              summary="Settings, optimizer, export, compare"
+              expanded={activeSection === 'system' || workspaceTab === 'crossover'}
               onToggle={() => setActiveSection(activeSection === 'system' ? 'driver' : 'system')}
             >
               <SystemPanel
@@ -337,7 +479,7 @@ function App() {
                 solverInput={solverInput}
                 systemResult={systemResult}
                 isMultiWay={isMultiWay}
-                onUpdateDesign={(updates) => setDesign({ ...designRef.current, ...updates })}
+                onUpdateDesign={updateDesign}
                 onSetDesign={setDesign}
                 overlay={overlay}
                 onSetOverlay={setOverlay}
@@ -355,20 +497,40 @@ function App() {
       </aside>
 
       <main className="app-main" style={{ display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <SharedSystemBar
+          design={design}
+          activeWay={safeActiveWay}
+          workspaceTab={workspaceTab}
+          onSelectWay={setActiveWay}
+          onSelectWorkspaceTab={handleWorkspaceTabChange}
+          onUpdateDesign={updateDesign}
+          onSetDesign={setDesign}
+          onOpenSetupWizard={() => setShowSetup(true)}
+        />
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px' }}>
           <SystemPlotArea
             result={systemResult}
             supplement={supplementResult}
             xmaxMm={way ? way.driver.xmax_m * 1000 : 6}
+            wayXmaxMm={design.ways.map(w => w.driver.xmax_m * 1000)}
             overlay={overlay}
             snapshots={snapshots}
+            viewFocus={workspaceTab === 'enclosure' ? 'enclosure' : workspaceTab === 'crossover' ? 'crossover' : 'all'}
+            cabinet={currentCabinet}
+            ways={design.ways}
           />
         </div>
         {way && (
           <SchematicPanel
             enclosureConfig={way.enclosure}
             driverSd={way.driver.sd_m2}
-            passiveFilters={way.passive_filters.length > 0 ? way.passive_filters : undefined}
+            passiveFilters={
+              (solverInput.ways[safeActiveWay]?.passive_filters?.length ?? 0) > 0
+                ? solverInput.ways[safeActiveWay].passive_filters
+                : way.passive_filters.length > 0
+                ? way.passive_filters
+                : undefined
+            }
             driverRe={way.driver.re_ohm}
           />
         )}

@@ -22,6 +22,7 @@ fn bandpass_produces_finite_output() {
             rear_volume_m3: 15e-3, front_volume_m3: 20e-3,
             port_area_m2: 20e-4, port_length_m: 0.12,
             port_flanged: true, rear_ql: 7.0, front_ql: 7.0,
+            ..Default::default()
         }),
         freq_start_hz: 10.0, freq_end_hz: 500.0, freq_points: 500, drive_voltage_rms: 2.83,
     }).unwrap();
@@ -37,6 +38,7 @@ fn bandpass_has_bandpass_shape() {
             rear_volume_m3: 15e-3, front_volume_m3: 20e-3,
             port_area_m2: 20e-4, port_length_m: 0.12,
             port_flanged: true, rear_ql: 7.0, front_ql: 7.0,
+            ..Default::default()
         }),
         freq_start_hz: 10.0, freq_end_hz: 500.0, freq_points: 500, drive_voltage_rms: 2.83,
     }).unwrap();
@@ -56,6 +58,40 @@ fn bandpass_has_bandpass_shape() {
     // Both extremes should be significantly below peak (bandpass shape)
     assert!(spl_peak - spl_low > 10.0, "Low end should roll off");
     assert!(spl_peak - spl_high > 10.0, "High end should roll off");
+}
+
+#[test]
+fn bandpass_6th_order_dual_reflex_produces_three_impedance_peaks() {
+    let r = solve_simulation(&SimulationInput {
+        driver: test_driver(),
+        enclosure: EnclosureConfig::Bandpass(BandpassParams {
+            rear_volume_m3: 28e-3,
+            front_volume_m3: 12e-3,
+            port_area_m2: 35e-4,
+            port_length_m: 0.14,
+            port_flanged: true,
+            rear_ql: 7.0,
+            front_ql: 7.0,
+            order: 6,
+            rear_port_area_m2: 20e-4,
+            rear_port_length_m: 0.25,
+            rear_port_flanged: true,
+        }),
+        freq_start_hz: 10.0,
+        freq_end_hz: 500.0,
+        freq_points: 1000,
+        drive_voltage_rms: 2.83,
+    }).unwrap();
+
+    assert!(r.spl_db.iter().all(|v| v.is_finite()));
+    let z = &r.impedance_ohm;
+    let mut peaks = 0;
+    for i in 1..z.len() - 1 {
+        if z[i] > z[i - 1] && z[i] > z[i + 1] && z[i] > 8.0 {
+            peaks += 1;
+        }
+    }
+    assert!(peaks >= 3, "6th-order dual-reflex bandpass should exhibit 3 impedance peaks, found {}", peaks);
 }
 
 // ============================================================

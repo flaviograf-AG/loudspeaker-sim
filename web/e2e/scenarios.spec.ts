@@ -291,3 +291,40 @@ test.describe('Scenario: same driver, different enclosures produce different res
     expect(ventedZ).toBeGreaterThan(4);
   });
 });
+
+// ─── Scenario 7: Shared Workspace, 3D Cabinet Sync, Passive RLC & Filtered Excursion ───
+
+test.describe('Scenario: Unified Shared Workspace, 3D Cabinet & Passive RLC physics', () => {
+  test('Reference 2-Way Passive Bookshelf template has valid passive impedance and filtered tweeter excursion', async ({ page }) => {
+    await setupSystem(page, '2-Way', ['Sealed', 'Sealed']);
+
+    // Load the 2-Way Passive Bookshelf reference system from the Shared System Bar
+    const templateSelect = page.locator('[data-testid="shared-system-bar"] select');
+    await templateSelect.selectOption('2way-passive-bookshelf');
+    await page.waitForTimeout(1000);
+
+    const result = await getSolverResult(page);
+    expect(result.ways.length).toBe(2);
+
+    // Passive 2-way impedance should not halve to ~3 ohms across the passband
+    const z200 = impedanceAtFreq(result, 200);
+    expect(z200).toBeGreaterThan(4.5);
+
+    // Per-way filtered excursion must be present and tweeter excursion at 100 Hz must be attenuated (< 0.05 mm)
+    expect(result.ways[1].cone_displacement_mm).toBeDefined();
+    const idx100 = result.frequencies_hz.findIndex(f => f >= 100);
+    expect(result.ways[1].cone_displacement_mm![idx100]).toBeLessThan(0.05);
+  });
+
+  test('3D Cabinet Calculator syncs shared Baffle Step frequency and enclosure volume', async ({ page }) => {
+    await setupSystem(page, '2-Way', ['Sealed', 'Sealed']);
+
+    await openAccordion(page, 'Enclosure');
+    // Change cabinet width to 30 cm -> f_bsc = 115 / 0.30 = 383 Hz
+    await setNumericInput(page, 'Width (W)', '30');
+    await page.waitForTimeout(400);
+
+    const sharedBar = page.locator('[data-testid="shared-system-bar"]');
+    await expect(sharedBar).toContainText('Baffle Step f_bsc = 383 Hz');
+  });
+});

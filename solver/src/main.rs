@@ -58,12 +58,19 @@ fn main() {
                     ways: result.ways.into_iter().map(|w| loudspeaker_solver::system_api::WayResultJson {
                         name: w.name,
                         spl_db: w.spl_db,
+                        phase_deg: w.phase_deg,
                         impedance_ohm: w.impedance_ohm,
+                        impedance_phase_deg: w.impedance_phase_deg,
                         filter_gain_db: w.filter_gain_db,
+                        cone_displacement_mm: w.cone_displacement_mm,
+                        port_velocity_ms: w.port_velocity_ms,
                     }).collect(),
                     system_spl_db: result.system_spl_db,
+                    system_phase_deg: result.system_phase_deg,
                     system_group_delay_ms: result.system_group_delay_ms,
                     system_impedance_ohm: result.system_impedance_ohm,
+                    system_impedance_phase_deg: result.system_impedance_phase_deg,
+                    way_max_displacement_mm: result.way_max_displacement_mm,
                 };
                 serde_json::to_writer(io::stdout(), &output).unwrap();
             }

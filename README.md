@@ -4,33 +4,33 @@
 
 Live at **[ls.graf.me.uk](https://ls.graf.me.uk)**
 
-[![LS Graf Simulator](https://ls.graf.me.uk/ls-blueprint.png)](https://ls.graf.me.uk)
+[![LS Graf Simulator](web/public/radiographic-rosewood-tl.png)](https://ls.graf.me.uk)
 
 ## Features
 
 ### Enclosure Modeling (7 types)
 - **Sealed** — with Ql box losses and alignment presets (Butterworth/Bessel/Chebyshev)
-- **Vented** — Helmholtz resonator with port velocity, slot ports, alignment presets (B4/QB3/SC4/EBS)
+- **Vented** — Helmholtz resonator with port velocity, slot ports, organ-pipe standing-wave resonance warnings, alignment presets (B4/QB3/SC4/EBS)
 - **Transmission Line** — TMM chain with driver offset, 3 taper profiles, per-zone stuffing, fold losses
 - **Horn** — multi-segment (up to 4), 6 flare profiles (Conical/Exp/Hyperbolic/Tractrix/Parabolic/Le Cléac'h)
-- **Bandpass** — 4th-order sealed rear + vented front
-- **Passive Radiator** — sealed box with mass-spring radiator
+- **Bandpass** — 4th-order (sealed rear + vented front) and 6th-order dual-reflex (vented rear + vented front) with per-port organ-pipe warnings
+- **Passive Radiator** — sealed box with mass-spring radiator and 1st-party passive radiator presets (Seas, Scan-Speak, Purifi, SB Acoustics + built-in 8"/10"/12" templates)
 - **Open Baffle** — dipole with baffle step diffraction
 
 ### Crossover Design
 - **Passive crossover** — 15 standard topologies (1st-4th order LP/HP, Zobel, L-pad, notch)
 - **Active filters** — 16 types (LR4, Butterworth, Bessel, PEQ, shelving, Linkwitz Transform, all-pass)
-- **Multi-way system** — N-way with per-way gain, delay, polarity, Z-offset
+- **Multi-way system** — N-way with per-way gain, delay, polarity, Z-offset, and one-click Coaxial 2-Way system presets
 - **Complex acoustic summation** — phase-correct inter-driver summing
 - **Nelder-Mead optimizer** — auto-tunes filter frequencies and gains
 - **Biquad DSP export** — miniDSP-compatible coefficients
 - **SVG circuit schematic** — live crossover circuit diagram
 
 ### Analysis & Visualization
-- SPL frequency response (auto-scaled)
+- SPL frequency response (auto-scaled) with optional Baffle Step & Off-Axis Polar Directivity ($0^\circ, 30^\circ, 60^\circ$) overlay
 - Impedance magnitude + phase (dual Y-axis)
 - Cone displacement with Xmax limit line
-- Port air velocity
+- Port air velocity & first organ-pipe resonance markers
 - Group delay
 - Acoustic phase
 - Filter transfer function (crossover attenuation per way)
@@ -39,10 +39,10 @@ Live at **[ls.graf.me.uk](https://ls.graf.me.uk)**
 - Enclosure cross-section schematic (SVG)
 
 ### Driver Database
-- **571 real drivers** from 30+ manufacturers
-- Searchable by vendor and model name
-- Covers woofers, tweeters, midrange, full-range, coaxial, compression
-- Sources: QSpeakers (GPL), manufacturer datasheets, web scraping
+- **1,308 real drivers** across 23 manufacturers (1st-party verified catalogues + `driver-base` community archive)
+- Faceted explorer filtering by Source Tier, Nominal Impedance, Cone Diameter, Category, and EBP alignment suitability
+- Provenance & Verification card with 6-point T/S physics validation, manufacturer datasheet links, and Before/After Burn-In switcher
+- Covers woofers, subwoofers, tweeters, midranges, full-range, coaxial, compression drivers, and passive radiators
 
 ### Workflow Features
 - Undo/Redo (Ctrl+Z/Y, 50-step history)

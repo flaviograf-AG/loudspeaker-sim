@@ -81,21 +81,21 @@ export function SystemPanel({
       <SaveLoad design={design} onLoad={onSetDesign} />
 
       {/* Export */}
-      {!isMultiWay && systemResult && systemResult.ways[0] && (
+      {systemResult && (
         <ExportControls result={{
           frequencies_hz: systemResult.frequencies_hz,
           spl_db: systemResult.system_spl_db,
           impedance_ohm: systemResult.system_impedance_ohm,
-          impedance_phase_deg: systemResult.frequencies_hz.map(() => 0),
-          acoustic_phase_deg: systemResult.frequencies_hz.map(() => 0),
-          cone_displacement_mm: [],
+          impedance_phase_deg: systemResult.system_impedance_phase_deg ?? systemResult.frequencies_hz.map(() => 0),
+          acoustic_phase_deg: systemResult.system_phase_deg ?? systemResult.frequencies_hz.map(() => 0),
+          cone_displacement_mm: systemResult.ways[0]?.cone_displacement_mm ?? [],
           group_delay_ms: systemResult.system_group_delay_ms,
-          port_velocity_ms: null,
+          port_velocity_ms: systemResult.ways[0]?.port_velocity_ms ?? null,
         }} />
       )}
       {isMultiWay && (
         <div className="section-card">
-          <div className="section-title">Export</div>
+          <div className="section-title">DSP Biquad Export</div>
           <div className="btn-row">
             <BiquadExport ways={solverInput.ways} />
           </div>

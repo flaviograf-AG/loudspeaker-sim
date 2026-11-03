@@ -1,100 +1,529 @@
 import { useState, useEffect, useMemo } from 'react';
-import { DRIVER_DB } from '../presets/drivers_db';
+import type {
+  DriverDbEntry,
+  PassiveRadiatorPreset,
+  CoaxialDriverPreset,
+} from '../presets/drivers_db';
 import { DRIVER_PRESETS } from '../presets/drivers';
 import type { DriverParams } from '../types';
 
+interface LoadedCatalogue {
+  driverDb: DriverDbEntry[];
+  coaxialPresets: CoaxialDriverPreset[];
+  passiveRadiatorPresets: PassiveRadiatorPreset[];
+  totalFirstParty: number;
+  totalDriverBase: number;
+}
+
+let cachedCataloguePromise: Promise<LoadedCatalogue> | null = null;
+
+export function loadDriverCatalogue(): Promise<LoadedCatalogue> {
+  if (!cachedCataloguePromise) {
+    cachedCataloguePromise = import('../presets/drivers_db').then((mod) => ({
+      driverDb: mod.DRIVER_DB,
+      coaxialPresets: mod.COAXIAL_DRIVER_PRESETS,
+      passiveRadiatorPresets: mod.PASSIVE_RADIATOR_PRESETS,
+      totalFirstParty: mod.FIRST_PARTY_SIMULATION_READY.length,
+      totalDriverBase: mod.DRIVER_BASE_METADATA.counts.simulation_ready,
+    }));
+  }
+  return cachedCataloguePromise;
+}
+
 interface Props {
-  onSelect: (params: DriverParams, name: string) => void;
+  onSelect: (params: DriverParams, name: string, entry?: DriverDbEntry) => void;
+  onApplyCoaxial2Way?: (coax: CoaxialDriverPreset) => void;
   currentName?: string;
 }
 
-export function PresetSelector({ onSelect, currentName }: Props) {
+export function PresetSelector({ onSelect, onApplyCoaxial2Way, currentName }: Props) {
   const [search, setSearch] = useState(currentName ?? '');
+  const [showList, setShowList] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [catalogue, setCatalogue] = useState<LoadedCatalogue | null>(null);
 
-  // Sync search field when active way changes
+  // Faceted filters
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'first_party' | 'driver_base'>('all');
+  const [impedanceFilter, setImpedanceFilter] = useState<number | 'all'>('all');
+  const [sizeFilter, setSizeFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [ebpFilter, setEbpFilter] = useState<'all' | 'sealed' | 'dual' | 'vented'>('all');
+
+  // Selected driver entry for rich provenance card & burn-in switcher
+  const [selectedEntry, setSelectedEntry] = useState<DriverDbEntry | null>(null);
+  const [burnInState, setBurnInState] = useState<'after_burn_in' | 'before_burn_in'>('after_burn_in');
+
   useEffect(() => {
     setSearch(currentName ?? '');
   }, [currentName]);
-  const [showList, setShowList] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    loadDriverCatalogue().then((cat) => {
+      if (mounted) {
+        setCatalogue(cat);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Keep selectedEntry synced if currentName matches a catalogue item
+  useEffect(() => {
+    if (!catalogue || !currentName) return;
+    const match = catalogue.driverDb.find(
+      (d) => `${d.vendor} ${d.model}`.toLowerCase() === currentName.toLowerCase()
+    );
+    if (match) {
+      setSelectedEntry(match);
+    }
+  }, [catalogue, currentName]);
+
+  const matchingCoaxial = useMemo(() => {
+    if (!catalogue || !selectedEntry) return null;
+    return (
+      catalogue.coaxialPresets.find(
+        (c) =>
+          c.lf_entry.canonical_id === selectedEntry.canonical_id ||
+          (c.vendor === selectedEntry.vendor &&
+            selectedEntry.model.replace(/\s*\[(?:LF|HF|Woofer|Tweeter)\]/gi, '').trim() === c.model)
+      ) ?? null
+    );
+  }, [catalogue, selectedEntry]);
 
   const filtered = useMemo(() => {
-    if (!search || search.length < 2) return [];
-    const q = search.toLowerCase();
-    return DRIVER_DB.filter(
-      (d) => d.vendor.toLowerCase().includes(q) || d.model.toLowerCase().includes(q)
-    ).slice(0, 30); // max 30 results
-  }, [search]);
+    if (!catalogue) return [];
+    const q = search.trim().toLowerCase();
+    const hasActiveFacet =
+      sourceFilter !== 'all' ||
+      impedanceFilter !== 'all' ||
+      sizeFilter !== 'all' ||
+      categoryFilter !== 'all' ||
+      ebpFilter !== 'all';
+
+    if (q.length < 2 && !hasActiveFacet) return [];
+
+    return catalogue.driverDb
+      .filter((d) => {
+        if (q.length >= 2) {
+          const textMatch =
+            d.vendor.toLowerCase().includes(q) ||
+            d.model.toLowerCase().includes(q) ||
+            (d.canonical_id && d.canonical_id.toLowerCase().includes(q)) ||
+            (d.part_number && d.part_number.toLowerCase().includes(q));
+          if (!textMatch) return false;
+        }
+        if (sourceFilter === 'first_party' && d.source_tier !== 'first_party') return false;
+        if (sourceFilter === 'driver_base' && d.source_tier === 'first_party') return false;
+        if (impedanceFilter !== 'all' && Math.round(d.z_nom) !== impedanceFilter) return false;
+        if (categoryFilter !== 'all' && d.driver_kind !== categoryFilter) return false;
+
+        if (sizeFilter !== 'all') {
+          const diaIn = (d.dia_m || 0) * 39.3701;
+          if (sizeFilter === 'le5' && diaIn > 5.6) return false;
+          if (sizeFilter === '6_7' && (diaIn < 5.6 || diaIn > 7.5)) return false;
+          if (sizeFilter === '8_10' && (diaIn < 7.5 || diaIn > 11.0)) return false;
+          if (sizeFilter === '12_15' && (diaIn < 11.0 || diaIn > 16.5)) return false;
+          if (sizeFilter === 'ge18' && diaIn < 16.5) return false;
+        }
+
+        if (ebpFilter !== 'all') {
+          const ebp = d.params.fs_hz / Math.max(0.01, d.params.qes);
+          if (ebpFilter === 'sealed' && ebp > 55) return false;
+          if (ebpFilter === 'dual' && (ebp < 50 || ebp > 95)) return false;
+          if (ebpFilter === 'vented' && ebp < 90) return false;
+        }
+        return true;
+      })
+      .slice(0, 45);
+  }, [catalogue, search, sourceFilter, impedanceFilter, sizeFilter, categoryFilter, ebpFilter]);
 
   return (
     <div className="section-card" style={{ position: 'relative', overflow: 'visible' }}>
-      <div className="section-title">Driver Database</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div
+          className="section-title"
+          style={{ margin: 0 }}
+          title="Deduplicated First-Party Manufacturer Specifications + CC BY 4.0 driver-base Catalogue"
+        >
+          Driver Database {catalogue ? `(${catalogue.driverDb.length})` : ''}
+        </div>
+        <button
+          className={`graf-btn graf-btn-sm ${showFilters ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+          style={{ fontSize: 10, padding: '1px 6px' }}
+          onClick={() => {
+            setShowFilters((s) => !s);
+            if (!showFilters) setShowList(true);
+          }}
+          title="Filter drivers by 1st-Party / driver-base source, impedance, cone diameter, driver category, or EBP alignment"
+          data-testid="toggle-driver-filters"
+        >
+          {showFilters ? 'Hide Filters' : 'Explorer / Filter'}
+        </button>
+      </div>
+
+      {/* Faceted Filter Panel */}
+      {showFilters && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderRadius: 4,
+            padding: 6,
+            marginBottom: 6,
+            fontSize: 10,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 4,
+          }}
+          data-testid="driver-filter-panel"
+        >
+          <div>
+            <label style={{ display: 'block', color: '#475569', fontWeight: 600 }}>Source Tier</label>
+            <select
+              className="graf-form-control"
+              style={{ width: '100%', fontSize: 10, padding: '2px 4px' }}
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value as 'all' | 'first_party' | 'driver_base');
+                setShowList(true);
+              }}
+            >
+              <option value="all">All Verified ({catalogue?.driverDb.length ?? '...'})</option>
+              <option value="first_party">1st-Party Official ({catalogue?.totalFirstParty ?? 303})</option>
+              <option value="driver_base">driver-base CC BY 4.0</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', color: '#475569', fontWeight: 600 }}>Impedance</label>
+            <select
+              className="graf-form-control"
+              style={{ width: '100%', fontSize: 10, padding: '2px 4px' }}
+              value={String(impedanceFilter)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setImpedanceFilter(v === 'all' ? 'all' : Number(v));
+                setShowList(true);
+              }}
+            >
+              <option value="all">Any Z_nom</option>
+              <option value="4">4 Ω</option>
+              <option value="8">8 Ω</option>
+              <option value="16">16 Ω</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', color: '#475569', fontWeight: 600 }}>Diameter</label>
+            <select
+              className="graf-form-control"
+              style={{ width: '100%', fontSize: 10, padding: '2px 4px' }}
+              value={sizeFilter}
+              onChange={(e) => {
+                setSizeFilter(e.target.value);
+                setShowList(true);
+              }}
+            >
+              <option value="all">Any Size</option>
+              <option value="le5">≤ 5.5" (14 cm)</option>
+              <option value="6_7">6" – 7" (16–18 cm)</option>
+              <option value="8_10">8" – 10" (20–26 cm)</option>
+              <option value="12_15">12" – 15" (30–38 cm)</option>
+              <option value="ge18">≥ 18" (46+ cm)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', color: '#475569', fontWeight: 600 }}>Category</label>
+            <select
+              className="graf-form-control"
+              style={{ width: '100%', fontSize: 10, padding: '2px 4px' }}
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setShowList(true);
+              }}
+            >
+              <option value="all">All Types</option>
+              <option value="subwoofer">Subwoofer</option>
+              <option value="lf_woofer">LF Woofer</option>
+              <option value="midwoofer">Midwoofer</option>
+              <option value="coax_lf">Coaxial (LF Unit)</option>
+              <option value="fullrange">Fullrange</option>
+            </select>
+          </div>
+          <div style={{ gridColumn: '1 / span 2' }}>
+            <label style={{ display: 'block', color: '#475569', fontWeight: 600 }}>
+              EBP Alignment Suitability (Fs / Qes)
+            </label>
+            <select
+              className="graf-form-control"
+              style={{ width: '100%', fontSize: 10, padding: '2px 4px' }}
+              value={ebpFilter}
+              onChange={(e) => {
+                setEbpFilter(e.target.value as 'all' | 'sealed' | 'dual' | 'vented');
+                setShowList(true);
+              }}
+            >
+              <option value="all">Any EBP</option>
+              <option value="sealed">Sealed Optimal (EBP ≤ 55)</option>
+              <option value="dual">Sealed or Vented (EBP 50–95)</option>
+              <option value="vented">Vented / Horn Optimal (EBP ≥ 90)</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Search input */}
-      <div className="param-row" title="Search 485 real drivers by manufacturer or model name (e.g. 'Scan-Speak', 'W18', 'Dayton')">
+      <div
+        className="param-row"
+        title="Search verified simulation-ready drivers by manufacturer, model, part number, or canonical_id"
+      >
         <input
           type="text"
           className="graf-form-control"
-          placeholder="Search drivers..."
+          placeholder="Search drivers (e.g. 12BR70, RSS315HF, WAF153, WF182)..."
           style={{ width: '100%' }}
           value={search}
           onFocus={() => setShowList(true)}
-          onChange={(e) => { setSearch(e.target.value); setShowList(true); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setShowList(true);
+          }}
         />
       </div>
 
       {/* Search results dropdown */}
       {showList && filtered.length > 0 && (
-        <div style={{
-          position: 'absolute', zIndex: 100, left: 0, right: 0,
-          maxHeight: 200, overflowY: 'auto',
-          background: 'var(--graf-surface, #fff)',
-          border: '1px solid var(--graf-border, #e8e4dc)',
-          borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          {filtered.map((d, i) => (
-            <div key={i}
-              style={{
-                padding: '4px 8px', cursor: 'pointer', fontSize: 12,
-                borderBottom: '1px solid var(--graf-warm-100, #f0ede8)',
-              }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                const name = `${d.vendor} ${d.model}`;
-                onSelect(d.params, name);
-                setSearch(name);
-                setShowList(false);
-              }}
-            >
-              <strong>{d.vendor}</strong> {d.model}
-              <span style={{ float: 'right', color: 'var(--graf-warm-400)', fontSize: 11 }}>
-                {d.params.fs_hz}Hz {d.z_nom}Ω {d.dia_m ? `${(d.dia_m * 100).toFixed(0)}cm` : ''}
-              </span>
-            </div>
-          ))}
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 100,
+            left: 0,
+            right: 0,
+            maxHeight: 240,
+            overflowY: 'auto',
+            background: 'var(--graf-surface, #fff)',
+            border: '1px solid var(--graf-border, #e8e4dc)',
+            borderRadius: 4,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+          }}
+        >
+          {filtered.map((d, i) => {
+            const isFirstParty = d.source_tier === 'first_party';
+            const ebp = Math.round(d.params.fs_hz / Math.max(0.01, d.params.qes));
+            return (
+              <div
+                key={d.canonical_id ?? `${d.vendor}-${d.model}-${i}`}
+                style={{
+                  padding: '5px 8px',
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  borderBottom: '1px solid var(--graf-warm-100, #f0ede8)',
+                }}
+                title={d.canonical_id ? `canonical_id: ${d.canonical_id}` : undefined}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const name = `${d.vendor} ${d.model}`;
+                  setSelectedEntry(d);
+                  setBurnInState('after_burn_in');
+                  onSelect(d.params, name, d);
+                  setSearch(name);
+                  setShowList(false);
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>
+                    <strong>{d.vendor}</strong> {d.model}
+                    {d.part_number ? (
+                      <span style={{ color: '#64748b', fontSize: 10, marginLeft: 4 }}>#{d.part_number}</span>
+                    ) : null}
+                  </span>
+                  <span style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: '1px 4px',
+                        borderRadius: 3,
+                        background: isFirstParty ? '#dcfce7' : '#e0f2fe',
+                        color: isFirstParty ? '#166534' : '#075985',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {isFirstParty ? '1st-Party' : 'CC-BY-4.0'}
+                    </span>
+                  </span>
+                </div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 1, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>
+                    Fs {d.params.fs_hz}Hz · {d.z_nom}Ω · Vas {(d.params.vas_m3 * 1000).toFixed(1)}L · EBP {ebp}
+                  </span>
+                  <span>
+                    {d.dia_m ? `${(d.dia_m * 100).toFixed(0)}cm` : ''}
+                    {d.burn_in_conditions ? ' · Burn-In ⇄' : ''}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Generic presets fallback */}
+      {/* Provenance & Condition Badge Card for Active Catalogue Driver */}
+      {selectedEntry && (
+        <div
+          style={{
+            marginTop: 6,
+            padding: '5px 7px',
+            borderRadius: 4,
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            fontSize: 10,
+            lineHeight: 1.4,
+          }}
+          data-testid="driver-provenance-card"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+            <span
+              style={{
+                padding: '1px 5px',
+                borderRadius: 3,
+                fontWeight: 600,
+                background: selectedEntry.source_tier === 'first_party' ? '#dcfce7' : '#e0f2fe',
+                color: selectedEntry.source_tier === 'first_party' ? '#166534' : '#075985',
+              }}
+            >
+              {selectedEntry.source_tier === 'first_party' ? '✓ 1st-Party Manufacturer Spec' : '✓ Verified driver-base (CC BY 4.0)'}
+            </span>
+            {selectedEntry.checks_run_ids && (
+              <span
+                style={{ color: '#475569' }}
+                title={`Validated equations: ${selectedEntry.checks_run_ids.join(', ')}`}
+              >
+                {selectedEntry.checks_run_ids.length}/6 T/S checks passed
+              </span>
+            )}
+            {selectedEntry.source_urls?.[0] && (
+              <a
+                href={selectedEntry.source_urls[0]}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#0284c7', textDecoration: 'underline' }}
+              >
+                Datasheet ↗
+              </a>
+            )}
+          </div>
+
+          {selectedEntry.precedence_outcome === 'official_promoted_fixing_third_party' && (
+            <div style={{ color: '#0f766e', marginTop: 3, fontWeight: 500 }}>
+              ★ Promoted from 3rd-party quarantine via official manufacturer datasheet resolution.
+            </div>
+          )}
+
+          {selectedEntry.recommended_enclosure_volume_liters && (
+            <div style={{ color: '#334155', marginTop: 2 }}>
+              Manufacturer recommended vented box: <strong>{selectedEntry.recommended_enclosure_volume_liters} L</strong> (kept separate from Vas = {(selectedEntry.params.vas_m3 * 1000).toFixed(2)} L)
+            </div>
+          )}
+
+          {/* Burn-In Condition Switcher (e.g. Wavecor WF182BD17/18/19/20) */}
+          {selectedEntry.burn_in_conditions && (
+            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+              <span style={{ fontWeight: 600, color: '#334155' }}>Measurement Condition:</span>
+              <div style={{ display: 'flex', gap: 3 }}>
+                <button
+                  className={`graf-btn graf-btn-sm ${burnInState === 'before_burn_in' ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+                  style={{ fontSize: 9.5, padding: '1px 5px' }}
+                  onClick={() => {
+                    setBurnInState('before_burn_in');
+                    onSelect(
+                      selectedEntry.burn_in_conditions!.before_burn_in,
+                      `${selectedEntry.vendor} ${selectedEntry.model} (Before Burn-In)`,
+                      selectedEntry
+                    );
+                  }}
+                >
+                  Before Burn-In (Fs {selectedEntry.burn_in_conditions.before_burn_in.fs_hz}Hz)
+                </button>
+                <button
+                  className={`graf-btn graf-btn-sm ${burnInState === 'after_burn_in' ? 'graf-btn-primary' : 'graf-btn-outline'}`}
+                  style={{ fontSize: 9.5, padding: '1px 5px' }}
+                  onClick={() => {
+                    setBurnInState('after_burn_in');
+                    onSelect(
+                      selectedEntry.burn_in_conditions!.after_burn_in,
+                      `${selectedEntry.vendor} ${selectedEntry.model} (After Burn-In)`,
+                      selectedEntry
+                    );
+                  }}
+                >
+                  After Burn-In (Fs {selectedEntry.burn_in_conditions.after_burn_in.fs_hz}Hz)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* One-Click Coaxial 2-Way Auto-Setup Button */}
+          {matchingCoaxial && onApplyCoaxial2Way && (
+            <div style={{ marginTop: 5 }}>
+              <button
+                className="graf-btn graf-btn-sm graf-btn-primary"
+                style={{ width: '100%', fontSize: 10 }}
+                onClick={() => onApplyCoaxial2Way(matchingCoaxial)}
+                title={`Configure 2-Way system with ${matchingCoaxial.vendor} ${matchingCoaxial.model} LF cone + HF unit at ${matchingCoaxial.hf_section.recommended_crossover_hz} Hz`}
+                data-testid="apply-coaxial-2way-btn"
+              >
+                ⇄ Configure Coaxial 2-Way (LF + HF @ {matchingCoaxial.hf_section.recommended_crossover_hz} Hz)
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Generic presets + Coaxial quick-select fallback */}
       <div className="param-row" style={{ marginTop: 4 }}>
         <span className="param-label" style={{ flex: '0 0 50px' }}>Quick</span>
         <select
           className="graf-form-control graf-form-select"
           style={{ width: '100%' }}
-          title="Quick-select a common driver type with typical T/S parameters"
+          title="Quick-select a common driver type or coaxial 2-way pair"
           defaultValue=""
           onChange={(e) => {
-            const idx = parseInt(e.target.value);
-            if (!isNaN(idx)) {
-              onSelect(DRIVER_PRESETS[idx].params, DRIVER_PRESETS[idx].name);
-              setSearch(DRIVER_PRESETS[idx].name);
+            const val = e.target.value;
+            if (val.startsWith('coax:') && catalogue && onApplyCoaxial2Way) {
+              const cid = val.slice(5);
+              const coax = catalogue.coaxialPresets.find((c) => c.id === cid);
+              if (coax) {
+                setSelectedEntry(coax.lf_entry);
+                onApplyCoaxial2Way(coax);
+                setSearch(`${coax.vendor} ${coax.model}`);
+              }
+            } else {
+              const idx = parseInt(val, 10);
+              if (!isNaN(idx)) {
+                setSelectedEntry(null);
+                onSelect(DRIVER_PRESETS[idx].params, DRIVER_PRESETS[idx].name);
+                setSearch(DRIVER_PRESETS[idx].name);
+              }
             }
             e.target.value = '';
           }}
         >
-          <option value="" disabled>Generic presets...</option>
-          {DRIVER_PRESETS.map((p, i) => (
-            <option key={i} value={i}>{p.name}</option>
-          ))}
+          <option value="" disabled>Generic & Coaxial presets...</option>
+          <optgroup label="Standard Role Presets">
+            {DRIVER_PRESETS.map((p, i) => (
+              <option key={i} value={String(i)}>{p.name}</option>
+            ))}
+          </optgroup>
+          {catalogue && catalogue.coaxialPresets.length > 0 && (
+            <optgroup label="1st-Party Coaxial 2-Way Pairs (Auto LF + HF)">
+              {catalogue.coaxialPresets.map((c) => (
+                <option key={c.id} value={`coax:${c.id}`}>
+                  {c.vendor} {c.model} (LF + HF @ {c.hf_section.recommended_crossover_hz}Hz)
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
     </div>

@@ -3,17 +3,53 @@
 // 485 drivers from 26 vendors
 
 import type { DriverParams } from "../types";
+import { DRIVER_BASE_SIMULATION_READY, DRIVER_BASE_METADATA } from "./driver_base_db";
+import {
+  FIRST_PARTY_SIMULATION_READY,
+  FIRST_PARTY_CATALOGUE_SUMMARY,
+  PASSIVE_RADIATOR_PRESETS,
+  COAXIAL_DRIVER_PRESETS,
+  type PassiveRadiatorPreset,
+  type CoaxialDriverPreset,
+} from "./first_party_catalogue_db";
+
+export {
+  DRIVER_BASE_SIMULATION_READY,
+  DRIVER_BASE_METADATA,
+  FIRST_PARTY_SIMULATION_READY,
+  FIRST_PARTY_CATALOGUE_SUMMARY,
+  PASSIVE_RADIATOR_PRESETS,
+  COAXIAL_DRIVER_PRESETS,
+  type PassiveRadiatorPreset,
+  type CoaxialDriverPreset,
+};
 
 export interface DriverDbEntry {
+  canonical_id?: string;
   vendor: string;
   model: string;
   params: DriverParams;
   z_nom: number;
   spl_ref: number;
   dia_m: number;
+  driver_kind?: string;
+  source_urls?: string[];
+  qts_only_validated?: boolean;
+  checks_run_ids?: string[];
+  fields_covered?: string[];
+  flagged_for_review?: boolean;
+  source_tier?: string;
+  precedence_outcome?: string;
+  part_number?: string;
+  recommended_enclosure_volume_liters?: number;
+  unit_conflict_flags?: string[];
+  burn_in_conditions?: {
+    before_burn_in: DriverParams;
+    after_burn_in: DriverParams;
+  };
 }
 
-export const DRIVER_DB: DriverDbEntry[] = [
+export const LEGACY_DRIVER_DB: DriverDbEntry[] = [
 {"vendor": "ALPINE", "model": "6002cx", "params": {"fs_hz": 33.5, "re_ohm": 4.0, "le_h": 0.0, "qes": 0.575, "qms": 9.95, "vas_m3": 0.2463579, "sd_m2": 0.0521999, "xmax_m": 0.01}, "z_nom": 4.0, "spl_ref": 0.0, "dia_m": 0.3048},
 {"vendor": "ALPINE", "model": "6012cx", "params": {"fs_hz": 44.0, "re_ohm": 3.3, "le_h": 0.0, "qes": 0.429, "qms": 11.8, "vas_m3": 0.0594657, "sd_m2": 0.0514999, "xmax_m": 0.012}, "z_nom": 4.0, "spl_ref": 92.0, "dia_m": 0.3048},
 {"vendor": "ALPINE", "model": "6013", "params": {"fs_hz": 30.0, "re_ohm": 3.2, "le_h": 0.0, "qes": 0.34, "qms": 4.0, "vas_m3": 0.09599464, "sd_m2": 0.03463864, "xmax_m": 0.016002}, "z_nom": 4.0, "spl_ref": 89.0, "dia_m": 0.254},
@@ -586,3 +622,35 @@ export const DRIVER_DB: DriverDbEntry[] = [
 {"vendor": "Scan-Speak", "model": "D2604/830000 (1in Discovery Textile Dome)", "params": {"fs_hz": 630.0, "re_ohm": 2.8, "le_h": 4e-05, "qes": 1.02, "qms": 3.46, "vas_m3": 1e-05, "sd_m2": 0.0008, "xmax_m": 0.0, "ke": 0}, "z_nom": 4.0, "spl_ref": 92.1, "dia_m": 0.026},
 {"vendor": "Scan-Speak", "model": "D2008/851200 (3/4in Classic Textile Dome)", "params": {"fs_hz": 800.0, "re_ohm": 5.0, "le_h": 0.0, "qes": 1.24, "qms": 1.26, "vas_m3": 1e-04, "sd_m2": 0.00038, "xmax_m": 0.0, "ke": 0}, "z_nom": 8.0, "spl_ref": 88.0, "dia_m": 0.022}
 ];
+
+function mergeDeduplicatedDriverDb(
+  firstParty: DriverDbEntry[],
+  driverBase: DriverDbEntry[],
+  legacy: DriverDbEntry[],
+): DriverDbEntry[] {
+  const seenKeys = new Set<string>();
+  const out: DriverDbEntry[] = [];
+  const makeKey = (entry: DriverDbEntry): string => {
+    if (entry.canonical_id) return `id:${entry.canonical_id}`;
+    const v = entry.vendor.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const m = entry.model.toLowerCase().replace(/\([^)]*\)/g, "").replace(/[^a-z0-9]+/g, "");
+    const z = Math.round((entry.z_nom || 8) * 10) / 10;
+    return `vmz:${v}__${m}__${z}`;
+  };
+  for (const list of [firstParty, driverBase, legacy]) {
+    for (const entry of list) {
+      const key = makeKey(entry);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        out.push(entry);
+      }
+    }
+  }
+  return out;
+}
+
+export const DRIVER_DB: DriverDbEntry[] = mergeDeduplicatedDriverDb(
+  FIRST_PARTY_SIMULATION_READY,
+  DRIVER_BASE_SIMULATION_READY,
+  LEGACY_DRIVER_DB,
+);

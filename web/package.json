@@ -12,7 +12,6 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@graf-asociados/design-system": "file:../../new-graf-design-system",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",
     "react": "^19.2.4",

@@ -302,13 +302,17 @@ pub struct HornParams {
 fn default_ang() -> f64 { 2.0 * std::f64::consts::PI }
 fn default_horn_segments() -> u32 { 30 }
 
-/// 4th-order bandpass enclosure: sealed rear chamber + vented front chamber.
-/// The driver fires into a sealed rear volume; the front volume has a port.
-/// All acoustic output comes from the port — the driver is not directly visible.
-/// Reference: Fincham, L.R. "A Bandpass Filter Loudspeaker System" (AES, 1983)
+fn default_bandpass_order() -> u8 { 4 }
+fn default_true_bp() -> bool { true }
+
+/// 4th-order or 6th-order bandpass enclosure:
+/// - 4th-order (`order == 4`): sealed rear chamber + vented front chamber.
+/// - 6th-order (`order == 6`): vented rear chamber + vented front chamber (dual-reflex parallel-tuned).
+/// Reference: Fincham, L.R. "A Bandpass Filter Loudspeaker System" (AES, 1983);
+/// Geddes, E.R. "An Introduction to Band-Pass Loudspeaker Systems" (JAES, 1989)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BandpassParams {
-    /// Rear (sealed) chamber volume (m³)
+    /// Rear chamber volume (m³)
     pub rear_volume_m3: f64,
     /// Front (vented) chamber volume (m³)
     pub front_volume_m3: f64,
@@ -316,12 +320,42 @@ pub struct BandpassParams {
     pub port_area_m2: f64,
     /// Front port physical length (m)
     pub port_length_m: f64,
-    /// Port is flanged
+    /// Front port is flanged
     pub port_flanged: bool,
     /// Rear chamber Ql
     pub rear_ql: f64,
     /// Front chamber Ql
     pub front_ql: f64,
+    /// Bandpass order: 4 (sealed rear + vented front, default) or 6 (vented rear + vented front)
+    #[serde(default = "default_bandpass_order")]
+    pub order: u8,
+    /// Rear port cross-sectional area (m²) — used when `order == 6`
+    #[serde(default)]
+    pub rear_port_area_m2: f64,
+    /// Rear port physical length (m) — used when `order == 6`
+    #[serde(default)]
+    pub rear_port_length_m: f64,
+    /// Rear port is flanged — used when `order == 6`
+    #[serde(default = "default_true_bp")]
+    pub rear_port_flanged: bool,
+}
+
+impl Default for BandpassParams {
+    fn default() -> Self {
+        Self {
+            rear_volume_m3: 15e-3,
+            front_volume_m3: 20e-3,
+            port_area_m2: 20e-4,
+            port_length_m: 0.12,
+            port_flanged: true,
+            rear_ql: 7.0,
+            front_ql: 7.0,
+            order: 4,
+            rear_port_area_m2: 0.0,
+            rear_port_length_m: 0.0,
+            rear_port_flanged: true,
+        }
+    }
 }
 
 /// Passive radiator enclosure: sealed box with a mass-loaded passive cone.

@@ -22,7 +22,7 @@ use crate::constants::{C_0, RHO_0, TWO_PI};
 use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::transfer_matrix::{
     cascade_2x2, characteristic_impedance_stuffed, complex_wave_number, duct_transfer_matrix,
-    identity_2x2, TransferMatrix2x2,
+    identity_2x2, piston_radiation_impedance, TransferMatrix2x2,
 };
 use crate::types::{
     DerivedDriver, MouthTermination, SimulationResult, TaperProfile, TransmissionLineParams,
@@ -198,13 +198,10 @@ pub fn tl_frequency_response(
                 std::f64::consts::PI * flare_radius_m * flare_radius_m
             }
         };
-        let a_mouth = (mouth_area / std::f64::consts::PI).sqrt();
-        let ka = (omega / C_0) * a_mouth;
         let z_rad = if tl.open_end {
-            // Open end: radiation impedance (piston in baffle)
-            // Beranek (1986), Eq. 5.12
-            let z0_mouth = RHO_0 * C_0 / mouth_area;
-            Complex::new(z0_mouth * 0.5 * ka * ka, z0_mouth * 0.6133 * ka)
+            // Open end: broadband circular piston radiation impedance in half-space (2π sr)
+            // Beranek (1986), Eq. 5.10–5.14
+            piston_radiation_impedance(omega, RHO_0, C_0, mouth_area, 2.0 * std::f64::consts::PI)
         } else {
             Complex::new(1e12, 0.0) // Closed end
         };
@@ -258,13 +255,22 @@ pub fn tl_frequency_response(
         displacement_mm.push(x_cone.norm() * 1000.0);
 
         // === Volume velocity at mouth (using cached transfer) ===
+        // The transmission line is driven by the rear face of the cone (-u_driver).
+        // Below the quarter-wave tuning frequency, the open mouth leaks the inverted
+        // rear wave (-u_driver), canceling the front wave (24 dB/oct rolloff).
+        // At quarter-wave resonance (kL = π/2), the acoustic delay along the line
+        // brings the mouth output in-phase with the front wave.
+        // For a closed pipe (open_end == false), the mouth is sealed and does not radiate.
         let u_driver = p.sd_m2 * v_cone;
-        let u_mouth = u_driver * u_mouth_from_driver;
+        let u_mouth = if tl.open_end {
+            -u_driver * u_mouth_from_driver
+        } else {
+            Complex::new(0.0, 0.0)
+        };
 
         // Radiated sound: driver front + mouth
-        let p_driver = RHO_0 * omega * u_driver / (2.0 * std::f64::consts::PI);
-        let p_mouth = RHO_0 * omega * u_mouth / (2.0 * std::f64::consts::PI);
-        let p_total = p_driver + p_mouth;
+        let u_total = u_driver + u_mouth;
+        let p_total = RHO_0 * s * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_total.norm()));
         pressure_phases.push(p_total.arg());
     }

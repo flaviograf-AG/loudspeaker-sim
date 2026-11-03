@@ -1,0 +1,751 @@
+{
+  "generated_at": "2026-11-03T17:31:11.618Z",
+  "tolerance_pct": 10,
+  "review_threshold_pct": 5,
+  "second_run_duplicates": 0,
+  "totals": {
+    "manufacturers_count": 23,
+    "total_canonical_variants": 2320,
+    "first_party_parsed_sets": 426,
+    "third_party_reconciled_sets": 2112,
+    "validated_accept": 1430,
+    "quarantined": 227,
+    "unverified": 663,
+    "catalogue_only": 579,
+    "simulator_eligible": 1308,
+    "net_new_canonical_variants": 298,
+    "enriched_existing_variants": 124,
+    "promoted_from_third_party_quarantine": 4
+  },
+  "manufacturer_reports": [
+    {
+      "manufacturer_key": "redcatt",
+      "manufacturer_name": "REDCATT",
+      "discovery_route": "Bulk JSON API v1.1 (https://www.redcatt.net/api/v1/products?per_page=500) + Schema + ETag/updated_since",
+      "status": "live-run",
+      "license_policy": "REDCATT Public Product API v1.1 — attribution to REDCATT (www.redcatt.net) for discovery, comparison, research, and recommendation.",
+      "counts": {
+        "unique_product_pages": 111,
+        "source_skus": 111,
+        "first_party_parsed": 111,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 77,
+        "quarantined": 4,
+        "unverified": 30,
+        "catalogue_only": 30,
+        "simulator_eligible": 73,
+        "net_new_canonical_variants": 111,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 12
+      }
+    },
+    {
+      "manufacturer_key": "faitalpro",
+      "manufacturer_name": "FaitalPRO",
+      "discovery_route": "Metric LF & Coaxial Excel comparison tables (.xlsx) + HTML \"Thiele and small parameters\" enrichment (12FH500 P/N 03004044)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 3,
+        "source_skus": 162,
+        "first_party_parsed": 128,
+        "third_party_reconciled": 147,
+        "parse_failed": 0,
+        "validated_accept": 107,
+        "quarantined": 8,
+        "unverified": 47,
+        "catalogue_only": 47,
+        "simulator_eligible": 107,
+        "net_new_canonical_variants": 15,
+        "enriched_existing_variants": 113,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 20
+      }
+    },
+    {
+      "manufacturer_key": "lavoce_italiana",
+      "manufacturer_name": "LaVoce Italiana",
+      "discovery_route": "Multi-sheet Comparative Table XLSX (LF & HF sheets) + HTML \"Small Signal Parameters\" enrichment (WAF153.00)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from LaVoce Italiana.",
+      "counts": {
+        "unique_product_pages": 2,
+        "source_skus": 140,
+        "first_party_parsed": 140,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 98,
+        "quarantined": 4,
+        "unverified": 38,
+        "catalogue_only": 38,
+        "simulator_eligible": 98,
+        "net_new_canonical_variants": 140,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "visaton",
+      "manufacturer_name": "Visaton",
+      "discovery_route": "Current Driver Categories + Product Archive HTML \"Technical Data\" (AL 170 vs AL 170 A) + BoxSim 2.0 resource inspection",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from Visaton.",
+      "counts": {
+        "unique_product_pages": 2,
+        "source_skus": 2,
+        "first_party_parsed": 2,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 1,
+        "quarantined": 1,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 1,
+        "net_new_canonical_variants": 2,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "b_c_speakers",
+      "manufacturer_name": "B&C Speakers",
+      "discovery_route": "Product family HTML Parameters block (18SW115 Xmax vs Xvar) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 274,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 274,
+        "parse_failed": 0,
+        "validated_accept": 166,
+        "quarantined": 9,
+        "unverified": 99,
+        "catalogue_only": 99,
+        "simulator_eligible": 166,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 1,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 40
+      }
+    },
+    {
+      "manufacturer_key": "eighteen_sound",
+      "manufacturer_name": "Eighteen Sound",
+      "discovery_route": "LF & Coaxial HTML specification sections (10CX650 LF vs HF unit separation) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 297,
+        "first_party_parsed": 2,
+        "third_party_reconciled": 296,
+        "parse_failed": 0,
+        "validated_accept": 179,
+        "quarantined": 33,
+        "unverified": 85,
+        "catalogue_only": 83,
+        "simulator_eligible": 179,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 1,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 40
+      }
+    },
+    {
+      "manufacturer_key": "eminence",
+      "manufacturer_name": "Eminence",
+      "discovery_route": "Collection HTML THIELE & SMALL PARAMETERS table (Kappalite 3015LF) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 117,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 116,
+        "parse_failed": 0,
+        "validated_accept": 32,
+        "quarantined": 2,
+        "unverified": 83,
+        "catalogue_only": 23,
+        "simulator_eligible": 32,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 4
+      }
+    },
+    {
+      "manufacturer_key": "sb_acoustics",
+      "manufacturer_name": "SB Acoustics",
+      "discovery_route": "Woofer/Midwoofer/Coaxial/Satori HTML specification sections (SB17BAC35-8 Woofer vs SPECS TWEETER) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 191,
+        "first_party_parsed": 2,
+        "third_party_reconciled": 189,
+        "parse_failed": 0,
+        "validated_accept": 173,
+        "quarantined": 14,
+        "unverified": 4,
+        "catalogue_only": 45,
+        "simulator_eligible": 134,
+        "net_new_canonical_variants": 2,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 22
+      }
+    },
+    {
+      "manufacturer_key": "sica",
+      "manufacturer_name": "SICA",
+      "discovery_route": "Product HTML attribute_name_values table (12 L1 2.5 SL Code Z007903 & 12 PNS 4 Code Z008167, Cms µm/N -> mm/N)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from SICA Altoparlanti.",
+      "counts": {
+        "unique_product_pages": 2,
+        "source_skus": 2,
+        "first_party_parsed": 2,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 2,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 2,
+        "net_new_canonical_variants": 2,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "beyma",
+      "manufacturer_name": "Beyma",
+      "discovery_route": "HTML Parameters Thiele & Small + Official PDF Datasheet unit resolution (12BR70 Moving mass 0.074 kg = 74 g) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 162,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 162,
+        "parse_failed": 0,
+        "validated_accept": 94,
+        "quarantined": 10,
+        "unverified": 58,
+        "catalogue_only": 57,
+        "simulator_eligible": 94,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 1,
+        "promoted_from_third_party_quarantine": 1,
+        "flagged_for_review": 17
+      }
+    },
+    {
+      "manufacturer_key": "jensen",
+      "manufacturer_name": "Jensen",
+      "discovery_route": "Multi-impedance HTML specification table (MOD 10-50 4Ω/8Ω/16Ω/32Ω with partial Qes row & 4Ω Vas typo detection) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 120,
+        "first_party_parsed": 4,
+        "third_party_reconciled": 120,
+        "parse_failed": 0,
+        "validated_accept": 80,
+        "quarantined": 39,
+        "unverified": 1,
+        "catalogue_only": 1,
+        "simulator_eligible": 77,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 4,
+        "promoted_from_third_party_quarantine": 2,
+        "flagged_for_review": 14
+      }
+    },
+    {
+      "manufacturer_key": "celestion",
+      "manufacturer_name": "Celestion",
+      "discovery_route": "LF & Guitar HTML Parameters block (FTR18-4080FD Sd 1134.12 cm² vs misprinted 175.79 ft³ conflict flag) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 210,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 212,
+        "parse_failed": 0,
+        "validated_accept": 104,
+        "quarantined": 12,
+        "unverified": 94,
+        "catalogue_only": 51,
+        "simulator_eligible": 91,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 1,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 7
+      }
+    },
+    {
+      "manufacturer_key": "monacor",
+      "manufacturer_name": "MONACOR",
+      "discovery_route": "MONACOR own-brand Technical Data & ?r=pdf order-number parser (SPH-200KE Order No. 10.1840) + reconciled catalogue variants",
+      "status": "cached/fixture",
+      "status_note": "monacor.com/products/... redirected to monacor-webshop.com on live probe; parsed from SPH-200KE technical sheet + reconciled catalogue.",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 145,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 220,
+        "parse_failed": 0,
+        "validated_accept": 61,
+        "quarantined": 45,
+        "unverified": 39,
+        "catalogue_only": 22,
+        "simulator_eligible": 61,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 36
+      }
+    },
+    {
+      "manufacturer_key": "tang_band",
+      "manufacturer_name": "Tang Band",
+      "discovery_route": "TB Speaker \"Driver\" category HTML <dl> parser (W5-2143 full-width punctuation, uMN⁻¹ & M² conversion, excluding /products/list/31 sound modules)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from TB Speaker Co., Ltd.",
+      "counts": {
+        "unique_product_pages": 4,
+        "source_skus": 4,
+        "first_party_parsed": 4,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 4,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 4,
+        "net_new_canonical_variants": 4,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 1
+      }
+    },
+    {
+      "manufacturer_key": "prv_audio",
+      "manufacturer_name": "PRV Audio",
+      "discovery_route": "Symbol-and-unit HTML specification table parser (12W750A)",
+      "status": "blocked",
+      "status_note": "Direct live fetch to https://prvaudio.com/products/12w750a/ returned HTTP 403 Cloudflare bot challenge; parser verified against 12W750A HTML fixture.",
+      "license_policy": "First-party factual technical specifications from PRV Audio.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 1,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 1,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 1,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "rcf",
+      "manufacturer_name": "RCF",
+      "discovery_route": "Transducer HTML \"Thiele - small parameters\" parser (LF18N401 trailing symbol stripping & Sd m² -> cm²) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 95,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 95,
+        "parse_failed": 0,
+        "validated_accept": 33,
+        "quarantined": 30,
+        "unverified": 32,
+        "catalogue_only": 32,
+        "simulator_eligible": 32,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 1,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 22
+      }
+    },
+    {
+      "manufacturer_key": "wavecor",
+      "manufacturer_name": "Wavecor",
+      "discovery_route": "Family HTML & PDF grouped multi-column parser (WF182BD17/18/19/20 -> 4 variants × 2 burn-in conditions before_burn_in / after_burn_in)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from Wavecor.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 4,
+        "first_party_parsed": 8,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 4,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 4,
+        "net_new_canonical_variants": 4,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "purifi",
+      "manufacturer_name": "PURIFI",
+      "discovery_route": "PTT Transducer & Passive Radiator datasheet parser (PTT6.5X04-NFA-01 -> PTT6.5W04-01 alias; PTT6.5PR-01 passive radiator separated)",
+      "status": "cached/fixture",
+      "status_note": "Legacy Odoo download route returned HTTP 404 on live probe; parsed from verified PTT6.5W04-01 / PTT6.5W08-01 / PTT6.5PR-01 datasheet specifications.",
+      "license_policy": "First-party factual technical specifications from PURIFI Audio.",
+      "counts": {
+        "unique_product_pages": 3,
+        "source_skus": 3,
+        "first_party_parsed": 3,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 3,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 1,
+        "simulator_eligible": 2,
+        "net_new_canonical_variants": 3,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "dayton_audio",
+      "manufacturer_name": "Dayton Audio",
+      "discovery_route": "Product HTML (RS180-8 distinct from RS180S-8) + Official PDF ToUnicode CMap parser (RSS315HF-4 BL = 13.99 T·m fixing third-party BL = 1.0) + reconciled catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications + CC BY 4.0 driver-base reconciliation.",
+      "counts": {
+        "unique_product_pages": 2,
+        "source_skus": 269,
+        "first_party_parsed": 2,
+        "third_party_reconciled": 281,
+        "parse_failed": 0,
+        "validated_accept": 208,
+        "quarantined": 16,
+        "unverified": 45,
+        "catalogue_only": 42,
+        "simulator_eligible": 147,
+        "net_new_canonical_variants": 0,
+        "enriched_existing_variants": 2,
+        "promoted_from_third_party_quarantine": 1,
+        "flagged_for_review": 29
+      }
+    },
+    {
+      "manufacturer_key": "mundorf",
+      "manufacturer_name": "Mundorf",
+      "discovery_route": "AMT U.Serie index & product HTML parser (AMTU50W1.1 .. AMTU160W1.1 imported as catalogue_only tweeter_amt without fabricated Qts/Vas)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from Mundorf.",
+      "counts": {
+        "unique_product_pages": 7,
+        "source_skus": 8,
+        "first_party_parsed": 8,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 0,
+        "quarantined": 0,
+        "unverified": 8,
+        "catalogue_only": 8,
+        "simulator_eligible": 0,
+        "net_new_canonical_variants": 8,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "scan_speak",
+      "manufacturer_name": "Scan-Speak",
+      "discovery_route": "Product HTML + Classical T-S PDF parser (18W/8531G00 preserving slash, keeping advanced parameters separate) + catalogue variants",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from Scan-Speak A/S.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 1,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 1,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 1,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "seas",
+      "manufacturer_name": "SEAS",
+      "discovery_route": "Prestige & Excel PDF datasheet parser (H1571-08 + U18RNX/P + rev v2) + catalogue variants",
+      "status": "cached/fixture",
+      "status_note": "seas.no TCP connection refused on live probe; parsed from verified H1571-08 (U18RNX/P v2) datasheet specification + Prestige/Excel catalogue.",
+      "license_policy": "First-party factual technical specifications from SEAS Fabrikker AS.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 1,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 1,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 1,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    },
+    {
+      "manufacturer_key": "bms_speakers",
+      "manufacturer_name": "BMS Speakers",
+      "discovery_route": "Cone Drivers index + WooCommerce tab-thiele-small HTML parser (18N862 extracted from header rather than descriptive slug; Mms kg -> g, Sd m² -> cm²)",
+      "status": "live-run",
+      "license_policy": "First-party factual technical specifications from BMS Speakers.",
+      "counts": {
+        "unique_product_pages": 1,
+        "source_skus": 1,
+        "first_party_parsed": 1,
+        "third_party_reconciled": 0,
+        "parse_failed": 0,
+        "validated_accept": 1,
+        "quarantined": 0,
+        "unverified": 0,
+        "catalogue_only": 0,
+        "simulator_eligible": 1,
+        "net_new_canonical_variants": 1,
+        "enriched_existing_variants": 0,
+        "promoted_from_third_party_quarantine": 0,
+        "flagged_for_review": 0
+      }
+    }
+  ],
+  "ambiguous_identity_matches": [
+    {
+      "manufacturer": "Visaton",
+      "first_party_model": "AL 170 (active /woofers/al-170-8-ohm, Qms=3.88)",
+      "candidate_third_party_model": "AL 170 A (archive /archive/al-170-8-ohm, Qms=4.47)",
+      "reason": "Identical URL slug \"al-170-8-ohm\" in active vs archive paths; kept as distinct canonical variants."
+    },
+    {
+      "manufacturer": "Dayton Audio",
+      "first_party_model": "RS180-8 (unshielded, 295-355)",
+      "candidate_third_party_model": "RS180S-8 (shielded, 295-374)",
+      "reason": "Different motor shielding and T/S parameters; kept as distinct canonical variants."
+    },
+    {
+      "manufacturer": "FaitalPRO",
+      "first_party_model": "12FH500 (4 Ω, P/N 03004044, Re=3.3 Ω)",
+      "candidate_third_party_model": "12FH500 (8 Ω, XLSX comparison export, Re=5.1 Ω)",
+      "reason": "Same commercial model family with distinct impedance variants (4 Ω vs 8 Ω); keyed separately by impedance."
+    }
+  ],
+  "unresolved_conflicts": [
+    {
+      "canonical_variant_id": "jensen__mod_10_50__4ohm",
+      "manufacturer": "Jensen",
+      "model": "MOD 10-50 (4 Ω)",
+      "conflict_type": "official_typo_quarantined_no_fallback",
+      "details": "Official Jensen 4Ω column publishes Vas = 2078 lt. (missing decimal point vs 20.8 lt.) and Qts = 1.24 vs Qms=16.16, Qes=2.91 (predicted Qts = 2.466, 98.9% error). Quarantined with no passing 4Ω fallback."
+    },
+    {
+      "canonical_variant_id": "celestion__ftr18_4080fd__8ohm",
+      "manufacturer": "Celestion",
+      "model": "FTR18-4080FD",
+      "conflict_type": "imperial_unit_label_misprint_resolved_to_metric",
+      "details": "Official Celestion HTML prints \"Sd: 1134.12cm² / 175.79ft³\" (imperial area 175.79 in² mislabelled as volume ft³). Resolved to dimensionally valid metric 1134.12 cm² and flagged."
+    },
+    {
+      "canonical_variant_id": "beyma__12br70__8ohm",
+      "manufacturer": "Beyma",
+      "model": "12BR70",
+      "conflict_type": "html_missing_unit_resolved_via_official_pdf",
+      "details": "Official Beyma HTML prints unitless \"Moving mass: 0.074\" (which caused third-party driver-base to record mms_g=0.074 g). Resolved via official Beyma PDF datasheet \"0,074 kg\" = 74 g."
+    }
+  ],
+  "reproducible_examples": {
+    "promoted_fixing_third_party_beyma_12br70": {
+      "canonical_variant_id": "beyma__12br70__8ohm",
+      "official_mms_g": 74,
+      "official_status": "ACCEPT",
+      "third_party_mms_g": 0.074,
+      "third_party_status": "QUARANTINE",
+      "precedence_outcome": "official_promoted_fixing_third_party"
+    },
+    "promoted_fixing_third_party_dayton_rss315hf_4": {
+      "canonical_variant_id": "dayton_audio__rss315hf_4__4ohm",
+      "official_bl_tm": 13.99,
+      "official_status": "ACCEPT",
+      "third_party_bl_tm": 1,
+      "third_party_status": "QUARANTINE",
+      "precedence_outcome": "official_promoted_fixing_third_party"
+    },
+    "quarantined_official_typo_jensen_mod_10_50_4ohm": {
+      "canonical_variant_id": "jensen__mod_10_50__4ohm",
+      "published_vas_liters": 2078,
+      "published_qts": 1.24,
+      "published_qms": 16.16,
+      "published_qes": 2.91,
+      "failed_checks": [
+        {
+          "check_id": "qts_from_qms_qes",
+          "published": 1.24,
+          "predicted": 2.4659,
+          "error_pct": 98.87
+        }
+      ]
+    },
+    "unit_conflict_flagged_celestion_ftr18_4080fd": {
+      "canonical_variant_id": "celestion__ftr18_4080fd__8ohm",
+      "raw_sd_string": "1134.12cm² / 175.79ft³",
+      "selected_sd_cm2": 1134.12,
+      "unit_conflict_flags": [
+        "unit_conflict_sd_imperial_mislabelled_ft3_instead_of_in2_preferred_metric_cm2"
+      ]
+    },
+    "lavoce_waf153_00_vas_vs_enclosure": {
+      "canonical_variant_id": "lavoce_italiana__waf153_00__8ohm",
+      "vas_liters": 146.26,
+      "recommended_enclosure_volume_liters": 102
+    },
+    "visaton_active_vs_archived_slug_separation": {
+      "active_variant": {
+        "id": "visaton__al_170__8ohm",
+        "model": "AL 170",
+        "part_number": "1302",
+        "qms": 3.88
+      },
+      "archived_variant": {
+        "id": "visaton__al_170_a__8ohm__archived",
+        "model": "AL 170 A",
+        "qms": 4.47
+      }
+    },
+    "wavecor_4_variants_2_burn_in_conditions": [
+      {
+        "model": "WF182BD17",
+        "before_burn_in": {
+          "fs_hz": 33,
+          "vas_liters": 24.3,
+          "qts": 0.35,
+          "mms_g": 23.4
+        },
+        "after_burn_in": {
+          "fs_hz": 28.5,
+          "vas_liters": 32.4,
+          "qts": 0.31,
+          "mms_g": 23.4
+        }
+      },
+      {
+        "model": "WF182BD18",
+        "before_burn_in": {
+          "fs_hz": 34,
+          "vas_liters": 24.3,
+          "qts": 0.42,
+          "mms_g": 21.9
+        },
+        "after_burn_in": {
+          "fs_hz": 29.5,
+          "vas_liters": 32.4,
+          "qts": 0.37,
+          "mms_g": 21.9
+        }
+      },
+      {
+        "model": "WF182BD19",
+        "before_burn_in": {
+          "fs_hz": 33,
+          "vas_liters": 24.3,
+          "qts": 0.35,
+          "mms_g": 23.4
+        },
+        "after_burn_in": {
+          "fs_hz": 28.5,
+          "vas_liters": 32.4,
+          "qts": 0.31,
+          "mms_g": 23.4
+        }
+      },
+      {
+        "model": "WF182BD20",
+        "before_burn_in": {
+          "fs_hz": 34,
+          "vas_liters": 24.3,
+          "qts": 0.42,
+          "mms_g": 21.9
+        },
+        "after_burn_in": {
+          "fs_hz": 29.5,
+          "vas_liters": 32.4,
+          "qts": 0.37,
+          "mms_g": 21.9
+        }
+      }
+    ],
+    "mundorf_amt_catalogue_only": [
+      {
+        "model": "AMTU50W1.1",
+        "driver_type": "tweeter_amt",
+        "catalogue_only": true,
+        "simulator_eligible": false,
+        "fs_hz": 2400,
+        "re_ohm": 3.5,
+        "qts": null,
+        "vas_liters": null
+      },
+      {
+        "model": "AMTU60W1.1",
+        "driver_type": "tweeter_amt",
+        "catalogue_only": true,
+        "simulator_eligible": false,
+        "fs_hz": 1950,
+        "re_ohm": 4.1,
+        "qts": null,
+        "vas_liters": null
+      },
+      {
+        "model": "AMTU80W1.1",
+        "driver_type": "tweeter_amt",
+        "catalogue_only": true,
+        "simulator_eligible": false,
+        "fs_hz": 1950,
+        "re_ohm": 4,
+        "qts": null,
+        "vas_liters": null
+      }
+    ]
+  }
+}

@@ -85,6 +85,12 @@ pub enum OptParam {
     /// an LPad PassiveBlock. The solver's ABCD matrix models the impedance
     /// interaction correctly, unlike the ideal gain_db approach.
     LPadAttenuation { way_idx: usize },
+    /// Inductance (H) of a passive block at way[way_idx].passive_filters[filter_idx].
+    PassiveL { way_idx: usize, filter_idx: usize },
+    /// Capacitance (F) of a passive block at way[way_idx].passive_filters[filter_idx].
+    PassiveC { way_idx: usize, filter_idx: usize },
+    /// Resistance (Ω) of a passive block at way[way_idx].passive_filters[filter_idx].
+    PassiveR { way_idx: usize, filter_idx: usize },
 }
 
 /// Frequency weighting for cost function.
@@ -192,6 +198,39 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
                 })
                 .unwrap_or(0.0)
         }
+        OptParam::PassiveL { way_idx, filter_idx } => {
+            use crate::crossover::PassiveBlock;
+            match project.ways.get(*way_idx).and_then(|w| w.passive_filters.get(*filter_idx)) {
+                Some(PassiveBlock::SeriesL { henries, .. }) |
+                Some(PassiveBlock::ShuntL { henries, .. }) |
+                Some(PassiveBlock::NotchShunt { henries, .. }) |
+                Some(PassiveBlock::NotchSeries { henries, .. }) => *henries,
+                _ => 1.0e-3,
+            }
+        }
+        OptParam::PassiveC { way_idx, filter_idx } => {
+            use crate::crossover::PassiveBlock;
+            match project.ways.get(*way_idx).and_then(|w| w.passive_filters.get(*filter_idx)) {
+                Some(PassiveBlock::SeriesC { farads }) |
+                Some(PassiveBlock::ShuntC { farads }) |
+                Some(PassiveBlock::ZobelShunt { farads, .. }) |
+                Some(PassiveBlock::NotchShunt { farads, .. }) |
+                Some(PassiveBlock::NotchSeries { farads, .. }) => *farads,
+                _ => 10.0e-6,
+            }
+        }
+        OptParam::PassiveR { way_idx, filter_idx } => {
+            use crate::crossover::PassiveBlock;
+            match project.ways.get(*way_idx).and_then(|w| w.passive_filters.get(*filter_idx)) {
+                Some(PassiveBlock::SeriesR { ohms }) |
+                Some(PassiveBlock::ShuntR { ohms }) |
+                Some(PassiveBlock::ZobelShunt { ohms, .. }) |
+                Some(PassiveBlock::NotchShunt { ohms, .. }) |
+                Some(PassiveBlock::NotchSeries { ohms, .. }) => *ohms,
+                Some(PassiveBlock::LPad { series_ohms, .. }) => *series_ohms,
+                _ => 8.0,
+            }
+        }
     }).collect()
 }
 
@@ -209,8 +248,21 @@ fn apply_values(project: &mut SpeakerProject, params: &[OptParam], values: &[f64
 fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], values: &[f64],
                         min_bounds: &[f64], max_bounds: &[f64]) {
     for (i, (p, &v)) in params.iter().zip(values.iter()).enumerate() {
-        let lo = min_bounds.get(i).copied().unwrap_or(0.0);
-        let hi = max_bounds.get(i).copied().unwrap_or(f64::MAX);
+        let default_lo = match p {
+            OptParam::FilterFreq { .. } | OptParam::CrossoverFreq { .. } => 20.0,
+            OptParam::WayGain { .. } => -20.0,
+            OptParam::LPadAttenuation { .. } | OptParam::WayDelay { .. } => 0.0,
+            OptParam::PassiveL { .. } => 1e-7,
+            OptParam::PassiveC { .. } => 1e-10,
+            OptParam::PassiveR { .. } => 0.01,
+        };
+        let default_hi = match p {
+            OptParam::FilterFreq { .. } | OptParam::CrossoverFreq { .. } => 19500.0,
+            OptParam::WayGain { .. } | OptParam::LPadAttenuation { .. } => 20.0,
+            _ => f64::MAX,
+        };
+        let lo = min_bounds.get(i).copied().unwrap_or(default_lo);
+        let hi = max_bounds.get(i).copied().unwrap_or(default_hi);
         match p {
             OptParam::FilterFreq { way_idx, filter_idx } => {
                 let filter = &mut project.ways[*way_idx].active_filters[*filter_idx];
@@ -283,6 +335,48 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
                 };
                 set_freq(&mut project.ways[*lp_way_idx].active_filters[*lp_filter_idx], freq);
                 set_freq(&mut project.ways[*hp_way_idx].active_filters[*hp_filter_idx], freq);
+            }
+            OptParam::PassiveL { way_idx, filter_idx } => {
+                use crate::crossover::PassiveBlock;
+                let val = v.max(1e-7).max(lo).min(hi);
+                if let Some(block) = project.ways.get_mut(*way_idx).and_then(|w| w.passive_filters.get_mut(*filter_idx)) {
+                    match block {
+                        PassiveBlock::SeriesL { henries, .. } |
+                        PassiveBlock::ShuntL { henries, .. } |
+                        PassiveBlock::NotchShunt { henries, .. } |
+                        PassiveBlock::NotchSeries { henries, .. } => *henries = val,
+                        _ => {}
+                    }
+                }
+            }
+            OptParam::PassiveC { way_idx, filter_idx } => {
+                use crate::crossover::PassiveBlock;
+                let val = v.max(1e-10).max(lo).min(hi);
+                if let Some(block) = project.ways.get_mut(*way_idx).and_then(|w| w.passive_filters.get_mut(*filter_idx)) {
+                    match block {
+                        PassiveBlock::SeriesC { farads } |
+                        PassiveBlock::ShuntC { farads } |
+                        PassiveBlock::ZobelShunt { farads, .. } |
+                        PassiveBlock::NotchShunt { farads, .. } |
+                        PassiveBlock::NotchSeries { farads, .. } => *farads = val,
+                        _ => {}
+                    }
+                }
+            }
+            OptParam::PassiveR { way_idx, filter_idx } => {
+                use crate::crossover::PassiveBlock;
+                let val = v.max(0.05).max(lo).min(hi);
+                if let Some(block) = project.ways.get_mut(*way_idx).and_then(|w| w.passive_filters.get_mut(*filter_idx)) {
+                    match block {
+                        PassiveBlock::SeriesR { ohms } |
+                        PassiveBlock::ShuntR { ohms } |
+                        PassiveBlock::ZobelShunt { ohms, .. } |
+                        PassiveBlock::NotchShunt { ohms, .. } |
+                        PassiveBlock::NotchSeries { ohms, .. } => *ohms = val,
+                        PassiveBlock::LPad { series_ohms, .. } => *series_ohms = val,
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -589,14 +683,25 @@ pub fn optimize(
         }
     };
 
-    // Clamp returned values to respect param bounds
+    // Clamp returned values to respect param bounds (or sensible audio defaults)
     for (i, val) in result.values.iter_mut().enumerate() {
-        if let Some(&lo) = config.param_min_bounds.get(i) {
-            if *val < lo { *val = lo; }
-        }
-        if let Some(&hi) = config.param_max_bounds.get(i) {
-            if *val > hi { *val = hi; }
-        }
+        let default_lo = match config.params.get(i) {
+            Some(OptParam::FilterFreq { .. }) | Some(OptParam::CrossoverFreq { .. }) => 20.0,
+            Some(OptParam::WayGain { .. }) => -20.0,
+            Some(OptParam::LPadAttenuation { .. }) | Some(OptParam::WayDelay { .. }) => 0.0,
+            Some(OptParam::PassiveL { .. }) => 1e-7,
+            Some(OptParam::PassiveC { .. }) => 1e-10,
+            Some(OptParam::PassiveR { .. }) => 0.01,
+            None => 0.0,
+        };
+        let default_hi = match config.params.get(i) {
+            Some(OptParam::FilterFreq { .. }) | Some(OptParam::CrossoverFreq { .. }) => 19500.0,
+            Some(OptParam::WayGain { .. }) | Some(OptParam::LPadAttenuation { .. }) => 20.0,
+            _ => f64::MAX,
+        };
+        let lo = config.param_min_bounds.get(i).copied().unwrap_or(default_lo);
+        let hi = config.param_max_bounds.get(i).copied().unwrap_or(default_hi);
+        *val = val.clamp(lo, hi);
     }
 
     // Enforce crossover frequency ordering: collect CrossoverFreq param indices,
@@ -630,7 +735,13 @@ fn nelder_mead(
     simplex.push(initial.to_vec());
     for i in 0..n {
         let mut v = initial.to_vec();
-        let step = if v[i].abs() > 1.0 { v[i] * 0.1 } else { 1.0 };
+        let step = if v[i].abs() > 1.0 {
+            v[i] * 0.1
+        } else if v[i].abs() > 1e-12 {
+            v[i].abs() * 0.15
+        } else {
+            1.0
+        };
         v[i] += step;
         simplex.push(v);
     }

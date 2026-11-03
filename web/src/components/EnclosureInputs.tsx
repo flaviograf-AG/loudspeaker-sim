@@ -1,9 +1,57 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { EnclosureConfig, EnclosureType, DriverParams, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
 import { DEFAULT_ENCLOSURES, computeDefaultEnclosure } from '../systemSetup';
 import { NumericInput } from './NumericInput';
+import { loadDriverCatalogue } from './PresetSelector';
+import type { PassiveRadiatorPreset } from '../presets/drivers_db';
 
 const C0 = 343.21;
+
+const BUILTIN_PR_PRESETS: PassiveRadiatorPreset[] = [
+  {
+    canonical_id: 'builtin:dayton-sd215-pr-8',
+    vendor: 'Dayton Audio',
+    model: 'SD215-PR 8" Passive Radiator',
+    pr_sd_m2: 213.8e-4,
+    pr_cms: 0.56e-3,
+    pr_mms_kg: 0.068,
+    pr_rms: 1.45,
+    xmax_mm: 11,
+    fs_hz: 25.9,
+    source_url: 'https://www.daytonaudio.com',
+  },
+  {
+    canonical_id: 'builtin:dayton-rss265-pr-10',
+    vendor: 'Dayton Audio',
+    model: 'RSS265-PR 10" Reference PR',
+    pr_sd_m2: 346.4e-4,
+    pr_cms: 0.25e-3,
+    pr_mms_kg: 0.165,
+    pr_rms: 2.1,
+    xmax_mm: 24,
+    fs_hz: 24.8,
+    source_url: 'https://www.daytonaudio.com',
+  },
+  {
+    canonical_id: 'builtin:sb-sb34nrx-00-12',
+    vendor: 'SB Acoustics',
+    model: 'SB34NRX-00 12" Passive Radiator',
+    pr_sd_m2: 506.0e-4,
+    pr_cms: 0.38e-3,
+    pr_mms_kg: 0.140,
+    pr_rms: 1.8,
+    xmax_mm: 16,
+    fs_hz: 21.8,
+    source_url: 'https://sbacoustics.com',
+  },
+];
+
+function computePipeResonanceHz(port_area_m2: number, port_length_m: number, port_flanged: boolean): number {
+  const port_d = Math.sqrt((4 * port_area_m2) / Math.PI);
+  const correction = port_flanged ? 0.85 * port_d / 2 : 0.6 * port_d / 2;
+  const lp_eff = Math.max(port_length_m + 2 * correction, 0.01);
+  return C0 / (2 * lp_eff);
+}
 
 
 function portLengthForFb(
@@ -45,6 +93,17 @@ interface Props {
 export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType, disabled, disabledReason }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
+  const [prPresets, setPrPresets] = useState<PassiveRadiatorPreset[]>(BUILTIN_PR_PRESETS);
+
+  useEffect(() => {
+    if (encType === 'PassiveRadiator') {
+      loadDriverCatalogue().then((mod) => {
+        if (mod.passiveRadiatorPresets && mod.passiveRadiatorPresets.length > 0) {
+          setPrPresets([...mod.passiveRadiatorPresets, ...BUILTIN_PR_PRESETS]);
+        }
+      });
+    }
+  }, [encType]);
 
   const switchType = (t: EnclosureType) => {
     if (t !== encType) {
@@ -71,8 +130,31 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
   }
   if (config.type === 'Vented') {
     const fb = computeFb(config.volume_m3, config.port_area_m2, config.port_length_m, config.num_ports, config.port_flanged);
+    const fPipe = computePipeResonanceHz(config.port_area_m2, config.port_length_m, config.port_flanged);
     readouts = [
       { label: 'Fb', value: `${fb.toFixed(1)} Hz`, tip: 'Port tuning frequency (Helmholtz resonance) — where the port takes over bass output from the cone' },
+      { label: 'f_pipe', value: `${fPipe.toFixed(0)} Hz${fPipe < 500 ? ' ⚠' : ''}`, tip: 'Port half-wave organ-pipe standing wave resonance (c / 2·L_eff). Keep well above crossover or passband.' },
+    ];
+  }
+  if (config.type === 'Bandpass') {
+    const fbFront = computeFb(config.front_volume_m3, config.port_area_m2, config.port_length_m, 1, config.port_flanged);
+    const fPipeFront = computePipeResonanceHz(config.port_area_m2, config.port_length_m, config.port_flanged);
+    readouts = [
+      { label: 'Fb(front)', value: `${fbFront.toFixed(1)} Hz`, tip: 'Front chamber Helmholtz tuning frequency' },
+      { label: 'f_pipe', value: `${fPipeFront.toFixed(0)} Hz`, tip: 'Front port half-wave pipe resonance (c / 2·L_eff)' },
+    ];
+    if (config.order === 6 && (config.rear_port_area_m2 ?? 0) > 0 && (config.rear_port_length_m ?? 0) > 0) {
+      const fbRear = computeFb(config.rear_volume_m3, config.rear_port_area_m2!, config.rear_port_length_m!, 1, config.rear_port_flanged ?? true);
+      readouts.unshift({ label: 'Fb(rear)', value: `${fbRear.toFixed(1)} Hz`, tip: 'Rear chamber Helmholtz tuning frequency (6th-order dual-reflex)' });
+    }
+  }
+  if (config.type === 'PassiveRadiator') {
+    const fsPr = 1 / (2 * Math.PI * Math.sqrt(config.pr_mms_kg * config.pr_cms));
+    const vasPr = 1.2041 * C0 * C0 * config.pr_sd_m2 * config.pr_sd_m2 * config.pr_cms;
+    const fbBox = fsPr * Math.sqrt(1 + vasPr / Math.max(config.volume_m3, 1e-4));
+    readouts = [
+      { label: 'Fs(PR)', value: `${fsPr.toFixed(1)} Hz`, tip: 'Passive radiator free-air resonance 1 / (2π√(Mms·Cms))' },
+      { label: 'Fb(box)', value: `${fbBox.toFixed(1)} Hz`, tip: 'Passive radiator coupled box tuning frequency' },
     ];
   }
   if (config.type === 'TransmissionLine') {
@@ -397,16 +479,48 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
 
       {config.type === 'Bandpass' && (
         <>
+          <div className="param-row" title="Bandpass topology: 4th-Order (sealed rear + vented front) or 6th-Order Dual-Reflex (vented rear + vented front).">
+            <span className="param-label">Order</span>
+            <select
+              className="graf-form-control"
+              style={{ width: 155 }}
+              value={config.order ?? 4}
+              data-testid="bandpass-order-select"
+              onChange={(e) => {
+                const nextOrder = Number(e.target.value) === 6 ? 6 : 4;
+                onChange({
+                  ...config,
+                  order: nextOrder,
+                  rear_port_area_m2: nextOrder === 6 ? (config.rear_port_area_m2 && config.rear_port_area_m2 > 0 ? config.rear_port_area_m2 : config.port_area_m2 * 0.75) : config.rear_port_area_m2,
+                  rear_port_length_m: nextOrder === 6 ? (config.rear_port_length_m && config.rear_port_length_m > 0 ? config.rear_port_length_m : config.port_length_m * 1.6) : config.rear_port_length_m,
+                  rear_port_flanged: config.rear_port_flanged ?? true,
+                });
+              }}
+            >
+              <option value={4}>4th-Order (Sealed Rear)</option>
+              <option value={6}>6th-Order (Dual-Reflex)</option>
+            </select>
+          </div>
           <NumericInput label="Rear vol." value={config.rear_volume_m3 * 1000} step={0.5} min={0.1} unit="L"
-            tooltip="Sealed rear chamber volume — determines high-pass rolloff of the bandpass."
+            tooltip="Rear chamber volume — sealed in 4th-order, or low-tuned bass-reflex chamber in 6th-order."
             onChange={(v) => onChange({ ...config, rear_volume_m3: v / 1000 })} />
+          {config.order === 6 && (
+            <>
+              <NumericInput label="Rear port S" value={(config.rear_port_area_m2 ?? 15e-4) * 1e4} step={1} min={1} unit="cm²"
+                tooltip="Rear chamber port cross-sectional area (6th-order dual-reflex)."
+                onChange={(v) => onChange({ ...config, rear_port_area_m2: v / 1e4 })} />
+              <NumericInput label="Rear port L" value={(config.rear_port_length_m ?? 0.20) * 100} step={1} min={1} unit="cm"
+                tooltip="Rear chamber port physical length (6th-order dual-reflex)."
+                onChange={(v) => onChange({ ...config, rear_port_length_m: v / 100 })} />
+            </>
+          )}
           <NumericInput label="Front vol." value={config.front_volume_m3 * 1000} step={0.5} min={0.1} unit="L"
-            tooltip="Vented front chamber volume — the port radiates from this chamber."
+            tooltip="Vented front chamber volume — the front port radiates from this chamber."
             onChange={(v) => onChange({ ...config, front_volume_m3: v / 1000 })} />
-          <NumericInput label="Port area" value={config.port_area_m2 * 1e4} step={1} min={1} unit="cm²"
+          <NumericInput label="Front port S" value={config.port_area_m2 * 1e4} step={1} min={1} unit="cm²"
             tooltip="Front port cross-sectional area."
             onChange={(v) => onChange({ ...config, port_area_m2: v / 1e4 })} />
-          <NumericInput label="Port len." value={config.port_length_m * 100} step={1} min={1} unit="cm"
+          <NumericInput label="Front port L" value={config.port_length_m * 100} step={1} min={1} unit="cm"
             tooltip="Front port physical length."
             onChange={(v) => onChange({ ...config, port_length_m: v / 100 })} />
           <NumericInput label="Rear Ql" value={config.rear_ql} step={0.5} min={1}
@@ -420,6 +534,36 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
 
       {config.type === 'PassiveRadiator' && (
         <>
+          <div className="param-row" title="Load real manufacturer passive radiator parameters (Sd, Cms, Mms, Rms)">
+            <span className="param-label">PR Preset</span>
+            <select
+              className="graf-form-control"
+              style={{ width: 165 }}
+              value=""
+              data-testid="pr-preset-select"
+              onChange={(e) => {
+                const id = e.target.value;
+                const found = prPresets.find((p) => p.canonical_id === id);
+                if (found) {
+                  onChange({
+                    ...config,
+                    pr_sd_m2: found.pr_sd_m2,
+                    pr_cms: found.pr_cms,
+                    pr_mms_kg: found.pr_mms_kg,
+                    pr_rms: found.pr_rms,
+                  });
+                }
+                e.target.value = '';
+              }}
+            >
+              <option value="" disabled>Select PR model...</option>
+              {prPresets.map((pr) => (
+                <option key={pr.canonical_id} value={pr.canonical_id}>
+                  {pr.vendor} {pr.model} ({Math.round(pr.pr_sd_m2 * 1e4)} cm², {Math.round(pr.pr_mms_kg * 1000)}g)
+                </option>
+              ))}
+            </select>
+          </div>
           <NumericInput label="Volume" value={config.volume_m3 * 1000} step={0.5} min={0.1} unit="L"
             tooltip="Box volume — sealed enclosure containing both the driver and the passive radiator."
             onChange={(v) => onChange({ ...config, volume_m3: v / 1000 })} />

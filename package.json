@@ -1,0 +1,14 @@
+{
+  "name": "loudspeaker-sim-root",
+  "private": true,
+  "workspaces": [
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=web run dev",
+    "build": "npm --workspace=web run build",
+    "preview": "npm --workspace=web run preview",
+    "test:e2e": "npm --workspace=web run test:e2e"
+  }
+}
+

@@ -122,9 +122,9 @@ pub fn sealed_frequency_response(
         displacement_mm.push(x_cone.norm() * 1000.0);
 
         // === Sound pressure at 1m (half-space, ka << 1) ===
-        // p = ρ₀ × ω × Sd × v_cone / (2π × r), r = 1m
+        // p = j × ω × ρ₀ × Sd × v_cone / (2π × r), r = 1m
         // Reference: Beranek (1986), Eq. 4.19
-        let p_acoustic = RHO_0 * omega * p.sd_m2 * v_cone
+        let p_acoustic = RHO_0 * s * p.sd_m2 * v_cone
             / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
         pressure_phases.push(p_acoustic.arg());

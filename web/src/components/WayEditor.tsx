@@ -3,14 +3,16 @@ import { PresetSelector } from './PresetSelector';
 import { DriverInputs } from './DriverInputs';
 import { parseFrd } from '../io/frd';
 import { parseZma } from '../io/zma';
+import type { CoaxialDriverPreset } from '../presets/drivers_db';
 import type { WayDesign, DriverParams } from '../types';
 
 interface WayEditorProps {
   way: WayDesign;
   onUpdate: (updates: Partial<WayDesign>) => void;
+  onApplyCoaxial2Way?: (coax: CoaxialDriverPreset) => void;
 }
 
-export function WayEditor({ way, onUpdate }: WayEditorProps) {
+export function WayEditor({ way, onUpdate, onApplyCoaxial2Way }: WayEditorProps) {
   const handleFrd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -54,6 +56,7 @@ export function WayEditor({ way, onUpdate }: WayEditorProps) {
     <>
       <PresetSelector
         onSelect={(driver: DriverParams, name: string) => onUpdate({ driver, preset_name: name })}
+        onApplyCoaxial2Way={onApplyCoaxial2Way}
         currentName={way.preset_name}
       />
       <DriverInputs params={way.driver} onChange={(d) => onUpdate({ driver: d })} />

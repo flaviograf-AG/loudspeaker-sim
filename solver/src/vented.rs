@@ -153,7 +153,7 @@ pub fn vented_frequency_response(
         // wave (24 dB/octave rolloff). Above Fb the port adds constructively.
         // Reference: Small (1973), Eq. 21; Dickason (2006), Ch. 6.
         let u_total = u_driver - u_port_circuit;
-        let p_acoustic = RHO_0 * omega * u_total / (2.0 * std::f64::consts::PI);
+        let p_acoustic = RHO_0 * s * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
         pressure_phases.push(p_acoustic.arg());
     }

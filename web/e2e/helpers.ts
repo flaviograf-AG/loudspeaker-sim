@@ -143,12 +143,19 @@ export async function importZma(page: Page, filePath: string) {
 export interface SolverResult {
   frequencies_hz: number[];
   system_spl_db: number[];
+  system_phase_deg?: number[];
   system_impedance_ohm: number[];
+  system_impedance_phase_deg?: number[];
   min_impedance_ohm: number;
   min_impedance_freq_hz: number;
+  way_max_displacement_mm?: number[];
   ways: {
     name: string;
     spl_db: number[];
+    phase_deg?: number[];
     filter_gain_db: number[];
+    impedance_ohm?: number[];
+    cone_displacement_mm?: number[];
+    port_velocity_ms?: number[];
   }[];
 }

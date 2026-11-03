@@ -6,7 +6,7 @@ Browser-based loudspeaker enclosure + crossover simulator. Combines Hornresp (en
 ## Architecture
 - `solver/` — Rust crate compiled to WASM (wasm-pack). 16 modules, 100 tests. Also builds as a CLI binary.
 - `web/` — React 19 + Vite + TypeScript frontend. ECharts for plots, GDS for styling.
-- Static deploy to ls.graf.me.uk (OVH VPS, Nginx, Cloudflare proxy). Zero server dependencies.
+- Static deploy to ls.graf.me.uk (MEVSPACE VPS, Nginx, Cloudflare proxy). Zero server dependencies.
 - WASM API: `simulate(json)` for single-driver, `simulate_system(json)` for multi-way, `optimize_system(json)` for crossover optimization.
 
 ### State Management (v2)
@@ -41,7 +41,7 @@ cd web && npx tsc --noEmit                 # TypeScript check only
 cd web && npx playwright test              # Playwright E2E tests (needs dev server or auto-starts)
 
 # Deploy (after building both)
-scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
+scp -r web/dist/* deploy@146.19.24.163:/var/www/ls/
 ```
 
 ## Rust Toolchain
@@ -140,7 +140,7 @@ scp -i ~/.ssh/id_ed25519 -r web/dist/* deploy@57.129.6.118:/var/www/ls/
 
 ## Deployment
 - **Domain:** ls.graf.me.uk
-- **Server:** OVH VPS (57.129.6.118), Nginx, Cloudflare proxy
+- **Server:** MEVSPACE VPS (146.19.24.163), Nginx, Cloudflare proxy
 - **Config:** `/etc/nginx/sites-available/ls.graf.me.uk`
 - **Web root:** `/var/www/ls/`
-- **SSH:** `ssh -i ~/.ssh/id_ed25519 deploy@57.129.6.118`
+- **SSH:** `ssh deploy@146.19.24.163`

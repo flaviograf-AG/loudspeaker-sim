@@ -1,0 +1,911 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<META NAME="KEYWORDS" CONTENT="speakers,professional,loudspeakers,speaker,louspeaker,pro,audio">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link rel="shortcut icon" href="http://www.faitalpro.com/img/favicon.ico" >
+<title>FaitalPRO | LF Loudspeakers</title>
+
+<link rel="stylesheet" media="screen" href="/css/general.css" />
+<link rel="stylesheet" media="screen" href="/css/products.css" />
+<link rel="stylesheet" media="screen" href="../../../css/products.css" />
+<link rel="stylesheet" media="screen" href="/lib/pagetop/css/pagetop.css" />
+<link rel="stylesheet" media="screen" href="/lib/accordion/css/accordion.css" />
+<link rel="stylesheet" media="screen" href="/lib/jquery-ui/css/jquery-ui.css" />
+<link rel="stylesheet" media="screen" href="/lib/popup/css/popup.css" />
+<link rel="stylesheet" media="screen" href="../../lib/searchbox/css/searchbox.css" />
+
+<!--[if IE 7]><link rel="stylesheet" type="text/css" href="/css/ie7.css"><![endif]-->
+<!--[if IE 8]><link rel="stylesheet" type="text/css" href="/css/ie8.css"><![endif]-->
+
+<script type="text/javascript" src="/lib/jquery.js"></script>
+<script type="text/javascript" src="/lib/jquery-ui/js/jquery-ui.js"></script>
+<script type="text/javascript" src="/lib/popup/js/popup.js"></script>
+<script type="text/javascript" src="/lib/cufon/cufon_engine.js"></script>
+<script type="text/javascript" src="/lib/cufon/cufon_font.js"></script>
+<script type="text/javascript" src="/lib/cufon/cufon_settings.js"></script>
+<script type="text/javascript" src="/lib/pagetop/js/pagetop.js"></script>
+<script type="text/javascript" src="/lib/accordion/js/accordion.js"></script>
+<script type="text/javascript" src="../compare_products/script/comp_functions.js"></script>
+<script type="text/javascript" src="../../lib/searchbox/js/searchbox.js"></script>
+<script type="text/javascript" src="/lib/cookieconsent/cookieconsent.min.js"></script>
+
+<script type="text/javascript">
+$(window).load(function(){	
+	$('#catalog_menu_load').fadeOut('fast',function(){
+		$('#catalog_menu').fadeIn('fast');	
+	});
+});
+
+$(document).ready(function() {
+	$().UItoTop();
+	
+	//POPUP RESULT BOX
+	$().piroBox_ext({
+		piro_speed : 700,
+		bg_alpha : 0.7,
+		piro_scroll : true
+	});
+	
+	//MENU DOWNLOAD ACCORDION MENU
+	$('#catalog_menu').liteAccordion({
+		firstSlide : 1,
+		slideSpeed : 300,
+		autoPlay : false,
+		theme : 'dark', 
+		rounded : true, 	
+		containerWidth : 955,
+		containerHeight: 200
+	});
+	
+	
+	$(function(){
+	var filter="&neodymium=10&ferrite=20&size=All&powermin=20&powermax=3000&vcmin=15&vcmax=170&fsmin=20&fsmax=180&demod=1&nodemod=1";
+	update_data();
+		
+	//MATERIAL CHECK
+	$('#material a.selected').click(function(){
+		var obj=$(this).attr("id");
+		var val=$(this).attr("rel");
+		
+		if ($(this).hasClass('selected')){
+			filter=filter.replace("&"+obj+"="+val, "&"+obj+"=0");
+			$(this).removeClass('selected').addClass('deselected');
+			var tot_selected=$("#material a.selected").length;
+				if(tot_selected<=1){
+				$("#material a.selected").removeClass('selected').addClass('disabled');
+				}
+		
+		update_data();
+			
+		}else if($(this).hasClass('deselected')){
+			filter=filter.replace("&"+obj+"=0", "&"+obj+"="+val);
+			$(this).removeClass().addClass('selected');
+			$("#material a.disabled").addClass('selected').removeClass('disabled');
+			
+		update_data();
+		}
+	});
+	
+	//SIZE SLIDER
+	$(function() {
+		var steps_size = ['All', 2.5, 3, 4, 5, 6, 8, 10, 12, 15, 18, 21];
+		$("#size_val").text("Value: "+steps_size[0]);
+		$( "#size_slider" ).slider({
+			animate: true,
+			min: 0,
+			max: steps_size.length-1,
+			slide: function(event, ui) {
+				if(steps_size[ui.value]=='All'){
+					var size=steps_size[ui.value];
+				}else{
+					var size=steps_size[ui.value]+'"';	
+				}
+				
+				$("#size_val").text("Value: "+size);
+				
+				filter=filter.replace(/\b&size=[A-Za-z0-9.]{1,3}\b/,"&size="+steps_size[ui.value]);
+				update_data();
+			}
+		});
+	});
+	
+	//POWER RANGE
+	$(function() {
+		$( "#power_slider" ).slider({
+			animate:true,
+			range: true,
+			min: 20,
+			max: 3000,
+			step: 20,
+			values: [20, 3000],
+			slide: function( event, ui ) {
+				$( "#power_val" ).text("Range: "+ ui.values[ 0 ] + " W - " + ui.values[ 1 ]+" W" );
+				filter=filter.replace(/\b&powermin=[0-9]{1,4}\b/,"&powermin="+ui.values[0]);
+				filter=filter.replace(/\b&powermax=[0-9]{1,4}\b/,"&powermax="+ui.values[1]);
+				update_data();
+			}
+		});
+		$( "#power_val" ).text("Range: "+$( "#power_slider" ).slider( "values", 0 ) +
+			" W - " + $( "#power_slider" ).slider( "values", 1 ) +" W");
+	});
+	
+    //VC RANGE
+	$(function() {
+		$( "#vc_slider" ).slider({
+			animate:true,
+			range: true,
+			min: 15,
+			max: 170,
+			step: 5,
+			values: [15, 170],
+			slide: function( event, ui ) {
+				$( "#vc_val" ).text("Range: "+ ui.values[ 0 ] + " mm - " + ui.values[ 1 ]+" mm" );
+				filter=filter.replace(/\b&vcmin=[0-9]{1,3}\b/,"&vcmin="+ui.values[0]);
+				filter=filter.replace(/\b&vcmax=[0-9]{1,3}\b/,"&vcmax="+ui.values[1]);
+				update_data();
+			}
+		});
+		$( "#vc_val" ).text("Range: "+$( "#vc_slider" ).slider( "values", 0 ) +
+			" mm - " + $( "#vc_slider" ).slider( "values", 1 ) +" mm");
+	});
+	
+	//FS RANGE
+	$(function() {
+		$( "#fs_slider" ).slider({
+			animate:true,
+			range: true,
+			min: 20,
+			max: 180,
+			step: 5,
+			values: [20, 180],
+			slide: function( event, ui ) {
+				$( "#fs_val" ).text("Range: "+ui.values[ 0 ] + " Hz - " + ui.values[ 1 ]+" Hz" );
+				filter=filter.replace(/\b&fsmin=[0-9]{1,3}\b/,"&fsmin="+ui.values[0]);
+				filter=filter.replace(/\b&fsmax=[0-9]{1,3}\b/,"&fsmax="+ui.values[1]);
+				update_data();
+			}
+		});
+		$( "#fs_val" ).text("Range: "+$( "#fs_slider" ).slider( "values", 0 ) +
+			" Hz - " + $( "#fs_slider" ).slider( "values", 1 ) +" Hz");
+	});
+	
+	//DEMODULATION CHECK
+	$('#demodulation a.selected').click(function(){
+		var obj=$(this).attr("id");
+		
+		if ($(this).hasClass('selected')){
+			filter=filter.replace("&"+obj+"=1", "&"+obj+"=0");
+			$(this).removeClass('selected').addClass('deselected');
+			tot_selected=$("#demodulation a.selected").length;
+			
+			if(tot_selected<=1){
+				$("#demodulation a.selected").removeClass('selected').addClass('disabled');
+			}
+		update_data();
+		
+		}else if($(this).hasClass('deselected')){
+			filter=filter.replace("&"+obj+"=0", "&"+obj+"=1");
+			$(this).removeClass().addClass('selected');
+			$("#demodulation a.disabled").addClass('selected').removeClass('disabled');
+		update_data();
+		}
+	});
+	
+	//RESET BUTTON
+	$(".btn_reset").live('click',function(){
+			filter="&neodymium=10&ferrite=20&size=All&powermin=20&powermax=3000&vcmin=15&vcmax=170&fsmin=20&fsmax=180&demod=1&nodemod=1";
+			$('#side_content li a').removeClass().addClass('selected');
+			
+			//RESETTO LO SLIDER "SIZE"
+			$('#size_slider').slider("value", 0);
+			$('#size_val').text("Value: All");
+			 
+			//RESETTO IL RANGE "POWER"
+			$( "#power_slider" ).slider( "option", "values",[20,2000]);
+            $( "#power_val" ).text("Range: "+$( "#power_slider" ).slider( "values", 0 ) +
+			" W - " + $( "#power_slider" ).slider( "values", 1 ) +" W");
+			 
+			//RESETTO LO SLIDER "VCDIAM"
+			$( "#vc_slider" ).slider( "option", "values",[15,170]);
+            $( "#vc_val" ).text("Intervallo: "+$( "#vc_slider" ).slider( "values", 0 ) +
+			" mm - " + $( "#vc_slider" ).slider( "values", 1 ) +" mm");
+			 
+			//RESETTO IL RANGE "FS"
+			$( "#fs_slider" ).slider( "option", "values",[20,180]);
+            $( "#fs_val" ).text("Range: "+$( "#fs_slider" ).slider( "values", 0 ) +
+			" Hz - " + $( "#fs_slider" ).slider( "values", 1 ) +" Hz");
+			 
+			update_data();
+	});
+	
+	function update_data(){
+		$.ajax({
+			type: "POST",
+			url: "search.php",
+			cache: false,
+			async:false,
+			data: filter,
+			dataType : 'json',
+			success: function(output){
+			$("#main_content").html(output);
+			Cufon.refresh();
+			}
+		});
+	}
+});
+	
+	//XLS EXPORT FUNCTION
+	$("#btn_comptable").click(function(){
+		$("#txt_comptable").slideToggle('fast');
+	});
+	
+	$(".btn_xlsdownload").click(function(event){
+		event.preventDefault();
+		var ptype="LF";
+		var selURL=$(this).attr("data-param");
+		if(selURL=="m"){
+			var fileLNK="../comparison_tables/FaitalPRO "+ptype+" Comparison Table - Metric.xlsx";
+		}else{
+			var fileLNK="../comparison_tables/FaitalPRO "+ptype+" Comparison Table - Imperial.xlsx";
+		}
+		
+		showLoader();
+		setTimeout(function(){
+			$.ajax({
+			type:'POST',
+			data:{"PTYPE":ptype,"MS":selURL},
+			url:'../comparison_table_generator.php',
+			success: function(){
+			hideLoader();	
+			},
+			complete: function(){			
+				window.location = fileLNK;
+				return false;
+			}
+			});	
+		},500);
+		
+		function showLoader(){
+		$(".btn_xlsdownload").fadeOut("fast",function(){
+			$("#xls_loader").fadeIn("fast");
+			$("#xls_introtxt").slideUp("fast",function(){
+				$(this).html("<span style='text-align:center; display:block;'>The file is being downloaded!</span>");
+				$(this).slideDown("fast");
+			});
+		});
+		}
+		
+		function hideLoader(){
+		$("#xls_loader").fadeOut("fast",function(){
+			$(".btn_xlsdownload").fadeIn("fast");
+			
+			$("#xls_introtxt").slideUp("fast",function(){
+				$(this).html("Download the complete comparison table of our LF Loudspeakers.<br /><br />Select the measurement system below");
+				$(this).slideDown("fast");
+			});
+		});
+		}
+	});
+	
+	
+	//COMPARE PRODUCTS
+	//Verifico se ho prodotti selezionati per la comparazione all'ingresso nelle pagine e gestisco il bottone nella side-bar
+	$(function(){
+		$.ajax({
+			type: "POST",
+			url: "../compare_products/script/comp_list.php",
+			cache: false,
+			dataType : "json",
+			success: function(array){
+				var arr_count=0;								
+					if(array!=null || array!="[]"){
+						$.each(array,function(key,val){
+							arr_count++;
+						$.ajax({
+							type: "POST",
+							url: "../compare_products/script/comp_data.php",
+							data:{"prod_id": key,"action":"checkimpedance"},
+							cache: false,
+							async:false,
+							dataType : "json",
+							success: function(imp){
+								
+							$.post("../compare_products/script/comp_list.php",{"action":"checkfamily"},function(data){
+								switch(data){
+								case "10":
+									prod_lnk="LF_Loudspeakers";
+									break;
+								case "20":
+									prod_lnk="HF_Drivers";
+									break;
+								case "30":
+									prod_lnk="Coaxial_Loudspeakers";
+									break;
+								}
+
+								$("#comp_prodlist").append("<a id='sideprodsel_"+key+"' href='/en/products/"+prod_lnk+"/product_details/index.php?id="+key+"'><b>"+val+"</b> - "+imp+"Ω Version</a>");
+							},"json");
+							}
+						});
+					});	
+				}
+				if(arr_count>0){
+					$("#comp_sidecount").text(arr_count).show();
+					$("#compbuttons").show();	
+					$("#btn_sidecomp").css({"cursor":"default"});	
+				}
+			}
+		});
+	});
+		
+//GESTIONE CHECK SELEZIONE PRODOTTI
+$('body, .btnimpwrapper_close').live("click",function(){
+	$(".wrapperimp_sel").fadeOut();
+});
+
+$(".compare_chk_index").live("click",function(event){
+	event.stopPropagation();
+	$(".wrapperimp_sel").fadeOut();
+	$(this).next().fadeIn();
+});
+
+$(".wrapperimp_sel").live("click",function(event){
+	event.stopImmediatePropagation();
+});
+
+$(".compare_chk_selimp").live("click",function(event){
+	event.stopPropagation();
+	
+	var prod_id=$(this).attr("data-id");
+	var prod_name=$(this).attr("data-name");
+	var prod_imp=$(this).attr("data-impedance");
+	var family_id=$(this).attr("data-family");
+	
+	$.ajax({
+		type: "POST",
+		url: "../compare_products/script/comp_list.php",
+		data: {"action":"checkfamily"},
+		dataType : "json",
+		cache:false,
+		async:false,
+		success: function(fid){
+			current_family=fid;
+		}
+	});
+	//Gestione Checkmark per selezione impedenza
+	if($(this).hasClass("chkcompoff")){
+		if(family_id == current_family || current_family == 0 || current_family == null || current_family==""){
+			$.ajax({
+				type: "POST",
+				url: "../compare_products/script/comp_list.php",
+				cache: false,
+				data: {"action":"add","prod_id":prod_id,"prod_name":prod_name,"FC":family_id},
+				dataType : "json",
+				success: function(output){
+					var arr_count=count_items(output);
+										
+					if(arr_count<=3){
+						$("#chkimp_"+prod_id).addClass('chkcompon').removeClass('chkcompoff');
+						if($("#chkimpwrapper_"+prod_name).children(".chkcompon").length > 0){
+							$("#chk_"+prod_name).removeClass("chkcompoff").addClass("chkcompon");
+							$("#chk_"+prod_name).parent().parent().parent("tr").addClass("comp_selected_row");
+							$("#comp_prodlist").append("<a id='sideprodsel_"+prod_id+"' href='/en/products/LF_Loudspeakers/product_details/index.php?id="+prod_id+"'><b>"+prod_name+"</b> - "+prod_imp+"Ω Version</a>");
+						}
+						if(arr_count>0){
+							$("#comp_sidecount").text(arr_count).show();
+							$("#compbuttons").slideDown();	
+							$("#btn_sidecomp").css({"cursor":"default"});	
+						}
+					}else{
+						$.ajax({
+							type: "POST",
+							url: "../compare_products/script/comp_list.php",
+							data: {"action":"remove","prod_id":prod_id,"prod_name":prod_name},
+							dataType : "json",
+							success: function(output){
+								$('#comp_limit_trigger').trigger("click");
+							}
+						});
+					}
+				}
+			});	
+		}else{
+			$(".nav_container").attr("style","display:none !important");
+			$(".piro_overlay").attr("style","cursor:default !important");
+			
+			$("#btn_changecat_proceed").attr("data-id",prod_id);
+			$("#btn_changecat_proceed").attr("data-name",prod_name);
+			$("#btn_changecat_proceed").attr("data-impedance",prod_imp);
+			$("#btn_changecat_proceed").attr("data-family",family_id);
+			
+			$("#changecat_trigger").trigger("click");
+		}
+	}else{
+		$.ajax({
+			type: "POST",
+			url: "../compare_products/script/comp_list.php",
+			data: {"action":"remove","prod_id":prod_id,"prod_name":prod_name},
+			dataType : "json",
+			cache:false,
+			async:false,
+			success: function(output){
+				var arr_count=count_items(output);
+				
+				$("#chkimp_"+prod_id).removeClass("chkcompon").addClass("chkcompoff");
+				$("#sideprodsel_"+prod_id).slideUp("fast",function(){$(this).remove();});
+				
+				if($("#chkimpwrapper_"+prod_name).children(".chkcompon").length == 0){
+					$("#chk_"+prod_name).removeClass("chkcompon").addClass("chkcompoff");
+					$("#chk_"+prod_name).parent().parent().parent("tr").removeClass("comp_selected_row");
+				}
+				if(arr_count < 1){
+					$("#comp_sidecount").text(arr_count).fadeOut("fast");
+					$("#compbuttons").slideUp("fast");
+					$("#btn_sidecomp").css({"cursor":"pointer"});
+					$.post("../compare_products/script/comp_list.php",{"action":"reset"},"json");
+				}else{
+					$("#comp_sidecount").text(arr_count);
+				}
+			}
+		});
+	}
+});	
+	
+	$("#btn_changecat_proceed").click(function(){
+		var prod_id=$(this).attr("data-id");
+		var prod_name=$(this).attr("data-name");
+		var prod_imp=$(this).attr("data-impedance");
+		var prod_family=$(this).attr("data-family");
+		
+		$.ajax({
+			type: "POST",
+			url: "../compare_products/script/comp_list.php",
+			cache: false,
+			async:false,
+			data: {"action":"reset"},
+			dataType : "json",
+			success: function(){
+								
+				$.ajax({
+				type: "POST",
+				url: "../compare_products/script/comp_list.php",
+				cache: false,
+				data: {"action":"add","prod_id":prod_id,"prod_name":prod_name,"FC":prod_family},
+				dataType : "json",
+				success: function(array){
+					var arr_count=count_items(array);
+					
+					if(arr_count<=3){
+						$("#chkimp_"+prod_id).addClass('chkcompon').removeClass('chkcompoff');
+						if($("#chkimpwrapper_"+prod_name).children(".chkcompon").length > 0){
+							$("#chk_"+prod_name).removeClass("chkcompoff").addClass("chkcompon");
+							$("#chk_"+prod_name).parent().parent().parent("tr").addClass("comp_selected_row");
+							$("#comp_prodlist").html("").append("<a id='sideprodsel_"+prod_id+"' href='/en/products/LF_Loudspeakers/product_details/index.php?id="+prod_id+"'><b>"+prod_name+"</b> - "+prod_imp+"Ω Version</a>");
+						}
+						if(arr_count>0){
+							$("#comp_sidecount").text(arr_count).show();
+							$("#compbuttons").slideDown();	
+							$("#btn_sidecomp").css({"cursor":"default"});	
+						}	
+					}
+
+					$(".piro_html,.piro_overlay").animate({"opacity":"hide"},250);
+					$(".nav_container").attr("style","display:block !important");
+					$(".piro_overlay").attr("style","cursor:pointer !important");
+				}
+				});
+			}
+		});	
+	});
+
+	$("#btn_changecat_cancel").click(function(){
+		$(".piro_html,.piro_overlay").animate({"opacity":"hide"},250);
+		$(".nav_container").attr("style","display:block !important");
+		$(".piro_overlay").attr("style","cursor:pointer !important");
+	});	
+		
+
+	//GESTIONE COMPARE BUTTON SIDE-BAR
+	$("#btn_sidecomp").click(function(){
+		$.post("../compare_products/script/comp_list.php",function(array){
+		var arr_count= count_items(array);
+		if (arr_count==0){
+			document.location.href="../compare_products/index.php";
+		}
+		},"json");
+	});
+	
+	//Clear Button Compare Side-Bar
+	$("#btnsidecomp_clear").click(function(){
+		$(".nav_container").attr("style","display:none !important");
+		$(".piro_overlay").attr("style","cursor:default !important");
+		$("#reset_trigger").trigger("click");
+	});
+	
+	$("#btnsidecomp_reset_proceed").click(function(){
+		$.post("../compare_products/script/comp_list.php",{"action":"reset"},function(){
+			$(".piro_html,.piro_overlay").animate({"opacity":"hide"},250);
+			$("#comp_prodlist").html("");
+			$("#comp_sidecount").fadeOut("fast");
+			$("#compbuttons").slideUp("fast");
+			$("#btn_sidecomp").css({"cursor":"pointer"});
+			$(".compare_chk_index, .compare_chk_selimp").removeClass("chkcompon chkcompoff").addClass("chkcompoff").parent().parent().parent("tr").removeClass("comp_selected_row");
+			});
+		$(".nav_container").attr("style","display:block !important");
+		$(".piro_overlay").attr("style","cursor:pointer !important");
+
+	});
+
+	$("#btnsidecomp_reset_cancel").click(function(){
+		$(".piro_html,.piro_overlay").animate({"opacity":"hide"},250);
+		$(".nav_container").attr("style","display:block !important");
+		$(".piro_overlay").attr("style","cursor:pointer !important");
+
+	});
+	
+//CLOSE DOCUMENT READY
+});
+</script>
+
+<body>
+<div id="master">
+<style>
+@-moz-document url-prefix() {#search_wrapper{margin-top:2px;}}	
+@media screen and (-webkit-min-device-pixel-ratio:0) {#search_wrapper{margin-top:2px;}}
+</style>
+<!-- Analytics Tracker
+<script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-43537001-1', 'auto');
+ga('set', 'anonymizeIP', true);
+ga('send', 'pageview');
+</script> -->
+
+<!-- Google tag Analytics 4 (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-NESTNKL6F5"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-NESTNKL6F5');
+</script>
+
+<!-- Language Selection -->
+<script>
+$(document).ready(function(){
+	var website_lang='en';	
+	$("#toolbar_lang_wrapper").find("a.toolbar_lnk[rel="+website_lang+"]").parent().remove().insertBefore("div.toolbar_lang:first").children().removeClass("lang_disabled").addClass("lang_selected").children("div.lng_txt");
+});
+
+
+<!-- Begin Cookie Consent plugin by Silktide - http://silktide.com/cookieconsent -->
+window.cookieconsent_options = {
+	message: "This website uses cookies. By continuing to navigate, you agree to our use of these cookies.",
+	learnMore: 'Find out more...',
+	dismiss: "Close and continue",
+	theme: "dark-bottom",
+	link: 'http://www.faitalpro.com/en/privacy_statement/',
+	markup: [
+		'<div class="cc_banner-wrapper {{containerClasses}}">',
+			'<div class="cc_banner cc_container cc_container--open">',
+				'<p class="cc_message">{{options.message}} <a data-cc-if="options.link" class="cc_more_info" href="{{options.link || "#null"}}">{{options.learnMore}}</a></p>',
+				'<a href="#null" data-cc-event="click:dismiss" target="_blank" class="cc_btn cc_btn_accept_all">{{options.dismiss}}</a>',
+				'<a class="cc_logo" target="_blank" href="http://silktide.com/cookieconsent">Cookie Consent plugin for the EU cookie law</a>',
+			'</div>',
+		'</div>'
+	  ]
+};
+
+</script>
+
+<div id="toolbar">
+<table id="toolbar_content" width="100%" height="30" border="0" cellspacing="0" cellpadding="0">
+  <tr>
+    <td width="50%" >
+	<div id="toolbar_lang_wrapper">
+    <div class='toolbar_lang'><a href='/cn/products/LF_Loudspeakers' rel='cn' class='toolbar_lnk lang_disabled' style='background-image:url(/img/icoflaglng_cn.png);'><div class='lng_txt'><b>中文</b></div></a></div><div class='toolbar_lang' ><a href='javascript:void(0);' rel='en' class='toolbar_lnk lang_disabled' style='background-image:url(/img/icoflaglng_en.png);'><div class='lng_txt'><b>English</b></div></a></div><div class='toolbar_lang'><a href='/es/products/LF_Loudspeakers' rel='es' class='toolbar_lnk lang_disabled' style='background-image:url(/img/icoflaglng_es.png);'><div class='lng_txt'><b>ES</b></div></a></div><div class='toolbar_lang'><a href='/it/products/LF_Loudspeakers' rel='it' class='toolbar_lnk lang_disabled' style='background-image:url(/img/icoflaglng_it.png);'><div class='lng_txt'><b>IT</b></div></a></div><div class='toolbar_lang'><a href='/ru/products/LF_Loudspeakers' rel='ru' class='toolbar_lnk lang_disabled' style='background-image:url(/img/icoflaglng_ru.png);'><div class='lng_txt'><b>РУС</b></div></a></div>    </div>
+   </td>
+    <td width="50%" valign="middle">
+    
+    <div id="search_wrapper">
+		<div><span id="search_label">Product Search</span><input type="text" size="30" value="" id="toolbar_srcfield" onkeyup="srcproduct(this.value);" /></div>
+		<div id="suggestions_wrapper">
+        <img id="suggestions_arrow" src="/en/lib/searchbox/css/toparrow.png" />
+        <div id="suggestions"></div>
+        </div>
+    </div>
+    <!--<a id="btn_newsletter" href="http://eepurl.com/X2fY5" class="toolbar_lnk toolbar_firstbtn" target="_blank" style="background-image:url(/img/ico_toolbar_newletter.png);">Newsletter Sign up</a>-->
+    <span class="clear"></span>
+    </td>
+  </tr>
+</table>
+</div>
+<div id="header_box">
+ <a href="/en/index.php"><img src="/img/faitalpro_logo.png" width="189" height="116" id="logo" alt="FaitalPRO - Professional Loudspeakers Made in Italy" title=""/></a>
+  <table id="main_menu" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" valign="middle"><a href="/en/products/">Products</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/where_to_buy/">Where to buy</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/request_a_quote/">Request a quote</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/about_us/">About Us</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/press_&_media/">Press & Media</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/downloads/">Downloads</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/tech_specs/">Tech Specs</a></td>
+      <td align="center" valign="middle"><img src="/img/sep_menutop.gif" /></td>
+      <td align="center" valign="middle"><a href="/en/contact_us/?ctype=0">Contact us</a></td>
+    </tr>
+  </table>
+</div><div id="breadcrumbs">
+<ul>
+<li><a href="/en/index.php" title="Back to Home"><img src="/img/ico_home.png" width="16" height="16" class="home"></a></li>
+
+<li><a href='/en/products'>Products</a></li><li>LF Loudspeakers</li>
+</ul>
+<span class="clear"></span>
+</div>
+
+
+ 	<div class="page">
+    <div class="page_content">
+    <span class="titolipage">LF LOUDSPEAKERS</span>
+    
+    <div id="main_content" class="search">
+        <div id="loader">
+            <img src="/img/orange_loader.gif" width="48" height="48" /><br />
+              Loading Products...
+        </div>
+    </div>
+
+    <div id="side_content">
+    <div id="comptable_wrapper" class="btn_wrapper">
+        <div id="btn_comptable">LF Comparison Table<img id="ico_xls" src="/products/img/ico_xls.png" /></div>
+        <div id="txt_comptable" style="display:none;">
+        <div id="xls_introtxt">Download the complete comparison table of our LF Loudspeakers.<br /><br />Select the measurement system below</div>
+        <a href="javascript:void(0);" data-param="m" class="btn_xlsdownload" style="margin:10px 0px;">Metric Units</a>
+        <a href="javascript:void(0);" data-param="i" class="btn_xlsdownload">US/Imperial Units</a>
+        <div id="xls_loader">Generating Excel File</div>
+        </div>
+    </div>
+    
+    <div id="wrapper_btn_index_compare" class="btn_wrapper">
+    	<div id="btn_sidecomp" href="../compare_products/"><span id="title_index_compare_txt">Compare Products</span><div id="comp_sidecount"></div></div>
+        <div id="compbuttons">
+        <div id="comp_prodlist"></div>
+        <a id="btnsidecomp_clear" class="btn_indexcomp"  href="javascript:void(0);" style="margin-right:11px;"><span>CLEAR LIST</span></a>
+        <a id="btnsidecomp_compare" class="btn_indexcomp" href="../compare_products/"><span>COMPARE</span></a> 
+        <span class="clear"></span>
+        </div>  
+    </div>
+    
+    <div class="side_title" style="margin-top:25px;">PRODUCT FILTERS</div>
+    <div class="side_box">
+        <ul id='material' class="filter_list">
+        Magnet Material<br />
+            <li><a id="neodymium" rel="10" class="selected">Neodymium</a></li>
+            <li><a id="ferrite" rel="20" class="selected">Ferrite</a></li>
+        </ul>
+    </div>
+    
+    <div class="side_box">
+    Loudspeaker Size<br />
+    <div id="size_slider" class="slider"></div>
+    <table width="96%" height="11" cellpadding="0" cellspacing="0" class="slider_labels">
+        <tr> 
+            <td width="9%"  align="center">All</td>
+			<td width="8%"  align="center">2.5"</td>
+            <td width="8%"  align="center">3"</td>
+            <td width="8%" align="center">4"</td>
+            <td width="8%" align="center">5"</td>
+            <td width="8%" align="center">6"</td>
+            <td width="8%" align="center">8"</td>
+            <td width="8%" align="center">10"</td>
+            <td width="8%" align="center">12"</td>
+            <td width="8%" align="center">15"</td>
+            <td width="8%" align="center">18"</td>
+            <td width="8%" align="center">21"</td>
+        </tr>
+    </table>
+    <div id="size_val" class="sliderval"></div>
+    </div>
+    
+    <div class="side_box">
+    AES Power Handling<br />
+    <div id="power_slider" class="slider"></div>
+    <table cellpadding="0" cellspacing="0" class="slider_labels">
+        <tr> 
+            <td width="50%"  align="left">20 W</td>
+            <td width="50%"  align="right">3000 W</td>
+        </tr>
+    </table>
+    <div id="power_val" class="sliderval"></div>
+    </div>
+    
+<div class="side_box">
+    Voice Coil Diameter<br />
+    <div id="vc_slider" class="slider"></div>
+    <table cellpadding="0" cellspacing="0" class="slider_labels">
+        <tr> 
+            <td width="50%"  align="left">15 mm</td>
+            <td width="50%"  align="right">170 mm</td>
+        </tr>
+    </table>
+    <div id="vc_val" class="sliderval"></div>
+    </div>
+
+    
+    <div class="side_box">
+    Fs<br />
+    <div id="fs_slider" class="slider"></div>
+    <table cellpadding="0" cellspacing="0" class="slider_labels">
+        <tr> 
+            <td width="50%"  align="left">20 Hz</td>
+            <td width="50%"  align="right">180 Hz</td>
+        </tr>
+    </table>
+    <div id="fs_val" class="sliderval"></div>
+    </div>
+    
+    <div class="side_box">
+        <ul id='demodulation' class="filter_list">
+        Demodulation<br />
+            <li><a id="demod" class="selected">Demodulated</a></li>
+            <lI><a id="nodemod" class="selected">Non Demodulated</a></lI>
+        </ul>
+    </div>
+    
+    <a id="btn_reset" class="btn_reset">Reset All Filters</a>
+    </div>
+    <span class="clear"></span>
+</div>
+</div>
+    <div id="catalog_menu_load" class="box"><img src="/img/orange_loader.gif" width="48" height="48" /><br />
+        <br />
+        Loading Catalog Menu...
+    </div>
+    <div id="catalog_menu">
+        <ol>
+            <li>
+                <h2><span>Full Product Catalog</span></h2>
+                <div><a href="/downloads/files/catalogs/FaitalPRO_Full_Catalogue.zip"><img src="../../img/accordion/catalogs/full_catalog.jpg" border="0"/></a></div>
+            </li>
+            <li>
+                <h2><span>Low Frequency Catalog</span></h2>
+                <div><a href="/downloads/files/catalogs/FaitalPRO_LF.zip"><img src="../../img/accordion/catalogs/LF_catalog.jpg" border="0"/></a></div>
+            </li>
+            <li>
+                <h2><span>HF Drivers Catalog</span></h2>
+                <div><a href="/downloads/files/catalogs/FaitalPRO_HF_Driver_and_Horns.zip"><img src="../../img/accordion/catalogs/HF_Drivers_Horns_catalog.jpg" border="0"/></a></div>
+            </li>
+            <li>
+                <h2><span>Coaxial Catalog</span></h2>
+                <div><a href="/downloads/files/catalogs/FaitalPRO_Coaxial.zip"><img src="../../img/accordion/catalogs/Coaxial_catalog.jpg" border="0"/></a></div>
+            </li>
+            <li>
+            <h2><span>Compare Products</span></h2>
+                <div><a href="../compare_products/"><img src="../../img/accordion/catalogs/compare.jpg" border="0"/></a></div>
+            </li>
+        </ol>
+  </div>
+
+  <div class="box_args">
+    <ul class="list_args">
+      <li class="box spacedx" style="width:466px;"><a href="../../request_a_quote/"><img src="../../img/2_quotation_box_bg.jpg" alt="Request a Free Quotation for your Speakers" title=""/></a></li>
+      <li class="box spacedx"><a href="../../downloads/index.php?cat=2"><img src="../../img/1_hirespict_box_bg.jpg" width="222" height="150"  alt="High Resolution Product Pictures" title=""/></a></li>
+      <li class="box"><a href="../../downloads/index.php?cat=3"><img src="../../img/1_recone_box_bg.jpg" width="222" height="150"  alt="Reconing Kit Instructions" title=""/></a></li>
+    </ul>
+    </div>
+<span class="clear"></span> 
+
+<a id="reset_trigger" href="#reset_popup" rel="inline-380-180" class="pirobox"></a>
+<div id="reset_popup" class="popup"><img src="/img/ico_attention.png" style="margin-bottom:10px;"/><br />
+<strong>WARNING</strong><br>
+Completing this operation will remove all selected product.<br />
+<a id="btnsidecomp_reset_cancel" href="javascript:void(0);" class="btn_option">Cancel</a>
+<a id="btnsidecomp_reset_proceed" href="javascript:void(0);" class="btn_option">Proceed</a>
+</div>
+
+<a href="#comp_limit_popup" rel="inline-380-130" class="pirobox" id="comp_limit_trigger"></a>
+<div id="comp_limit_popup" class="popup_box"><img src="/img/ico_attention.png" style="margin-bottom:10px;"/><br />
+<strong>WARNING</strong><br>
+You cannot select more than three products.
+</div>
+
+<a id="changecat_trigger" href="#changecat_popup" rel="inline-440-205" class="pirobox"></a>
+<div id="changecat_popup" class="popup_box"><img src="/img/ico_attention.png" style="margin-bottom:10px;"/><br />
+<strong>WARNING</strong><br>
+Speakers currently selected are part of a different product group.<br />Completing this operation will remove all selected product.<br />
+<a id="btn_changecat_cancel" href="javascript:void(0);" class="btn_option">Cancel</a>
+<a id="btn_changecat_proceed" href="javascript:void(0);" class="btn_option">Proceed</a>
+</div>
+</div>
+<div id="footer_box">
+    <div id="footer_menu">
+    <table border="0" cellpadding="7" cellspacing="0" id="tbl_footer_menu">
+      <tr>
+        <td align="left" valign="top" width="330">
+ 	<div id="footer_social">
+        <span id="btn_fbt"><a href="https://www.facebook.com/FaitalPRO" target="_blank" title="FaitalPRO on Facebook"><img src="/img/ico_fb_foot.png"></a></span>
+        <span id="btn_ig"><a href="https://www.instagram.com/faitalpro/" title="FaitalPRO on Instagram" target="_blank"><img src="/img/ico_ig_foot.png"></a></span>
+        <span id="btn_int"><a href="https://linkedin.com/showcase/faitalpro" rel="publisher" title="FaitalPRO on LinkedIn" target="_blank"><img src="/img/ico_in_foot.png"></a></span>
+        <span id="btn_twt"><a href="https://x.com/faitalpro" title="FaitalPRO on X" target="_blank"><img src="/img/ico_tw_foot.png"></a></span>
+        <span id="btn_ytt"><a href="https://www.youtube.com/user/faitalpro" title="FaitalPRO YouTube Channel" target="_blank"><img src="/img/ico_yt_foot.png"></a></span>
+    </div>
+
+		<b>FAITAL S.p.A.</b><br>
+        <span>Via Bruno Buozzi, 12</span><br>
+        20097  San Donato Milanese (Milan)<br>
+        Italy<br>
+        <br>
+        <b>P.I.</b> IT00757890157<br><br>
+        <b>Tel:</b> +39 02 5277031<br>
+        <img id="alpsalpine_footlogo" src="/img/alpsalpinegroup_logo_foot.svg">
+        </td>
+        <td width="180" align="right" valign="top" class="bordersx">
+        	<ul>
+              <li class="first">LEARN</li>
+              <li><a href="/en/about_us/">About Us</a></li>
+              <li><a href="/en/tech_specs/">Tech Specs</a></li>
+              <li><a href="/en/about_us/eco-conscious/">Eco-Conscious</a></li>
+              <li><a href="/en/press_&_media/">Press & Media</a></li>
+              <li><a href="/en/downloads/">Downloads</a></li>
+            </ul>
+        </td>
+        <td width="180" align="right" valign="top" class="bordersx">
+       <ul>
+            	<li><a href="/en/products/" class="first">FIND</a></li>
+                <li><a href="/en/products/LF_Loudspeakers/">LF Loudspeakers</a></li>
+                <li><a href="/en/products/HF_Drivers/">HF Drivers</a></li>
+                <li><a href="/en/products/Coaxial_Loudspeakers/">Coaxial Speakers</a></li>
+                <li class="foot-li-spacer"><a href="/en/products/HF_Horns/">HF Horns</a></li>
+                <li><a href="/en/products/archived_products/">Archived Products</a></li>
+                <li><a href="/en/products/bass_products/">Bass Products</a></li>
+                <li class="foot-li-spacer"><a href="/en/products/compare_products/">Compare Products</a></li>
+               <li><a href="/en/products/warranty/">Limited Product Warranty</a></li>
+          </ul>
+        </td>
+        <td width="180" align="right" valign="top" class="bordersx">
+        	<ul>
+           	  <li class="first">BUY</li>
+            	<li><a href="/en/request_a_quote/">Request a Quote</a></li>
+                <li><a href="/en/where_to_buy/">Find a Distributor</a></li>
+                <li><a href="/en/where_to_buy/become_a_distributor/">Become a Distributor</a></li>
+            </ul>
+        </td>
+        <td width="180" align="right" valign="top" class="bordersx">
+        	<ul>
+           	  <li class="first">CONTACT</li>
+            	<li><a href="/en/contact_us/?ctype=0">Information Request</a></li>
+                <li><a href="/en/contact_us/?ctype=1">Sales Contact</a></li>
+                <li><a href="/en/contact_us/?ctype=2">Technical Support</a></li>
+                <li><a href="/en/contact_us/?ctype=3">Press Contact</a></li>
+            </ul>
+            <ul style="margin-top:30px;">
+           	  <li class="first">SUPPORT</li>
+            	<li><a href="/en/support/online_fraud_prevention/index.php">Online Fraud Prevention</a></li>
+            </ul>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <div id="footer_info">
+  <table border="0" width="960" cellpadding="4" cellspacing="0" id="tbl_footer_info">
+      <tr>
+        <td align="left" valign="middle">©2026 FAITAL S.p.A. a socio unico - ALL RIGHTS RESERVED</td>
+        <td align="right" valign="middle"><a href="/en/privacy_statement/">PRIVACY POLICY</a></td>
+      </tr>
+    </table>
+   </div>
+ </div></body>
+</html>

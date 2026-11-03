@@ -3,6 +3,7 @@ solver/target/
 solver/pkg/
 
 # Node
+node_modules/
 web/node_modules/
 web/dist/
 
@@ -10,8 +11,9 @@ web/dist/
 .DS_Store
 Thumbs.db
 
-# Executables (reference only, not tracked)
+# Executables and archives (reference only, not tracked)
 *.exe
+*.zip
 
 # PDFs (reference only, stored locally)
 docs/references/*.pdf

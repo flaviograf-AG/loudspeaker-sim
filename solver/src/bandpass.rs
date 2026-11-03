@@ -1,10 +1,12 @@
-//! 4th-order bandpass enclosure model.
+//! 4th-order and 6th-order bandpass enclosure models.
 //!
-//! The driver fires into a sealed rear chamber. The front chamber
-//! is vented — all acoustic output comes through the port.
-//! This produces a bandpass-shaped SPL response.
+//! - 4th-order (`order == 4`): The driver fires into a sealed rear chamber;
+//!   the front chamber is vented and radiates through the front port.
+//! - 6th-order (`order == 6`): Both the rear and front chambers are vented
+//!   (dual-reflex parallel-tuned bandpass) and both ports radiate into free space.
 //!
 //! Reference: Fincham, L.R. "A Bandpass Filter Loudspeaker System" (AES, 1983)
+//! Reference: Geddes, E.R. "An Introduction to Band-Pass Loudspeaker Systems" (JAES, 1989)
 
 use num_complex::Complex;
 
@@ -22,16 +24,31 @@ pub fn bandpass_frequency_response(
     let p = &driver.params;
     let j = Complex::new(0.0, 1.0);
 
-    // Acoustic elements
+    // Acoustic compliances
     let cab_rear = enc.rear_volume_m3 / (RHO_0 * C_0 * C_0);
     let cab_front = enc.front_volume_m3 / (RHO_0 * C_0 * C_0);
 
-    // Port
+    // Front Port
     let port_d = (4.0 * enc.port_area_m2 / std::f64::consts::PI).sqrt();
     let port_r = port_d / 2.0;
     let end_corr = if enc.port_flanged { 0.85 * port_r } else { 0.6 * port_r };
     let lp_eff = enc.port_length_m + 2.0 * end_corr;
-    let map = RHO_0 * lp_eff / enc.port_area_m2;
+    let map_front = RHO_0 * lp_eff / enc.port_area_m2;
+    let fb_front = C_0 / TWO_PI * (enc.port_area_m2 / (lp_eff * enc.front_volume_m3)).sqrt();
+
+    // Optional Rear Port (for 6th-order dual-reflex bandpass)
+    let is_6th = enc.order == 6 && enc.rear_port_area_m2 > 0.0 && enc.rear_port_length_m > 0.0;
+    let (map_rear, fb_rear) = if is_6th {
+        let r_port_d = (4.0 * enc.rear_port_area_m2 / std::f64::consts::PI).sqrt();
+        let r_port_r = r_port_d / 2.0;
+        let r_end_corr = if enc.rear_port_flanged { 0.85 * r_port_r } else { 0.6 * r_port_r };
+        let r_lp_eff = enc.rear_port_length_m + 2.0 * r_end_corr;
+        let m_rear = RHO_0 * r_lp_eff / enc.rear_port_area_m2;
+        let f_rear = C_0 / TWO_PI * (enc.rear_port_area_m2 / (r_lp_eff * enc.rear_volume_m3)).sqrt();
+        (m_rear, f_rear)
+    } else {
+        (0.0, fb_front)
+    };
 
     // Driver acoustic elements
     let sd2 = p.sd_m2 * p.sd_m2;
@@ -39,43 +56,48 @@ pub fn bandpass_frequency_response(
     let ras = driver.rms / sd2;
     let cas = driver.cms * sd2;
 
-    // Port tuning
-    let fb = C_0 / (TWO_PI) * (enc.port_area_m2 / (lp_eff * enc.front_volume_m3)).sqrt();
-
     let n = frequencies_hz.len();
     let mut spl_db = Vec::with_capacity(n);
     let mut impedance_ohm = Vec::with_capacity(n);
     let mut impedance_phase_deg = Vec::with_capacity(n);
     let mut displacement_mm = Vec::with_capacity(n);
     let mut pressure_phases = Vec::with_capacity(n);
+    let mut port_velocity = Vec::with_capacity(n);
 
     for &f in frequencies_hz {
         let omega = TWO_PI * f;
         let s = j * omega;
 
-        // Rear chamber: sealed compliance with Ql loss
-        let z_rear = {
-            let z_c = 1.0 / (s * cab_rear);
-            if enc.rear_ql > 0.0 && enc.rear_ql < 1e6 {
-                let r_ab = enc.rear_ql / (TWO_PI * fb * cab_rear);
-                let r_c = Complex::new(r_ab, 0.0);
-                (z_c * r_c) / (z_c + r_c)
-            } else { z_c }
+        // Rear chamber compliance with Ql loss
+        let z_rear_c = 1.0 / (s * cab_rear);
+        let z_rear_c_loss = if enc.rear_ql > 0.0 && enc.rear_ql < 1e6 {
+            let r_ab = enc.rear_ql / (TWO_PI * fb_rear * cab_rear);
+            let r_c = Complex::new(r_ab, 0.0);
+            (z_rear_c * r_c) / (z_rear_c + r_c)
+        } else {
+            z_rear_c
         };
 
-        // Front chamber: compliance ∥ port
+        let (z_rear, z_port_rear_opt) = if is_6th {
+            let z_pr = s * map_rear;
+            ((z_rear_c_loss * z_pr) / (z_rear_c_loss + z_pr), Some(z_pr))
+        } else {
+            (z_rear_c_loss, None)
+        };
+
+        // Front chamber: compliance ∥ front port
         let z_front_c = 1.0 / (s * cab_front);
         let z_front_c_loss = if enc.front_ql > 0.0 && enc.front_ql < 1e6 {
-            let r_ab = enc.front_ql / (TWO_PI * fb * cab_front);
+            let r_ab = enc.front_ql / (TWO_PI * fb_front * cab_front);
             let r_c = Complex::new(r_ab, 0.0);
             (z_front_c * r_c) / (z_front_c + r_c)
-        } else { z_front_c };
-        let z_port = s * map;
-        let z_front = (z_front_c_loss * z_port) / (z_front_c_loss + z_port);
+        } else {
+            z_front_c
+        };
+        let z_port_front = s * map_front;
+        let z_front = (z_front_c_loss * z_port_front) / (z_front_c_loss + z_port_front);
 
-        // Driver sees: rear compliance + front load
-        // In acoustic domain: Z_total = Z_rear + Z_front (series)
-        // Driver compliance is in parallel path
+        // Driver sees: rear load + front load in series with its own acoustic impedance
         let z_acoustic = s * mas + ras + 1.0 / (s * cas) + z_rear + z_front;
 
         // Convert to electrical
@@ -92,14 +114,28 @@ pub fn bandpass_frequency_response(
         let x_cone = v_cone / (j * omega);
         displacement_mm.push(x_cone.norm() * 1000.0);
 
-        // Port output: volume velocity through port
+        // Volume velocity of driver cone
         let u_driver = p.sd_m2 * v_cone;
-        // Pressure in front chamber from driver
-        let p_front = u_driver * z_front;
-        let u_port = p_front / z_port;
 
-        // SPL: only port radiates (driver is enclosed)
-        let p_acoustic = RHO_0 * omega * u_port / (2.0 * std::f64::consts::PI);
+        // Front port volume velocity
+        let p_front = u_driver * z_front;
+        let u_port_front = p_front / z_port_front;
+        let v_port_front = (u_port_front / enc.port_area_m2).norm();
+
+        // Rear port volume velocity (for 6th-order: rear chamber is driven by -u_driver)
+        let (u_total, max_v_port) = if let Some(z_port_rear) = z_port_rear_opt {
+            let p_rear = -u_driver * z_rear;
+            let u_port_rear = p_rear / z_port_rear;
+            let v_port_rear = (u_port_rear / enc.rear_port_area_m2).norm();
+            (u_port_front + u_port_rear, v_port_front.max(v_port_rear))
+        } else {
+            (u_port_front, v_port_front)
+        };
+
+        port_velocity.push(max_v_port);
+
+        // SPL: combined port radiation into 2π half-space
+        let p_acoustic = RHO_0 * s * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_acoustic.norm()));
         pressure_phases.push(p_acoustic.arg());
     }
@@ -114,6 +150,6 @@ pub fn bandpass_frequency_response(
         cone_displacement_mm: displacement_mm,
         group_delay_ms,
         acoustic_phase_deg: pressure_phases.iter().map(|p| p.to_degrees()).collect(),
-        port_velocity_ms: None,
+        port_velocity_ms: Some(port_velocity),
     }
 }

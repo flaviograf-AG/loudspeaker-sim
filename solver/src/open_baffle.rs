@@ -76,11 +76,15 @@ pub fn open_baffle_frequency_response(
         // Reference: Olson (1969) — simplified diffraction model
         let k = omega / 343.21;
         let delay = 2.0 * path;
-        let baffle_factor = Complex::new(1.0, 0.0) - Complex::new(0.0, -k * delay).exp();
+        // Damped edge diffraction: exact dipole cancellation at DC (rear_atten → 1),
+        // while high-frequency rear diffraction around finite rectangular edges is
+        // partially shadowed (Olson 1969; Linkwitz 2007).
+        let rear_atten = 1.0 / (1.0 + (0.25 * k * delay).powi(2)).sqrt();
+        let baffle_factor = Complex::new(1.0, 0.0) - rear_atten * Complex::new(0.0, -k * delay).exp();
 
         // Front radiation (half-space monopole)
         let u_driver = p.sd_m2 * v_cone;
-        let p_monopole = RHO_0 * omega * u_driver / (2.0 * std::f64::consts::PI);
+        let p_monopole = RHO_0 * s * u_driver / (2.0 * std::f64::consts::PI);
 
         // Apply baffle diffraction
         let p_total = p_monopole * baffle_factor;

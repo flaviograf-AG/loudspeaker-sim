@@ -84,12 +84,14 @@ pub fn passive_radiator_frequency_response(
         let u_driver = p.sd_m2 * v_cone;
         // Pressure in box from driver
         let p_box = u_driver * z_box;
-        // Passive radiator velocity
+        // Passive radiator volume velocity (z_pr is already in acoustic units via pr_sd2)
         let u_pr = p_box / z_pr;
         // Radiated sound: driver front + passive radiator front
-        let p_driver = RHO_0 * omega * u_driver / (2.0 * std::f64::consts::PI);
-        let p_pr = RHO_0 * omega * u_pr * enc.pr_sd_m2 / (2.0 * std::f64::consts::PI);
-        let p_total = p_driver + p_pr;
+        // Same circuit sign convention as vented box (Small 1974): outward cone motion
+        // reduces box pressure, so circuit current u_pr = p_box / z_pr is opposite
+        // to outward room radiation.
+        let u_total = u_driver - u_pr;
+        let p_total = RHO_0 * s * u_total / (2.0 * std::f64::consts::PI);
         spl_db.push(pressure_to_spl_db(p_total.norm()));
         pressure_phases.push(p_total.arg());
     }

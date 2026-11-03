@@ -5,6 +5,7 @@ pub mod bandpass;
 pub mod constants;
 pub mod crossover;
 pub mod driver;
+pub mod driver_import;
 pub mod horn;
 pub mod open_baffle;
 pub mod optimizer;
@@ -31,7 +32,7 @@ use vented::vented_frequency_response;
 use wasm_bindgen::prelude::*;
 
 /// Validate driver parameters. Returns an error message if invalid.
-fn validate_driver(d: &types::DriverParams) -> Result<(), String> {
+pub fn validate_driver(d: &types::DriverParams) -> Result<(), String> {
     if d.fs_hz <= 0.0 { return Err("Fs must be positive".into()); }
     if d.re_ohm <= 0.0 { return Err("Re must be positive".into()); }
     if d.qes <= 0.0 { return Err("Qes must be positive".into()); }
@@ -75,6 +76,9 @@ fn validate_enclosure(enc: &EnclosureConfig) -> Result<(), String> {
             if b.front_volume_m3 <= 0.0 { return Err("Front volume must be positive".into()); }
             if b.port_area_m2 <= 0.0 { return Err("Port area must be positive".into()); }
             if b.port_length_m <= 0.0 { return Err("Port length must be positive".into()); }
+            if b.order == 6 && (b.rear_port_area_m2 <= 0.0 || b.rear_port_length_m <= 0.0) {
+                return Err("6th-order bandpass requires positive rear port area and length".into());
+            }
         }
         EnclosureConfig::PassiveRadiator(pr) => {
             if pr.volume_m3 <= 0.0 { return Err("Box volume must be positive".into()); }
@@ -166,12 +170,19 @@ pub fn simulate_system(input_json: &str) -> Result<String, JsValue> {
         ways: result.ways.into_iter().map(|w| system_api::WayResultJson {
             name: w.name,
             spl_db: w.spl_db,
+            phase_deg: w.phase_deg,
             impedance_ohm: w.impedance_ohm,
+            impedance_phase_deg: w.impedance_phase_deg,
             filter_gain_db: w.filter_gain_db,
+            cone_displacement_mm: w.cone_displacement_mm,
+            port_velocity_ms: w.port_velocity_ms,
         }).collect(),
         system_spl_db: result.system_spl_db,
+        system_phase_deg: result.system_phase_deg,
         system_group_delay_ms: result.system_group_delay_ms,
         system_impedance_ohm: result.system_impedance_ohm,
+        system_impedance_phase_deg: result.system_impedance_phase_deg,
+        way_max_displacement_mm: result.way_max_displacement_mm,
     };
 
     serde_json::to_string(&output)
@@ -199,6 +210,12 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
             },
         system_api::OptParamJson::LPadAttenuation { way_idx } =>
             optimizer::OptParam::LPadAttenuation { way_idx: *way_idx },
+        system_api::OptParamJson::PassiveL { way_idx, filter_idx } =>
+            optimizer::OptParam::PassiveL { way_idx: *way_idx, filter_idx: *filter_idx },
+        system_api::OptParamJson::PassiveC { way_idx, filter_idx } =>
+            optimizer::OptParam::PassiveC { way_idx: *way_idx, filter_idx: *filter_idx },
+        system_api::OptParamJson::PassiveR { way_idx, filter_idx } =>
+            optimizer::OptParam::PassiveR { way_idx: *way_idx, filter_idx: *filter_idx },
     }).collect();
 
     // Convert target curve (with legacy fallback)
@@ -269,6 +286,9 @@ pub fn optimize_system(input_json: &str) -> Result<String, JsValue> {
                 let lo = f_disp.max(way.driver.fs_hz * 2.5);
                 (lo.max(20.0), input.freq_max_hz)
             }
+            optimizer::OptParam::PassiveL { .. } => (1e-6, 0.2),   // 1 µH to 200 mH
+            optimizer::OptParam::PassiveC { .. } => (1e-8, 2e-3),  // 0.01 µF to 2000 µF
+            optimizer::OptParam::PassiveR { .. } => (0.1, 200.0),  // 0.1 Ω to 200 Ω
         }
     }).unzip();
 

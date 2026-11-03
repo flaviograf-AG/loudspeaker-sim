@@ -131,8 +131,16 @@ pub struct SystemInputJson {
 pub struct WayResultJson {
     pub name: String,
     pub spl_db: Vec<f64>,
+    #[serde(default)]
+    pub phase_deg: Vec<f64>,
     pub impedance_ohm: Vec<f64>,
+    #[serde(default)]
+    pub impedance_phase_deg: Vec<f64>,
     pub filter_gain_db: Vec<f64>,
+    #[serde(default)]
+    pub cone_displacement_mm: Vec<f64>,
+    #[serde(default)]
+    pub port_velocity_ms: Option<Vec<f64>>,
 }
 
 /// JSON-serializable system result.
@@ -143,8 +151,14 @@ pub struct SystemResultJson {
     pub min_impedance_freq_hz: f64,
     pub ways: Vec<WayResultJson>,
     pub system_spl_db: Vec<f64>,
+    #[serde(default)]
+    pub system_phase_deg: Vec<f64>,
     pub system_group_delay_ms: Vec<f64>,
     pub system_impedance_ohm: Vec<f64>,
+    #[serde(default)]
+    pub system_impedance_phase_deg: Vec<f64>,
+    #[serde(default)]
+    pub way_max_displacement_mm: Vec<f64>,
 }
 
 impl SystemInputJson {
@@ -184,6 +198,9 @@ pub enum OptParamJson {
         hp_way_idx: usize, hp_filter_idx: usize,
     },
     LPadAttenuation { way_idx: usize },
+    PassiveL { way_idx: usize, filter_idx: usize },
+    PassiveC { way_idx: usize, filter_idx: usize },
+    PassiveR { way_idx: usize, filter_idx: usize },
 }
 
 /// Target curve specification for the optimizer.

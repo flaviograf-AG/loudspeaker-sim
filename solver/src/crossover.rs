@@ -124,18 +124,20 @@ pub fn passive_transfer_function(
 
         // Series element: [[1, Z], [0, 1]]
         if z_series.norm() > 1e-12 && z_shunt.norm() > 1e12 {
-            // Pure series
+            // Pure series: [[A, B], [C, D]] * [[1, Zs], [0, 1]]
             let new_b = a * z_series + b;
             let new_d = c * z_series + d;
-            b = new_b; d = new_d;
+            b = new_b;
+            d = new_d;
         }
         // Shunt element: [[1, 0], [1/Z, 1]]
         else if z_series.norm() < 1e-12 && z_shunt.norm() < 1e12 {
-            // Pure shunt
+            // Pure shunt: [[A, B], [C, D]] * [[1, 0], [Y, 1]]
             let y = 1.0 / z_shunt;
-            let new_c = a * y + c;
-            let new_d = b * y + d;
-            c = new_c; d = new_d;
+            let new_a = a + b * y;
+            let new_c = c + d * y;
+            a = new_a;
+            c = new_c;
         }
         // L-pad type: series + shunt combined
         else {
@@ -143,20 +145,82 @@ pub fn passive_transfer_function(
             if z_series.norm() > 1e-12 {
                 let nb = a * z_series + b;
                 let nd = c * z_series + d;
-                b = nb; d = nd;
+                b = nb;
+                d = nd;
             }
             // Then shunt: [[1, 0], [1/Zp, 1]]
             if z_shunt.norm() < 1e12 {
                 let y = 1.0 / z_shunt;
-                let nc = a * y + c;
-                let nd = b * y + d;
-                c = nc; d = nd;
+                let na = a + b * y;
+                let nc = c + d * y;
+                a = na;
+                c = nc;
             }
         }
     }
 
     // Transfer function: H = Z_load / (A×Z_load + B)
     load_impedance / (a * load_impedance + b)
+}
+
+/// Compute the electrical input impedance Z_in(f) seen by the amplifier looking into
+/// a passive ladder network terminated by a frequency-dependent driver load.
+///
+/// Uses ABCD matrix cascading of the passive blocks (excluding amplifier source impedance):
+///   Z_in = (A × Z_load + B) / (C × Z_load + D)
+///
+/// When `blocks` is empty, returns `load_impedance`.
+pub fn passive_input_impedance(
+    blocks: &[PassiveBlock],
+    load_impedance: Complex<f64>,
+    omega: f64,
+) -> Complex<f64> {
+    if blocks.is_empty() {
+        return load_impedance;
+    }
+
+    let mut a = Complex::new(1.0, 0.0);
+    let mut b = Complex::new(0.0, 0.0);
+    let mut c = Complex::new(0.0, 0.0);
+    let mut d = Complex::new(1.0, 0.0);
+
+    for block in blocks {
+        let (z_series, z_shunt) = block_impedances(block, omega);
+
+        if z_series.norm() > 1e-12 && z_shunt.norm() > 1e12 {
+            let new_b = a * z_series + b;
+            let new_d = c * z_series + d;
+            b = new_b;
+            d = new_d;
+        } else if z_series.norm() < 1e-12 && z_shunt.norm() < 1e12 {
+            let y = 1.0 / z_shunt;
+            let new_a = a + b * y;
+            let new_c = c + d * y;
+            a = new_a;
+            c = new_c;
+        } else {
+            if z_series.norm() > 1e-12 {
+                let nb = a * z_series + b;
+                let nd = c * z_series + d;
+                b = nb;
+                d = nd;
+            }
+            if z_shunt.norm() < 1e12 {
+                let y = 1.0 / z_shunt;
+                let na = a + b * y;
+                let nc = c + d * y;
+                a = na;
+                c = nc;
+            }
+        }
+    }
+
+    let denom = c * load_impedance + d;
+    if denom.norm() < 1e-15 {
+        Complex::new(1e12, 0.0)
+    } else {
+        (a * load_impedance + b) / denom
+    }
 }
 
 /// An active (DSP/analog) filter block — ideal voltage gain.
@@ -343,6 +407,29 @@ pub mod presets {
     pub fn lr4_hp(freq_hz: f64, z_load: f64) -> (f64, f64, f64, f64) {
         let (c, l) = butterworth2_hp(freq_hz, z_load);
         (c, l, c, l)
+    }
+
+    /// Compute parallel RLC conjugate notch values (`NotchShunt`) to flatten
+    /// a driver's fundamental impedance peak at Fs.
+    /// Returns (R_ohms, L_henries, C_farads).
+    /// Reference: Dickason, "Loudspeaker Design Cookbook", Ch. 7.
+    pub fn resonance_notch(fs_hz: f64, re_ohm: f64, qes: f64, qms: f64) -> (f64, f64, f64) {
+        let w_s = 2.0 * std::f64::consts::PI * fs_hz.max(1.0);
+        let r = re_ohm * (1.0 + qes / qms.max(0.01));
+        let l = qes * re_ohm / w_s;
+        let c = 1.0 / (w_s * w_s * l.max(1e-12));
+        (r, l, c)
+    }
+
+    /// Compute Baffle Step Compensation (BSC) parallel RL values from baffle width.
+    /// Returns (f_bsc_hz, r_bsc_ohms, l_bsc_henries).
+    /// Reference: Olson (1969); Linkwitz (2007).
+    pub fn baffle_step_rl(baffle_width_m: f64, re_ohm: f64, attenuation_db: f64) -> (f64, f64, f64) {
+        let f_bsc = 115.0 / baffle_width_m.max(0.05);
+        let ratio = 10.0_f64.powf(attenuation_db.clamp(0.5, 10.0) / 20.0);
+        let r_bsc = re_ohm * (ratio - 1.0);
+        let l_bsc = (re_ohm * r_bsc) / ((re_ohm + r_bsc) * std::f64::consts::PI * f_bsc);
+        (f_bsc, r_bsc, l_bsc)
     }
 }
 

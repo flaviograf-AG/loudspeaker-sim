@@ -100,6 +100,10 @@ export interface BandpassParams {
   port_flanged: boolean;
   rear_ql: number;
   front_ql: number;
+  order?: 4 | 6;
+  rear_port_area_m2?: number;
+  rear_port_length_m?: number;
+  rear_port_flanged?: boolean;
 }
 
 export interface PassiveRadiatorParams {
@@ -123,7 +127,7 @@ export type EnclosureConfig =
   | { type: 'Vented'; volume_m3: number; port_area_m2: number; port_length_m: number; num_ports: number; port_flanged: boolean; ql: number; port_shape: PortShape }
   | { type: 'TransmissionLine'; length_m: number; area_driver_m2: number; area_mouth_m2: number; num_segments: number; stuffing_density_kg_m3: number; flow_resistivity_pa_s_m2: number; open_end: boolean; driver_position: number; taper_profile: TaperProfile; stuffing_zones: StuffingZone[]; mouth_termination: MouthTermination; num_folds: number }
   | { type: 'Horn'; segments: HornSegment[]; rear_chamber: RearChamber; throat_chamber: ThroatChamber | null; radiation_angle_sr: number; num_tmm_segments: number; stuffing_zones: StuffingZone[] }
-  | { type: 'Bandpass'; rear_volume_m3: number; front_volume_m3: number; port_area_m2: number; port_length_m: number; port_flanged: boolean; rear_ql: number; front_ql: number }
+  | { type: 'Bandpass'; rear_volume_m3: number; front_volume_m3: number; port_area_m2: number; port_length_m: number; port_flanged: boolean; rear_ql: number; front_ql: number; order?: 4 | 6; rear_port_area_m2?: number; rear_port_length_m?: number; rear_port_flanged?: boolean }
   | { type: 'PassiveRadiator'; volume_m3: number; pr_sd_m2: number; pr_cms: number; pr_mms_kg: number; pr_rms: number; ql: number }
   | { type: 'OpenBaffle'; width_m: number; height_m: number; driver_offset_m: number };
 
@@ -214,8 +218,12 @@ export interface SystemInput {
 export interface WayResult {
   name: string;
   spl_db: number[];
+  phase_deg?: number[];
   impedance_ohm: number[];
+  impedance_phase_deg?: number[];
   filter_gain_db: number[];
+  cone_displacement_mm?: number[];
+  port_velocity_ms?: number[] | null;
 }
 
 export interface SystemResult {
@@ -224,12 +232,29 @@ export interface SystemResult {
   min_impedance_freq_hz: number;
   ways: WayResult[];
   system_spl_db: number[];
+  system_phase_deg?: number[];
   system_group_delay_ms: number[];
   system_impedance_ohm: number[];
+  system_impedance_phase_deg?: number[];
+  way_max_displacement_mm?: number[];
 }
 
 // System topology — decided in setup wizard, rarely changed
 export type SystemTopology = '1-way' | '2-way' | '2.5-way' | '3-way' | '3.5-way' | '4-way';
+
+// Crossover implementation mode
+export type CrossoverMode = 'active' | 'passive' | 'hybrid';
+
+// Shared 3D Cabinet & Baffle dimensions (couples Enclosure volume, Cut-List, and Baffle Step)
+export interface CabinetDimensions {
+  width_cm: number;
+  height_cm: number;
+  depth_cm: number;
+  wall_thickness_mm: number;
+  bracing_volume_l: number;
+  driver_displacement_l: number;
+  sync_with_enclosure: boolean;
+}
 
 // Describes the skeleton of a system before driver/enclosure details
 export interface WayTemplate {
@@ -274,6 +299,8 @@ export interface WayDesign {
 export interface DesignState {
   version: 2;
   topology: SystemTopology;
+  crossover_mode?: CrossoverMode;
+  cabinet?: CabinetDimensions;
   ways: WayDesign[];
   crossover_points: CrossoverPoint[];
   per_way_eq: ActiveFilter[][];

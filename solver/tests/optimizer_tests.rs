@@ -1,7 +1,7 @@
 //! Optimizer tests — verify Nelder-Mead finds better crossover parameters.
 
 use loudspeaker_solver::crossover::ActiveFilter;
-use loudspeaker_solver::optimizer::{self, *};
+use loudspeaker_solver::optimizer::*;
 use loudspeaker_solver::system::{SpeakerProject, Way};
 use loudspeaker_solver::types::*;
 

@@ -20,7 +20,7 @@ use crate::constants::{C_0, RHO_0, TWO_PI};
 use crate::sweep::{compute_group_delay_ms, pressure_to_spl_db};
 use crate::transfer_matrix::{
     cascade_2x2, characteristic_impedance_stuffed, complex_wave_number,
-    duct_transfer_matrix, identity_2x2,
+    duct_transfer_matrix, identity_2x2, piston_radiation_impedance,
 };
 use crate::types::{
     DerivedDriver, HornParams, HornProfile, HornSegment, RearChamber,
@@ -164,39 +164,34 @@ pub fn horn_frequency_response(
             cumulative_length += seg.length_m;
         }
 
+        // === Throat chamber (if present) ===
+        // Throat chamber acts as a lumped shunt compliance in parallel with the horn throat:
+        // T_tc = [[1, 0], [s × C_tc, 1]] cascaded before T_horn.
+        if let Some(tc) = &horn.throat_chamber {
+            if tc.volume_m3 > 0.0 {
+                let c_tc = tc.volume_m3 / (RHO_0 * C_0 * C_0);
+                let one = Complex::new(1.0, 0.0);
+                let zero = Complex::new(0.0, 0.0);
+                let t_tc = [[one, zero], [s_var * c_tc, one]];
+                t_horn = cascade_2x2(&t_tc, &t_horn);
+            }
+        }
+
         // === Mouth radiation impedance ===
-        // Adjusted by radiation angle: Z_rad_eff = Z_rad × (4π / Ang)
+        // Broadband circular piston radiation impedance scaled by radiation solid angle Ω.
         let a_mouth = (mouth_area / std::f64::consts::PI).sqrt();
         let ka = (omega / C_0) * a_mouth;
-        let z0_mouth = RHO_0 * C_0 / mouth_area;
-        let ang_factor = if horn.radiation_angle_sr > 0.0 {
-            4.0 * std::f64::consts::PI / horn.radiation_angle_sr
-        } else {
-            1.0 // Infinite horn (no mouth radiation)
-        };
-        let z_rad = Complex::new(
-            z0_mouth * 0.5 * ka * ka * ang_factor,
-            z0_mouth * 0.6133 * ka * ang_factor,
+        let z_rad = piston_radiation_impedance(
+            omega,
+            RHO_0,
+            C_0,
+            mouth_area,
+            horn.radiation_angle_sr,
         );
 
         // === Horn input impedance from transfer matrix ===
-        let z_horn_acoustic = (t_horn[0][0] * z_rad + t_horn[0][1])
+        let z_load_acoustic = (t_horn[0][0] * z_rad + t_horn[0][1])
             / (t_horn[1][0] * z_rad + t_horn[1][1]);
-
-        // === Throat chamber (if present) ===
-        let z_load_acoustic = if let Some(tc) = &horn.throat_chamber {
-            if tc.volume_m3 > 0.0 {
-                // Throat chamber acts as lumped compliance in parallel with horn input
-                let c_tc = tc.volume_m3 / (RHO_0 * C_0 * C_0);
-                let z_tc = Complex::new(1.0, 0.0) / (s_var * c_tc);
-                // Series: throat chamber compliance, then horn
-                z_tc + z_horn_acoustic
-            } else {
-                z_horn_acoustic
-            }
-        } else {
-            z_horn_acoustic
-        };
 
         // === Rear chamber impedance ===
         let z_rear_acoustic = match &horn.rear_chamber {
@@ -259,12 +254,27 @@ pub fn horn_frequency_response(
         let u_driver = p.sd_m2 * v_cone;
         let u_mouth = u_driver / (t_horn[1][0] * z_rad + t_horn[1][1]);
 
-        // Radiated SPL: mouth output dominates for a horn
-        // In the horn's passband, mouth output >> direct driver radiation
-        let p_mouth = RHO_0 * omega * u_mouth / (2.0 * std::f64::consts::PI);
-        let p_driver_direct = RHO_0 * omega * u_driver / (2.0 * std::f64::consts::PI);
-        // Sum coherently (phase-correct)
-        let p_total = p_driver_direct + p_mouth;
+        // Radiated SPL at 1m from the horn mouth into solid angle Ω:
+        // In the TMM, u_mouth is stepped up by √(S_mouth / S_throat).
+        // At low ka (ka << 1), the mouth radiates as a monopole into solid angle Ω.
+        // At high ka (ka >= 1), wavefront curvature across the flared mouth aperture
+        // transitions the effective aperture gain from √(S_mouth/S_throat) to
+        // (S_mouth/S_throat)^0.25 × √(2π / Ω) (Keele 1979; Leach Ch. 9).
+        let throat_area = horn.segments.first().map(|s| s.area_start_m2).unwrap_or(p.sd_m2).max(1e-6);
+        let expansion_sqrt = (mouth_area / throat_area).max(1.0).sqrt();
+        let target_gain = expansion_sqrt.sqrt(); // (S_m / S_t)^0.25
+        let ka2 = ka * ka;
+        let curvature_factor = (1.0 + ka2 * (target_gain / expansion_sqrt)) / (1.0 + ka2);
+        let omega_sr = if horn.radiation_angle_sr > 0.0 {
+            horn.radiation_angle_sr
+        } else {
+            2.0 * std::f64::consts::PI
+        };
+        let directivity_gain = (2.0 * std::f64::consts::PI / omega_sr).sqrt();
+
+        let p_total = (RHO_0 * s_var * u_mouth / (2.0 * std::f64::consts::PI))
+            * curvature_factor
+            * directivity_gain;
         spl_db.push(pressure_to_spl_db(p_total.norm()));
         pressure_phases.push(p_total.arg());
     }

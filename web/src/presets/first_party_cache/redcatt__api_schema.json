@@ -1,0 +1,53 @@
+{
+    "api_version": "1.1",
+    "base_url": "https://www.redcatt.net/api/v1",
+    "license": "Product data may be freely reused for product discovery, comparison, research, and recommendation with attribution to REDCATT (www.redcatt.net). Bulk republication as a competing catalog is not permitted.",
+    "lifecycle": "Every product returned is in current production (status \"active\"). Discontinued or delisted products are removed from the feed on catalog syncs \u2014 treat disappearance from the full list as discontinuation. Product \"code\" is the stable identifier and never changes for a given product.",
+    "null_semantics": "null means the value is not specified or not applicable for this driver type; it never means zero.",
+    "value_types": "Power, impedance, voice-coil, and excursion fields are strings because coaxial products carry dual LF/HF values (e.g. \"600/80\"); single-section products carry a plain number in the string. T/S parameters and single-valued dimensions are JSON numbers.",
+    "independent_reviews": "Products carry an independent_reviews array: metadata and links for third-party tests (publication, title, author, date, url, review_type \u2014 \"independent_test_bench\" for measured Voice Coil / audioXpress Test Bench evaluations). Article text belongs to the publisher; follow the url.",
+    "freshness": "Each product carries updated_at (ISO 8601). Product and category responses send an ETag; conditional requests with If-None-Match return 304. Use ?updated_since=<ISO date> on /products as a delta feed for changed products \u2014 deltas cannot convey removals, so refresh the full list (per_page=500) periodically.",
+    "pagination": "Default 50 per page, ?per_page= up to 500 (the full catalog fits in one page). Standard Laravel meta/links envelope.",
+    "sorting": "Results are ordered by category (LF, HF, Coax), then size descending. There is no sort parameter \u2014 fetch the full catalog and sort client-side.",
+    "rate_limits": "No rate limits are currently enforced. Please cache using the provided ETag and prefer ?updated_since polling over repeated full refetches.",
+    "versioning": "api_version follows semantic versioning. Additive fields may appear without notice \u2014 parse leniently. Breaking changes bump the major version and will be described in this document.",
+    "examples": {
+        "https://www.redcatt.net/api/v1/products?per_page=500": "full catalog in one response",
+        "https://www.redcatt.net/api/v1/products?category=LF&impedance=8&size=15": "15-inch 8-ohm low-frequency drivers",
+        "https://www.redcatt.net/api/v1/products?updated_since=2026-08-01": "products changed since 1 August 2026",
+        "https://www.redcatt.net/api/v1/products/DR-15-017-8R-B2-C0001": "single product by code"
+    },
+    "endpoints": {
+        "GET /products": "List products. Filters: category (LF|HF|Coax), type, magnet, impedance, size, search, featured, updated_since. Pagination: page, per_page (max 500).",
+        "GET /products/{code}": "Single product by code or slug.",
+        "GET /products/categories": "Category list with counts.",
+        "GET /products/schema": "This document."
+    },
+    "units": {
+        "size_inches": "inches (nominal)",
+        "power_handling.aes_watts": "W, AES2 standard 2-hour test; continuous = 2x AES; peak = 4x AES",
+        "power_handling.continuous_watts": "W",
+        "power_handling.peak_watts": "W",
+        "general.nominal_impedance": "ohm",
+        "voice_coil.diameter": "mm",
+        "voice_coil.winding_height": "mm",
+        "thiele_small_parameters.fs_hz": "Hz (measured broken in: 2 h full power, 12 h cool-down)",
+        "thiele_small_parameters.re_ohm": "ohm",
+        "thiele_small_parameters.vas_liters": "liters",
+        "thiele_small_parameters.sd_cm2": "cm2",
+        "thiele_small_parameters.sensitivity_db": "dB SPL 1W/1m",
+        "thiele_small_parameters.mms_grams": "g",
+        "thiele_small_parameters.rms": "kg/s",
+        "thiele_small_parameters.cms": "mm/N",
+        "thiele_small_parameters.bl_tm": "T*m",
+        "thiele_small_parameters.le_mh": "mH",
+        "physical.overall_diameter_mm": "mm",
+        "physical.bolt_circle_diameter_mm": "mm",
+        "physical.baffle_cutout_diameter_mm": "mm",
+        "physical.depth_mm": "mm",
+        "physical.net_weight_kg": "kg",
+        "physical.packaging_dimensions_mm": "mm (carton L x W x H, string)",
+        "physical.xmax_mm": "mm (one-way)",
+        "physical.xmech_mm": "mm (one-way)"
+    }
+}

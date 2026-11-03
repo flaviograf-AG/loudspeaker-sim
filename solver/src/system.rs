@@ -13,7 +13,10 @@
 use num_complex::Complex;
 
 use crate::constants::{C_0, TWO_PI};
-use crate::crossover::{active_filter_response, passive_transfer_function, ActiveFilter, PassiveBlock};
+use crate::crossover::{
+    active_filter_response, passive_input_impedance, passive_transfer_function, ActiveFilter,
+    PassiveBlock,
+};
 use crate::solve_simulation;
 use crate::sweep::{compute_group_delay_ms, log_frequency_sweep, pressure_to_spl_db};
 use crate::types::*;
@@ -67,10 +70,20 @@ pub struct WayResult {
     pub complex_pressure: Vec<Complex<f64>>,
     /// SPL of this way alone
     pub spl_db: Vec<f64>,
-    /// Electrical impedance of this way's driver + crossover
+    /// Acoustic phase of this way (degrees)
+    pub phase_deg: Vec<f64>,
+    /// Electrical impedance magnitude of this way's driver + passive crossover (Ω)
     pub impedance_ohm: Vec<f64>,
+    /// Electrical impedance phase of this way's driver + passive crossover (degrees)
+    pub impedance_phase_deg: Vec<f64>,
+    /// Complex electrical input impedance of this way (Ω)
+    pub complex_impedance: Vec<Complex<f64>>,
     /// Filter transfer function magnitude (dB) — the crossover attenuation curve
     pub filter_gain_db: Vec<f64>,
+    /// Filtered cone displacement per frequency point (mm)
+    pub cone_displacement_mm: Vec<f64>,
+    /// Filtered port air velocity per frequency point (m/s), if applicable
+    pub port_velocity_ms: Option<Vec<f64>>,
 }
 
 /// Result for the complete system.
@@ -83,11 +96,15 @@ pub struct SystemResult {
     pub ways: Vec<WayResult>,
     /// Combined system SPL (complex sum of all ways)
     pub system_spl_db: Vec<f64>,
+    /// Combined system acoustic phase (degrees)
+    pub system_phase_deg: Vec<f64>,
     /// System group delay
     pub system_group_delay_ms: Vec<f64>,
-    /// System impedance (parallel combination of all ways as seen by amplifier)
+    /// System impedance magnitude (parallel combination of all ways as seen by amplifier)
     pub system_impedance_ohm: Vec<f64>,
-    /// Maximum cone displacement per way (mm, peak)
+    /// System impedance phase (degrees)
+    pub system_impedance_phase_deg: Vec<f64>,
+    /// Maximum cone displacement per way (mm, after crossover filter attenuation)
     pub way_max_displacement_mm: Vec<f64>,
 }
 
@@ -110,8 +127,8 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         }
 
         // 1. Get raw driver response: either from measured FRD/ZMA or T/S simulation.
-        // When measured data is present, interpolate it to the system frequency grid.
-        let (raw_spl, raw_phase, raw_z_mag, raw_z_phase, has_real_phase) =
+        // Both paths provide full complex acoustic phase and complex electrical impedance.
+        let (raw_spl, raw_phase, raw_z_mag, raw_z_phase, raw_disp, raw_port_vel) =
             if let Some(ref m) = way.measured {
                 // Log-frequency linear interpolation of measured data onto system grid
                 let interp = |src_f: &[f64], src_v: &[f64], target_f: f64| -> f64 {
@@ -139,10 +156,9 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
                 } else {
                     freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.impedance_phase_deg, f)).collect()
                 };
-                way_max_displacement_mm.push(0.0); // no displacement data from FRD
-                (spl, phase, z_mag, z_phase, true)
+                (spl, phase, z_mag, z_phase, vec![0.0; n], None)
             } else {
-                // T/S-based simulation (existing path)
+                // T/S-based simulation
                 let raw_input = SimulationInput {
                     driver: way.driver.clone(),
                     enclosure: way.enclosure.clone(),
@@ -152,38 +168,47 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
                     drive_voltage_rms: project.drive_voltage_rms,
                 };
                 let raw_result = solve_simulation(&raw_input)?;
-                let max_disp = raw_result.cone_displacement_mm.iter()
-                    .cloned()
-                    .fold(0.0_f64, f64::max);
-                way_max_displacement_mm.push(max_disp);
                 (
                     raw_result.spl_db,
                     raw_result.acoustic_phase_deg,
                     raw_result.impedance_ohm,
                     raw_result.impedance_phase_deg,
-                    false,
+                    raw_result.cone_displacement_mm,
+                    raw_result.port_velocity_ms,
                 )
             };
 
         let mut complex_pressure = Vec::with_capacity(n);
         let mut way_spl = Vec::with_capacity(n);
+        let mut way_phase_deg = Vec::with_capacity(n);
         let mut way_impedance = Vec::with_capacity(n);
+        let mut way_impedance_phase = Vec::with_capacity(n);
+        let mut way_complex_impedance = Vec::with_capacity(n);
         let mut filter_gain_db = Vec::with_capacity(n);
+        let mut way_disp_mm = Vec::with_capacity(n);
+        let mut way_port_vel = raw_port_vel.as_ref().map(|_| Vec::with_capacity(n));
 
         for (i, &f) in freqs.iter().enumerate() {
             let omega = TWO_PI * f;
 
             // Driver electrical impedance (from ZMA or simulation)
             let z_driver = Complex::from_polar(
-                raw_z_mag[i],
+                raw_z_mag[i].max(1e-3),
                 raw_z_phase[i].to_radians(),
             );
 
-            // Passive crossover transfer function
-            let h_passive = if way.passive_filters.is_empty() {
-                Complex::new(1.0, 0.0)
+            // Passive crossover transfer function & branch input impedance
+            let (h_passive, z_way) = if way.passive_filters.is_empty() {
+                (Complex::new(1.0, 0.0), z_driver)
             } else {
-                passive_transfer_function(&way.passive_filters, z_driver, omega, way.source_impedance_ohm)
+                let h_p = passive_transfer_function(
+                    &way.passive_filters,
+                    z_driver,
+                    omega,
+                    way.source_impedance_ohm,
+                );
+                let z_in = passive_input_impedance(&way.passive_filters, z_driver, omega);
+                (h_p, z_in)
             };
 
             // Active filter cascade
@@ -202,36 +227,48 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
             let total_delay = way.delay_s + way.z_offset_m / C_0;
             let phase_delay = Complex::from_polar(1.0, -omega * total_delay);
 
-            // Reconstruct complex acoustic pressure.
-            // With measured FRD data, use real acoustic phase for accurate summation.
-            // With T/S simulation, use magnitude only (minimum-phase approximation).
+            // Reconstruct complex acoustic pressure using true acoustic phase
             let p_mag = 10.0_f64.powf(raw_spl[i] / 20.0) * 20e-6; // dB → Pa
-            let p_raw = if has_real_phase {
-                Complex::from_polar(p_mag, raw_phase[i].to_radians())
-            } else {
-                Complex::new(p_mag, 0.0) // minimum-phase approx
-            };
+            let p_raw = Complex::from_polar(p_mag, raw_phase[i].to_radians());
 
             // Filter transfer function (crossover attenuation in dB)
             let h_total = h_passive * h_active * gain * polarity;
-            filter_gain_db.push(20.0 * h_total.norm().log10());
+            let h_mag = h_total.norm();
+            filter_gain_db.push(20.0 * h_mag.max(1e-12).log10());
 
             // Combined: p_way = p_raw × H_passive × H_active × gain × polarity × delay
-            let p_way = p_raw * h_passive * h_active * gain * polarity * phase_delay;
+            let p_way = p_raw * h_total * phase_delay;
             complex_pressure.push(p_way);
             way_spl.push(pressure_to_spl_db(p_way.norm()));
+            way_phase_deg.push(p_way.arg().to_degrees());
 
-            // Way impedance as seen by amplifier
-            way_impedance.push(raw_z_mag[i]);
+            // Filtered mechanical displacement and port velocity
+            way_disp_mm.push(raw_disp[i] * h_mag);
+            if let (Some(ref raw_pv), Some(ref mut out_pv)) = (&raw_port_vel, &mut way_port_vel) {
+                out_pv.push(raw_pv[i] * h_mag);
+            }
+
+            // Way electrical impedance as seen by amplifier (including passive crossover ladder)
+            way_impedance.push(z_way.norm());
+            way_impedance_phase.push(z_way.arg().to_degrees());
+            way_complex_impedance.push(z_way);
         }
+
+        let max_disp = way_disp_mm.iter().cloned().fold(0.0_f64, f64::max);
+        way_max_displacement_mm.push(max_disp);
 
         way_results.push(WayResult {
             name: way.name.clone(),
             frequencies_hz: freqs.clone(),
             complex_pressure,
             spl_db: way_spl,
+            phase_deg: way_phase_deg,
             impedance_ohm: way_impedance,
+            impedance_phase_deg: way_impedance_phase,
+            complex_impedance: way_complex_impedance,
             filter_gain_db,
+            cone_displacement_mm: way_disp_mm,
+            port_velocity_ms: way_port_vel,
         });
     }
 
@@ -250,18 +287,31 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
     let system_phases: Vec<f64> = system_pressure.iter()
         .map(|p| p.arg())
         .collect();
+    let system_phase_deg: Vec<f64> = system_phases.iter()
+        .map(|p| p.to_degrees())
+        .collect();
     let system_group_delay = compute_group_delay_ms(&freqs, &system_phases);
 
-    // System impedance: parallel combination of all way impedances
-    let system_impedance: Vec<f64> = (0..n).map(|i| {
-        let mut y_total = 0.0;
+    // System impedance: complex parallel combination of all way input impedances
+    // Y_total(jω) = sum_k (1 / Z_way_k(jω))
+    let mut system_impedance = Vec::with_capacity(n);
+    let mut system_impedance_phase_deg = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut y_total = Complex::new(0.0, 0.0);
         for wr in &way_results {
-            if wr.impedance_ohm[i] > 0.0 {
-                y_total += 1.0 / wr.impedance_ohm[i];
+            let z_w = wr.complex_impedance[i];
+            if z_w.norm() > 1e-9 {
+                y_total += Complex::new(1.0, 0.0) / z_w;
             }
         }
-        if y_total > 0.0 { 1.0 / y_total } else { 1e6 }
-    }).collect();
+        let z_sys = if y_total.norm() > 1e-12 {
+            Complex::new(1.0, 0.0) / y_total
+        } else {
+            Complex::new(1e6, 0.0)
+        };
+        system_impedance.push(z_sys.norm());
+        system_impedance_phase_deg.push(z_sys.arg().to_degrees());
+    }
 
     // Find minimum system impedance
     let mut min_z = f64::MAX;
@@ -279,8 +329,10 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
         min_impedance_freq_hz: min_z_freq,
         ways: way_results,
         system_spl_db: system_spl,
+        system_phase_deg,
         system_group_delay_ms: system_group_delay,
         system_impedance_ohm: system_impedance,
+        system_impedance_phase_deg,
         way_max_displacement_mm,
     })
 }

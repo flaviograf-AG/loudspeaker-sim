@@ -22,6 +22,7 @@ All driver parameters are **fixed for a given physical driver** — the LLM shou
 | `vas_m3` | f64 | m³ | L (×1000) | 0.0001–1.0 | Equivalent compliance volume. Determines interaction with box volume. | High — directly determines Fc and Qtc for sealed |
 | `sd_m2` | f64 | m² | cm² (×1e4) | 1e-4–0.1 | Effective cone area. Determines displacement-limited SPL. | Medium — affects sensitivity and max SPL |
 | `xmax_m` | f64 | m | mm (×1000) | 0.5e-3–50e-3 | Maximum linear excursion. Determines displacement-limited max SPL. | Not used in simulation — display only |
+| `ke` | f64 | $\text{H}\cdot\text{s}^{-0.5}$ | — | 0–0.5 | Thorborg voice-coil semi-inductance coefficient (when $>0$, replaces pure $L_e$ with $K_e(j\omega)^{0.5}$). | Medium — improves HF impedance phase accuracy above 1 kHz |
 
 **Derived (computed, not inputs):** Qts, Bl, Mms, Cms, Rms, sensitivity (dB/W/m), efficiency (%).
 
@@ -106,12 +107,16 @@ All driver parameters are **fixed for a given physical driver** — the LLM shou
 
 | Field | Unit | Range | Meaning |
 |-------|------|-------|---------|
-| `rear_volume_m3` | m³ | 1e-3 – 0.5 | Sealed rear chamber. Controls HP slope. |
-| `front_volume_m3` | m³ | 1e-3 – 0.5 | Vented front chamber. Controls LP slope. |
-| `port_area_m2` | m² | 5e-5 – 0.05 | Front port area. |
-| `port_length_m` | m | 0.01 – 1.0 | Front port length. |
+| `order` | u8 | `4` or `6` | `4` = 4th-order single-reflex (sealed rear + vented front); `6` = 6th-order dual-reflex (vented rear + vented front). |
+| `rear_volume_m3` | m³ | 1e-3 – 0.5 | Rear chamber volume. Controls low-cutoff / HP slope. |
+| `front_volume_m3` | m³ | 1e-3 – 0.5 | Vented front chamber volume. Controls high-cutoff / LP slope. |
+| `port_area_m2` | m² | 5e-5 – 0.05 | Front port cross-section area. |
+| `port_length_m` | m | 0.01 – 1.0 | Front port physical length. |
+| `rear_port_area_m2` | m² | 5e-5 – 0.05 | Rear port cross-section area (used when `order == 6`). |
+| `rear_port_length_m` | m | 0.01 – 1.0 | Rear port physical length (used when `order == 6`). |
+| `rear_port_flanged` | bool | — | Rear port end correction flag (used when `order == 6`). |
 
-**Optimization:** Ratio of rear/front volumes shapes the passband width. Equal volumes → symmetric bandpass.
+**Optimization:** Ratio of rear/front volumes shapes the passband width. In 6th-order mode, tune the rear port to the lower passband edge ($F_{b,\text{rear}} < F_s$) and the front port to the upper passband edge ($F_{b,\text{front}} \approx 1.8\text{–}2.2 \times F_{b,\text{rear}}$).
 
 ---
 
@@ -152,8 +157,9 @@ All driver parameters are **fixed for a given physical driver** — the LLM shou
 
 | Field | Unit | Range | Meaning |
 |-------|------|-------|---------|
-| `ways[].active_filters` | array | — | Active crossover chain (LR4LP, LR4HP, PEQ, etc.) |
-| `ways[].passive_filters` | array | — | Passive crossover network (series/shunt RLC) |
+| `ways[].active_filters` | array | — | Active crossover chain (`LR4LP`, `LR4HP`, `PEQ`, etc., each with optional `bypassed: bool`) |
+| `ways[].passive_filters` | array | — | Passive crossover network (`PassiveFilterEntry { block, bypassed }`) |
+| `ways[].source_impedance_ohm` | Ω | 0.01 to 20 | Amplifier output + speaker cable series resistance driving the passive crossover (default `0.35`). |
 | `ways[].gain_db` | dB | -20 to +20 | Level matching between ways. |
 | `ways[].delay_s` | s | 0 to 0.01 | Time alignment (29µs ≈ 1cm). |
 | `ways[].inverted` | bool | — | 180° polarity flip. |
@@ -173,7 +179,10 @@ All driver parameters are **fixed for a given physical driver** — the LLM shou
 | `impedance_phase_deg` | deg | Impedance phase. Large negative = capacitive load (stresses amplifier). |
 | `cone_displacement_mm` | mm | Peak excursion. Compare against Xmax for distortion risk. |
 | `group_delay_ms` | ms | Time delay variation vs frequency. >20ms at LF is audible. |
-| `port_velocity_ms` | m/s | Port air velocity (vented only). >15-20 m/s → turbulence noise. |
+| `port_velocity_ms` | m/s | Port air velocity (vented/bandpass). >15-20 m/s → turbulence noise. |
+| `port_resonance_hz` | Hz (opt) | First half-wave organ-pipe resonance $f_{\text{pipe}} = c_0 / (2 L_{\text{eff}})$ of the primary/front port. |
+| `rear_port_resonance_hz` | Hz (opt) | First half-wave organ-pipe resonance of the rear port (6th-order bandpass only). |
+| `phase_deg` | deg | Acoustic pressure phase at 1m. |
 
 ### System Result
 

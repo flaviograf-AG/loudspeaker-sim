@@ -220,14 +220,14 @@ Implement the 6 tasks from `docs/plans/2026-04-08-optimizer-v3-param-locks.md`:
 
 ---
 
-## Execution Summary
+## Execution Summary (Updated 2026-11-03)
 
 | Phase | Tasks | Purpose | Status |
 |-------|-------|---------|--------|
-| **1** | 1.1–1.4 | Tests with domain understanding | **DONE** (45 E2E tests) |
-| **2** | 2.1–2.2 | Fix already-identified bugs | TODO |
-| **3** | 3.1–3.5 | Architectural review + debugging | TODO |
-| **4** | 4.1–4.6 | Priority additional features | TODO |
+| **1** | 1.1–1.4 | Tests with domain understanding | **DONE** (45 E2E tests + 95 Rust tests + 33 Node DB tests) |
+| **2** | 2.1–2.2 | Fix already-identified bugs (Source Impedance & Filter Bypass) | **DONE** |
+| **3** | 3.1–3.5 | Architectural review + debugging | **IN PROGRESS** (`Ke` semi-inductance, acoustic phase, passive network audit done) |
+| **4** | 4.1–4.6 | Priority additional features | **PARTIAL DONE** (Optimizer v2/v3, Baffle Step & Off-Axis Polar Directivity, 6th-Order Bandpass, Organ-Pipe Resonance, 1,308-Driver Provenance DB DONE) |
 
 **Phase 2** fixes known bugs — source impedance and filter bypass.
 **Phase 3** finds and fixes unknown bugs — reads reference materials, audits solver, exposes silent failures. Must complete before Phase 4.

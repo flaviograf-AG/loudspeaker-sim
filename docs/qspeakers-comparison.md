@@ -1,28 +1,23 @@
 # QSpeakers Feature Comparison
 
-## What QSpeakers Does That We Don't
+Updated 2026-11-03.
 
-1. **Enclosure optimization** — 6 vented alignments (Max Flat, Bessel, Bullock, Keele-Hoge, Legendre, Zbinden) + sealed Qtc=0.707 + bandpass optimization. One-click.
-2. **OpenSCAD export** — 3D box models + 2D cutting templates with wood thickness/kerf parameters
-3. **Series/parallel driver wiring** (Nd scaling within a single enclosure)
-4. **Slot/rectangular ports**
-5. **Undo/redo**
-6. **Visual driver and enclosure cross-section rendering**
-7. **~1100 drivers** vs our 485 (we imported a subset of their DB)
+## Parity & Gaps Closed Since Initial Audit
 
-## What We Do That QSpeakers Doesn't
+| Feature | QSpeakers | LS Graf Simulator |
+|---------|-----------|-------------------|
+| **Driver Database** | ~1,100 unverified XML entries | **1,308 verified drivers** across 23 manufacturers with 6-point T/S physics validation, provenance badges, datasheet links, and burn-in state switching |
+| **Enclosure Alignments** | Sealed ($Q_{tc}=0.707$) + 6 vented alignments | **One-click Sealed (Butterworth, Bessel, Chebyshev) & Vented (B4, QB3, SC4, EBS) alignments** |
+| **Port Geometries & Warnings** | Round & slot ports | **Round & slot ports + port air velocity plot + organ-pipe standing-wave resonance warnings** |
+| **Bandpass Enclosures** | 4th-order sealed/vented | **4th-order single-reflex AND 6th-order dual-reflex bandpass** |
+| **Cabinet & Cross-Section Visuals** | 2D/OpenSCAD export | **Live SVG enclosure cross-section schematic + interactive Cabinet Cut-List Calculator** |
+| **Undo / Redo & Snapshots** | Basic undo/redo | **50-step Undo/Redo (`Ctrl+Z`/`Ctrl+Y`) + A/B Comparison Snapshot overlay** |
 
-1. **4 additional enclosure types** (TL, Horn, PR, Open Baffle)
-2. **Crossover design** (passive + active filters, multi-way)
-3. **5 additional output plots** (impedance, displacement, group delay, port velocity)
-4. **Full electromechanical circuit models** (QSpeakers uses simplified polynomials)
-5. **Web-based** (zero install)
-6. **83 unit tests with cited equations**
-7. **CLI binary for LLM optimization**
+## What LS Graf Simulator Does That QSpeakers Doesn't
 
-## Priority Gaps to Close
-
-1. Vented alignment optimizer (closed-form formulas — easy to implement)
-2. Slot port support
-3. Undo/redo
-4. OpenSCAD/SVG enclosure diagram export
+1. **4 additional enclosure types**: Transmission Line (32-segment TMM), Multi-Segment Horn (6 flare profiles), Passive Radiator (with 1st-party PR presets), and Open Baffle (Olson diffraction)
+2. **Multi-way active & passive crossover design**: 15 passive ladder topologies + 16 active DSP filters + live SVG schematic + Nelder-Mead/DE optimizer + miniDSP biquad export
+3. **Full electromechanical circuit models**: Includes voice-coil inductance ($L_e$ and $K_e$ semi-inductance), piston radiation impedance, and complex acoustic phase summation
+4. **7 interactive diagnostic plots**: SPL (with optional Baffle Step & $0^\circ/30^\circ/60^\circ$ off-axis directivity), electrical impedance + phase, cone excursion vs $X_{\text{max}}$, port air velocity + organ-pipe resonance, group delay, acoustic phase, and crossover filter transfer functions
+5. **FRD/ZMA measurement import & export**
+6. **Zero-install WebAssembly app** at [ls.graf.me.uk](https://ls.graf.me.uk) + shareable `#v2=` design URLs

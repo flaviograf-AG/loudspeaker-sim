@@ -4,19 +4,19 @@ Generated 2026-04-08 from page-by-page VituixCAD manual reading (44 pages) cross
 
 ## Confirmed Missing / Broken
 
-| # | Feature | VituixCAD | Our Code | Severity |
-|---|---------|-----------|----------|----------|
-| 1 | **Source impedance configurable** | User sets amp output R + cable R per config (p.27 line 908) | Hardcoded 0.35Ω in `crossover.rs:113` | High — user can't model tube amps (high R) or bench setups |
-| 2 | **Power dissipation per component** | Shows power spectrum for amp, drivers, resistors in passive network (p.20 line 672) | Not computed anywhere | Medium — needed for component thermal rating |
-| 3 | **Extended impedance model (Thorborg 2010)** | Le + Leb + Ke + Rss four-parameter model (p.26 line 856) | Only Le and Ke; missing Leb (free inductance) and Rss (shunt resistance) | Medium — affects HF accuracy above 1 kHz |
-| 4 | **Multiple drivers per way** | Up to 4 drivers per way, series/parallel/series-parallel (p.7 line 257) | Single `DriverParams` per Way, no Vec | Medium — limits MTM, d'Appolito, multi-sub configs |
-| 5 | **Driver X,Y position** | Full X,Y,Z positioning per driver (p.8 line 260) | Z-offset only, no X/Y | Low — needed for off-axis/polar simulation |
-| 6 | **Listening distance** | Configurable virtual distance (p.22 line 729) | Fixed 1m assumption, not configurable | Low — affects delay/phase calculations |
-| 7 | **Baffle diffraction for all enclosures** | Diffraction simulator for any baffle shape (p.39) | Only open baffle has Olson-model diffraction (`open_baffle.rs`) | Medium — sealed/vented boxes lack baffle step |
-| 8 | **Filter bypass (without delete)** | Per-block bypass checkbox (p.9 line 325) | No `bypass` flag on PassiveBlock or ActiveFilter | Medium — important for A/B comparisons |
-| 9 | **Connection topology** | series/shunt in common net vs driver's net (p.12 lines 430-434) | Fixed ABCD ladder only | Low — covers 90% of standard crossovers |
-| 10 | **Parameter lock/optimize checkboxes** | Per-parameter Opt checkbox; unchecked = locked (p.13 line 473) | No `locked` flag on OptParam | High — already in v3 plan |
-| 11 | **Passive component values in optimizer** | All R/L/C values optimizable with Opt checkboxes | Only LPadAttenuation; can't optimize inductor/capacitor values | High — already in v3 plan |
+| # | Feature | VituixCAD | Our Code | Status |
+|---|---------|-----------|----------|--------|
+| 1 | **Source impedance configurable** | User sets amp output R + cable R per config (p.27 line 908) | `source_impedance_ohm` in `Way` / `SystemPanel.tsx` | **✓ Fixed** |
+| 2 | **Power dissipation per component** | Shows power spectrum for amp, drivers, resistors in passive network (p.20 line 672) | Planned | Open (Medium) |
+| 3 | **Extended impedance model (Thorborg 2010)** | Le + Leb + Ke + Rss four-parameter model (p.26 line 856) | `Le` and `Ke` semi-inductance implemented; `Leb`/`Rss` optional | Partial (Medium) |
+| 4 | **Multiple drivers per way** | Up to 4 drivers per way, series/parallel/series-parallel (p.7 line 257) | Single `DriverParams` per Way (Coaxial 2-Way preset supported) | Open (Medium) |
+| 5 | **Driver X,Y position & Off-Axis Directivity** | Full X,Y,Z positioning per driver (p.8 line 260) | Z-offset + circular-piston $0^\circ/30^\circ/60^\circ$ off-axis directivity overlay | **✓ Directivity Overlay Added** |
+| 6 | **Listening distance** | Configurable virtual distance (p.22 line 729) | Fixed 1m reference assumption | Open (Low) |
+| 7 | **Baffle diffraction for all enclosures** | Diffraction simulator for any baffle shape (p.39) | Open baffle Olson diffraction + configurable Baffle Step overlay on SPL plot | **✓ Implemented** |
+| 8 | **Filter bypass (without delete)** | Per-block bypass checkbox (p.9 line 325) | `bypassed: bool` on `PassiveFilterEntry` and `ActiveFilter` | **✓ Fixed** |
+| 9 | **Connection topology** | series/shunt in common net vs driver's net (p.12 lines 430-434) | ABCD ladder topologies (15 blocks) | Open (Low) |
+| 10 | **Parameter lock/optimize checkboxes** | Per-parameter Opt checkbox; unchecked = locked (p.13 line 473) | `locked: bool` on `OptParam` + UI checkboxes | **✓ Fixed** |
+| 11 | **Passive component values in optimizer** | All R/L/C values optimizable with Opt checkboxes | All passive R/L/C + active freq/gain/Q optimizable | **✓ Fixed** |
 
 ## Already Implemented (Parity)
 

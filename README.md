@@ -72,9 +72,18 @@ cd solver && wasm-pack build --target web --release
 cd web && npm install && npm run build
 ```
 
+## Documentation
+
+Full technical documentation is located in [`docs/`](./docs/README.md):
+- [`docs/README.md`](./docs/README.md) — Architecture overview, enclosure models, driver provenance pipeline, and test suite guide
+- [`docs/LLM-VARIABLE-INVENTORY.md`](./docs/LLM-VARIABLE-INVENTORY.md) — Complete JSON input/output schema and optimization guide for the `loudspeaker-solver` CLI & WASM API
+- [`docs/REFERENCES.md`](./docs/REFERENCES.md) — Academic literature and equations cited across the solver
+- [`docs/feature-audit-hornresp-xsim.md`](./docs/feature-audit-hornresp-xsim.md) & [`docs/qspeakers-comparison.md`](./docs/qspeakers-comparison.md) — Feature parity matrices vs Hornresp, XSim, VituixCAD, and QSpeakers
+- [`docs/cross-validation-results.md`](./docs/cross-validation-results.md) — Numerical cross-validation against QSpeakers C++
+
 ## References
 
-Small (1972-1973), Beranek (1954), Bailey (1965), King (2005-2020), Bradbury (1976), Keele (1979), Thorborg (2010), Bristow-Johnson (Audio EQ Cookbook).
+Small (1972-1974), Beranek (1954), Bailey (1965), Olson (1969), Bradbury (1976), Linkwitz (1976), Keele (1979), Kinsler & Frey (1982), King (2005-2020), Le Cléac'h (2009), Thorborg (2010), Bristow-Johnson (Audio EQ Cookbook).
 
 ## License
 

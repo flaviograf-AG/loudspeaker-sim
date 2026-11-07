@@ -1,0 +1,106 @@
+# LS Graf Simulator — Complete Loudspeaker Enclosure & Crossover Engineering Reference
+
+> Authoritative technical reference for LS Graf Simulator (`https://ls.graf.me.uk/`), covering loudspeaker cabinet design, Thiele-Small electro-mechanical modeling, Transfer Matrix Method (TMM) waveguides, passive RLC crossover synthesis, active DSP biquad filters, and measurement-driven speaker voicing.
+
+## 1. Overview & Architecture
+
+[LS Graf Simulator](https://ls.graf.me.uk/) is a browser-based acoustic simulation suite compiled from Rust to WebAssembly (`wasm32-unknown-unknown`). Unlike legacy desktop tools that separate box modeling (such as WinISD or Hornresp) from crossover simulation (such as XSim or VituixCAD), LS Graf Simulator couples the **shared driver parameters, enclosure radiation impedance, cabinet baffle geometry, and passive/active crossover network** into a single real-time complex solver (`20 Hz – 20 kHz`).
+
+Key outputs computed simultaneously across the frequency sweep:
+- **System & Per-Way SPL (dB at 1 m)**: Complex acoustic vector summation including driver phase, enclosure port/mouth phase, physical voice-coil depth offset ($Z_{\text{offset}}$), and baffle-step diffraction.
+- **Acoustic Phase (deg) & Group Delay (ms)**: Negative derivative of unwrapped acoustic phase $\tau_g(\omega) = -d\phi/d\omega$, critical for evaluating bass transient tightness and crossover time alignment.
+- **System Complex Electrical Impedance ($\Omega$ & Phase)**: True ladder network input impedance loading the amplifier, accounting for voice-coil DC resistance ($R_e$), inductance ($L_e$), motional resonance ($F_s, Q_{es}, Q_{ms}$), box/port loading, and passive RLC components. Flags minimum impedance $Z_{\min} < 3.2\,\Omega$ (4 $\Omega$ nominal standard).
+- **Cone Excursion (mm vs. $X_{\max}$)**: Peak diaphragm displacement at the configured RMS drive voltage / input power in Watts, flagging mechanical over-excursion below port tuning $F_b$ or below high-pass crossover cutoffs.
+- **Port Air Velocity (m/s)**: Peak air velocity inside bass-reflex or bandpass ports, flagging turbulence / port chuffing above $17\text{ m/s}$ ($5\%$ Mach) and $25\text{ m/s}$.
+- **Horizontal / Off-Axis Polar Directivity**: Combines piston radiation directivity $2 J_1(ka \sin\theta) / (ka \sin\theta)$ or imported multi-angle `.frd` measurements ($0^\circ, 15^\circ, 30^\circ, 45^\circ, 60^\circ$) to evaluate off-axis power response and crossover lobing.
+
+---
+
+## 2. Thiele-Small Parameters & Driver Selection Formulas
+
+Every electrodynamic loudspeaker driver in LS Graf Simulator is modeled from its fundamental Thiele-Small parameters:
+- **$f_s$ (Hz)**: Free-air mechanical resonance frequency, $f_s = \frac{1}{2\pi\sqrt{M_{ms} C_{ms}}}$.
+- **$R_e$ ($\Omega$)**: Voice-coil DC resistance.
+- **$L_e$ (mH)**: Voice-coil inductance (causes rising impedance $Z \approx R_e + j\omega L_e$ at high frequencies).
+- **$Q_{es}$**: Electrical Q factor at $f_s$, $Q_{es} = \frac{2\pi f_s M_{ms} R_e}{(Bl)^2}$.
+- **$Q_{ms}$**: Mechanical Q factor at $f_s$, $Q_{ms} = \frac{2\pi f_s M_{ms}}{R_{ms}}$.
+- **$Q_{ts}$**: Total driver Q factor:
+  $$Q_{ts} = \frac{Q_{es} \cdot Q_{ms}}{Q_{es} + Q_{ms}}$$
+- **$V_{as}$ (L or $\text{m}^3$)**: Equivalent air compliance volume, $V_{as} = \rho_0 c^2 C_{ms} S_d^2$.
+- **$S_d$ ($\text{cm}^2$ or $\text{m}^2$)**: Effective piston radiating area.
+- **$X_{\max}$ (mm)**: Maximum linear one-way voice-coil excursion.
+
+### Efficiency Bandwidth Product (EBP)
+$$\text{EBP} = \frac{f_s}{Q_{es}}$$
+- **$\text{EBP} < 50$**: Best suited for **Sealed (Closed Box)** or **Linkwitz-Transformed Sealed** enclosures.
+- **$50 \le \text{EBP} \le 90$**: Flexible — suitable for either **Sealed**, **Vented (Bass-Reflex)**, **Passive Radiator**, or **Quarter-Wave Transmission Line** enclosures.
+- **$\text{EBP} > 90$**: Best suited for **Vented (Bass-Reflex)** or **Horn-Loaded** enclosures.
+
+---
+
+## 3. Loudspeaker Enclosure Alignments & Equations
+
+### 3.1 Sealed Box (Closed Acoustic Suspension)
+- **Compliance Ratio**: $\alpha = V_{as} / V_b$
+- **System Resonance**: $F_c = f_s \sqrt{1 + \alpha}$
+- **System Total Q**: $Q_{tc} = Q_{ts} \sqrt{1 + \alpha}$ (combined with box absorption loss $Q_l$, typically $Q_l \approx 7$)
+- **Standard Alignments**:
+  - **Bessel ($Q_{tc} = 0.577$)**: Optimal transient step response and lowest group delay; gentle roll-off ($F_3$ higher, 12 dB/oct asymptotic slope).
+  - **Butterworth ($Q_{tc} = 0.707$)**: Maximally flat amplitude response with zero passband ripple; $F_3 = F_c$.
+  - **Chebyshev ($Q_{tc} = 0.9 - 1.1$)**: Compact box volume with a $+1\text{ dB}$ to $+2\text{ dB}$ upper-bass boost before roll-off.
+
+### 3.2 Vented Box (Bass-Reflex / Ported Helmholtz Resonator)
+- **Helmholtz Tuning Frequency ($F_b$)**:
+  $$F_b = \frac{c}{2\pi} \sqrt{\frac{S_p}{V_b \cdot L_{\text{eff}}}}$$
+  where $S_p$ is total port cross-sectional area, $V_b$ is net internal box volume, and $L_{\text{eff}} = L_{\text{phys}} + 2 \Delta L$ includes flanged ($0.85 r$) or unflanged ($0.60 r$) end corrections.
+- **Port Half-Wave Pipe Resonance**: $f_{\text{pipe}} = \frac{c}{2 L_{\text{eff}}}$. LS Graf Simulator warns when $f_{\text{pipe}} < 500\text{ Hz}$ or falls inside the driver's passband.
+- **Standard Vented Alignments**:
+  - **$B4$ (4th-Order Butterworth)**: $V_b \approx V_{as}$, $F_b \approx f_s$ (ideal for $Q_{ts} \approx 0.38–0.40$).
+  - **$QB3$ (Quasi-Butterworth 3rd-Order)**: $V_b = 15 V_{as} Q_{ts}^{2.87}$, $F_b = 0.26 f_s Q_{ts}^{-1.4}$ (for low-$Q_{ts}$ drivers).
+  - **$SC4$ (Sub-Chebyshev 4th-Order)** & **$EBS$ (Extended Bass Shelf)**: Larger cabinet volumes tuned lower for deeper sub-bass extension.
+
+### 3.3 Passive Radiator (Drone Cone)
+Replaces the open port tube with a mass-loaded passive diaphragm ($S_{d,\text{PR}}, M_{ms,\text{PR}}, C_{ms,\text{PR}}, R_{ms,\text{PR}}$), eliminating port wind chuffing and pipe standing-wave resonances in compact subwoofers.
+
+### 3.4 4th-Order & 6th-Order Bandpass
+- **4th-Order Bandpass**: Sealed rear chamber ($V_{\text{rear}}$) + vented front chamber ($V_{\text{front}}, F_{b,\text{front}}$).
+- **6th-Order Dual-Reflex Bandpass**: Vented low-tuned rear chamber ($F_{b,\text{rear}}$) + vented high-tuned front chamber ($F_{b,\text{front}}$), solved via coupled acoustic network equations.
+
+### 3.5 Quarter-Wave Transmission Line (TMM) & Multi-Segment Horns
+Solved using a **2×2 Acoustic Transfer Matrix Method (TMM)** across $N$ discretized waveguide segments:
+$$\begin{bmatrix} p_{\text{in}} \\ U_{\text{in}} \end{bmatrix} = \left( \prod_{k=1}^{N} T_k(\omega) \right) \begin{bmatrix} p_{\text{mouth}} \\ U_{\text{mouth}} \end{bmatrix}$$
+- **Transmission Line**: Quarter-wave fundamental $f_{\lambda/4} = \frac{c}{4L}$, supporting straight, conical, and exponential tapers, driver offset from the closed end (e.g. $1/3$ line offset to cancel the 3rd-harmonic pipe dip), $180^\circ$ fold acoustic mass corrections, and Delany-Bazley complex propagation in multi-zone fibrous stuffing ($\text{kg/m}^3$).
+- **Horn Loading**: Up to 4 cascaded Conical, Exponential, Hyperbolic (Salmon $T$-family), or Tractrix horn segments with sealed or vented rear compression chambers.
+
+---
+
+## 4. Passive RLC & Active DSP Crossover Engineering
+
+### 4.1 Target Acoustic Filter Alignments
+- **1st-Order Butterworth (6 dB/oct)**: $-3\text{ dB}$ at $f_c$, $90^\circ$ asymptotic phase shift, wide driver overlap.
+- **2nd-Order Linkwitz-Riley (`LR2`, 12 dB/oct)**: $-6\text{ dB}$ at $f_c$ ($Q = 0.5$); inverting one driver by $180^\circ$ yields flat coherent summation.
+- **2nd-Order Butterworth (`BW2`, 12 dB/oct)**: $-3\text{ dB}$ at $f_c$ ($Q = 0.707$).
+- **4th-Order Linkwitz-Riley (`LR4`, 24 dB/oct)**: $-6\text{ dB}$ at $f_c$ (cascade of two Butterworth 2nd-order filters); drivers are in-phase ($0^\circ$ relative phase) at $f_c$, producing a flat $+6\text{ dB}$ sum on-axis and a deep cancellation notch when one driver is inverted (**Reverse-Null Test**).
+
+### 4.2 Passive Crossover Compensation Networks
+Because a loudspeaker driver has a complex, frequency-dependent impedance $Z_{\text{driver}}(\omega)$ rather than a pure resistor, textbook passive LC tables fail without impedance linearization and baffle compensation:
+1. **Zobel Impedance Flattening (`ZobelShunt`)**: Shunt series $R_z + C_z$ across the driver terminals to linearize rising voice-coil inductance $L_e$:
+   $$R_z \approx 1.25 R_e, \quad C_z = \frac{L_e}{R_e^2}$$
+2. **Conjugate $F_s$ Resonance Notch (`NotchShunt`)**: Shunt series $R + L + C$ tuned to the tweeter or midrange fundamental resonance $f_s$ to flatten the motional impedance peak:
+   $$R_{\text{notch}} \approx R_e (Q_{ms} / Q_{es}), \quad L_{\text{notch}} = \frac{Q_{es} R_e}{2\pi f_s}, \quad C_{\text{notch}} = \frac{1}{(2\pi f_s)^2 L_{\text{notch}}}$$
+3. **Baffle Step Compensation (`SeriesParallelRL`)**: Below $f_{\text{bsc}} \approx \frac{115}{W_{\text{baffle (m)}}}$, acoustic radiation transitions from $2\pi$ half-space to $4\pi$ full-space ($-6\text{ dB}$ loss). A parallel $R_{\text{bsc}} \parallel L_{\text{bsc}}$ in series with the woofer shelves down mid/high frequencies by $3–5\text{ dB}$ to match bass sensitivity.
+4. **L-Pad Attenuator (`LPad`)**: Series resistor $R_s$ and shunt resistor $R_p$ that attenuate a higher-sensitivity tweeter by $\Delta\text{dB}$ while maintaining a constant load impedance $R_e$ seen by the crossover filter:
+   $$k = 10^{-\Delta\text{dB}/20}, \quad R_s = R_e (1 - k), \quad R_p = R_e \frac{k}{1 - k}$$
+5. **Series Parallel `R || C` (`SeriesParallelRC`)**: Capacitor in parallel with a series resistor for high-frequency contour/shelving compensation on wide-bandwidth drivers and compression horns.
+
+### 4.3 Linkwitz Transform (Active DSP Sealed-Box Extension)
+Transforms an existing small sealed enclosure with resonance $(f_0 = F_c, Q_0 = Q_{tc})$ into a deeper target response $(f_p, Q_p)$ via a 2nd-order biquad pole-zero cancellation filter, trading amplifier headroom and low-frequency cone excursion ($+12\text{ dB/oct}$ excursion increase per octave of extension) for extended flat sub-bass.
+
+---
+
+## 5. Links & Resources
+- Web Application: [https://ls.graf.me.uk/](https://ls.graf.me.uk/)
+- Markdown Reference: [https://ls.graf.me.uk/index.md](https://ls.graf.me.uk/index.md)
+- Concise LLM Map: [https://ls.graf.me.uk/llms.txt](https://ls.graf.me.uk/llms.txt)
+- Source Code: [https://github.com/flaviograf-AG/loudspeaker-sim](https://github.com/flaviograf-AG/loudspeaker-sim)
+

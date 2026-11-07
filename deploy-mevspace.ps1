@@ -29,6 +29,11 @@ for f in $(grep -l "ls\.graf\.me\.uk" /etc/nginx/sites-enabled/* 2>/dev/null || 
 done
 
 sudo tee /etc/nginx/sites-available/ls.graf.me.uk > /dev/null << 'NGINX_EOF'
+map $http_accept $ls_root_target {
+    default         /index.html;
+    ~*text/markdown /index.md;
+}
+
 server {
     listen 80;
     listen [::]:80;
@@ -45,9 +50,52 @@ server {
 
     root /var/www/ls;
     index index.html;
+    charset utf-8;
+    charset_types text/plain text/markdown application/json application/xml;
 
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Exact root '/' supports HTTP Content Negotiation (Accept: text/markdown -> /index.md, otherwise /index.html)
+    location = / {
+        add_header Vary "Accept" always;
+        add_header Link '<https://ls.graf.me.uk/index.md>; rel="alternate"; type="text/markdown", <https://ls.graf.me.uk/llms.txt>; rel="llms-txt", <https://ls.graf.me.uk/.well-known/ai-catalog.json>; rel="ai-catalog"' always;
+        rewrite ^ $ls_root_target last;
+    }
+
+    location = /index.html {
+        add_header Vary "Accept" always;
+        add_header Cache-Control "public, max-age=300, must-revalidate" always;
+        add_header Link '<https://ls.graf.me.uk/index.md>; rel="alternate"; type="text/markdown", <https://ls.graf.me.uk/llms.txt>; rel="llms-txt", <https://ls.graf.me.uk/.well-known/ai-catalog.json>; rel="ai-catalog"' always;
+    }
+
+    location ~* ^/(llms\.txt|llms-full\.txt|index\.md)$ {
+        default_type text/markdown;
+        add_header Vary "Accept" always;
+        add_header Cache-Control "public, max-age=3600" always;
+    }
+
+    location = /robots.txt {
+        default_type text/plain;
+        add_header Cache-Control "public, max-age=3600" always;
+        try_files /robots.txt =404;
+    }
+
+    location = /sitemap.xml {
+        default_type application/xml;
+        add_header Cache-Control "public, max-age=3600" always;
+        try_files /sitemap.xml =404;
+    }
+
+    location = /.well-known/ai-catalog.json {
+        default_type application/json;
+        add_header Cache-Control "public, max-age=3600" always;
+        try_files /.well-known/ai-catalog.json =404;
+    }
+
+    # Return a real 404 for unknown paths (prevents soft-404s in Google Search & Lighthouse Agentic Browsing)
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files $uri $uri/ =404;
     }
 
     location ~* \.wasm$ {
@@ -56,7 +104,7 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
-    location ~* \.(js|css|png|svg|ico)$ {
+    location ~* \.(js|css|png|svg|ico|webmanifest)$ {
         expires 30d;
         add_header Cache-Control "public, no-transform";
     }
@@ -72,13 +120,19 @@ curl -sI -H "Host: ls.graf.me.uk" http://127.0.0.1/assets/index-i0NqgtVn.js | he
 
 if (Test-Path $IdentityFile) {
   Write-Host "Uploading $DistDir\* to ${Server}:/var/www/ls/..." -ForegroundColor Cyan
-  ssh -i $IdentityFile $Server "sudo mkdir -p /var/www/ls && sudo chown -R `$(whoami):`$(whoami) /var/www/ls"
+  ssh -i $IdentityFile $Server "sudo mkdir -p /var/www/ls/.well-known && sudo chown -R `$(whoami):`$(whoami) /var/www/ls"
   scp -i $IdentityFile -r "$DistDir\*" "${Server}:/var/www/ls/"
+  if (Test-Path "$DistDir\.well-known") {
+    scp -i $IdentityFile -r "$DistDir\.well-known\*" "${Server}:/var/www/ls/.well-known/"
+  }
   $remoteSetup | ssh -i $IdentityFile $Server "tr -d '\r' | bash -s"
 } else {
   Write-Host "Uploading $DistDir\* to ${Server}:/var/www/ls/..." -ForegroundColor Cyan
-  ssh $Server "sudo mkdir -p /var/www/ls && sudo chown -R `$(whoami):`$(whoami) /var/www/ls"
+  ssh $Server "sudo mkdir -p /var/www/ls/.well-known && sudo chown -R `$(whoami):`$(whoami) /var/www/ls"
   scp -r "$DistDir\*" "${Server}:/var/www/ls/"
+  if (Test-Path "$DistDir\.well-known") {
+    scp -r "$DistDir\.well-known\*" "${Server}:/var/www/ls/.well-known/"
+  }
   $remoteSetup | ssh $Server "tr -d '\r' | bash -s"
 }
 

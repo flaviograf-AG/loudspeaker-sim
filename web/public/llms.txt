@@ -1,0 +1,26 @@
+# LS Graf Simulator
+
+> Free browser-based loudspeaker enclosure calculator, passive RLC and active DSP crossover simulator, horn and transmission-line Transfer Matrix Method (TMM) solver, and 3D cabinet cut-list generator powered by a Rust/WebAssembly acoustic physics engine and a verified 1,308-driver Thiele-Small database.
+
+LS Graf Simulator (`https://ls.graf.me.uk/`) is a modern web-based acoustic CAD tool and online alternative to WinISD, VituixCAD, XSim, Boxsim, and Hornresp. It enables DIY speaker builders, acoustic engineers, and audio enthusiasts to design 1-way, 2-way, 3-way, and 4-way loudspeaker systems directly in the browser with sub-millisecond Rust/WASM simulation.
+
+## Primary Application & Documentation
+
+- [LS Graf Simulator Web Application](https://ls.graf.me.uk/): Interactive loudspeaker enclosure and crossover design workbench (Sealed, Vented/Bass-Reflex, Passive Radiator, 4th/6th-Order Bandpass, Transmission Line, Horn, Open Baffle, Passive RLC & Active DSP Crossovers).
+- [Markdown Technical Reference (`index.md`)](https://ls.graf.me.uk/index.md): Complete Markdown documentation of acoustic equations, enclosure alignments, crossover topologies, and workflow guides.
+- [Full LLM Technical Knowledge Base (`llms-full.txt`)](https://ls.graf.me.uk/llms-full.txt): Extended reference covering Thiele-Small formulas, Baffle Step diffraction, Zobel & L-Pad synthesis, Linkwitz Transform equations, and multi-angle FRD/ZMA measurement import.
+- [GitHub Repository (`flaviograf-AG/loudspeaker-sim`)](https://github.com/flaviograf-AG/loudspeaker-sim): Open source Rust/WebAssembly acoustic solver and React/TypeScript frontend source code.
+
+## Core Loudspeaker Design Capabilities
+
+- **7 Enclosure Alignments**: Sealed (closed box with $Q_{tc}$ targets: Bessel 0.577, Butterworth 0.707, Chebyshev), Vented / Bass-Reflex ($B4$, $QB3$, $SC4$, $EBS$ alignments, circular & slot ports, organ-pipe resonance & port air velocity chuffing analysis), Passive Radiator, 4th-Order & 6th-Order Dual-Reflex Bandpass, Quarter-Wave Transmission Line (TMM with multi-zone fibrous damping & folds), Multi-Segment Horn (Conical, Exponential, Hyperbolic, Tractrix TMM), and Open Baffle dipole.
+- **Passive RLC & Active DSP Crossover Lab**: 1st-order Butterworth, 2nd/4th-order Linkwitz-Riley (`LR2`, `LR4`) and Butterworth (`BW2`) crossovers, series/shunt RLC ladders, parallel `R || C` bypass networks, Baffle-Step `R || L` compensation ($f_3 = 115 / W_m$), Zobel impedance flattening, conjugate $F_s$ resonance notch filters, L-Pad attenuators, E12/E24 component snapping, and automated Bill of Materials (BOM) generation.
+- **Active DSP & Studio Monitor Tools**: Parametric EQ (`PEQ`), Low/High Shelf, 1st/2nd-order All-Pass phase filters, Linkwitz Transform ($f_0, Q_0 \rightarrow f_p, Q_p$) sealed-box sub-bass extension, acoustic depth $Z$-offset to microsecond delay synchronization, Nelder-Mead automated crossover optimizer, and DSP biquad coefficient export (miniDSP / Equalizer APO).
+- **Measurement-Driven Voicing (FRD / ZMA)**: Import on-axis and multi-angle off-axis `.frd` frequency response and `.zma` complex impedance files, view polar directivity maps, run Reverse-Null phase alignment checks, or use Hybrid FRD + Simulated Enclosure mode.
+- **Verified 1,308-Driver Thiele-Small Database**: Built-in presets from SB Acoustics, Scan-Speak, SEAS, Dayton Audio, Peerless, Purifi, Wavecor, Visaton, Focal, Morel, Eminence, B&C Speakers, Beyma, Eighteen Sound, FaitalPRO, RCF, BMS, Celestion, Monacor, Mundorf, Tang Band, Sica, and Lavoce, plus custom driver creation.
+
+## Optional
+
+- [XML Sitemap](https://ls.graf.me.uk/sitemap.xml): Search engine sitemap indexing application and documentation endpoints.
+- [Agentic Resource Discovery Catalog](https://ls.graf.me.uk/.well-known/ai-catalog.json): Machine-readable ARD 1.0 catalog for AI agents.
+

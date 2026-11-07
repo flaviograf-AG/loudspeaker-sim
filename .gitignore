@@ -27,3 +27,8 @@ web/playwright-report/
 
 # Misc
 --sqlite
+
+# Local environment & API credentials (never commit)
+.env
+.env.*
+*.env

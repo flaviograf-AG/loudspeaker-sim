@@ -5,14 +5,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>LS Graf Simulator | Loudspeaker Design & Crossover Simulation</title>
+    <title>LS Graf Simulator | Loudspeaker Enclosure Calculator &amp; Passive/Active Crossover Design CAD</title>
     <meta
       name="description"
-      content="LS Graf Simulator is a web app for loudspeaker design, enclosure modeling, horn simulation, crossover design, and system response analysis."
+      content="Free online loudspeaker enclosure calculator, bass-reflex &amp; sealed box simulator, passive RLC &amp; active DSP crossover designer, horn &amp; transmission-line TMM solver, and 3D cabinet cut-list tool with 1,308 Thiele-Small driver presets. Browser-based alternative to WinISD, VituixCAD, XSim &amp; Hornresp."
     />
     <meta
       name="keywords"
-      content="LS Graf Simulator, loudspeaker simulator, loudspeaker design, speaker design, enclosure modeling, horn simulation, crossover simulation, Hornresp alternative, XSim alternative, speaker response analysis"
+      content="loudspeaker simulator, speaker box calculator, loudspeaker enclosure design, crossover calculator, passive crossover design, active DSP crossover, bass reflex port calculator, sealed subwoofer calculator, transmission line speaker calculator, horn loudspeaker simulator, Thiele-Small parameters, Linkwitz-Riley crossover, Zobel network calculator, baffle step compensation, L-Pad calculator, Linkwitz transform calculator, FRD ZMA viewer, WinISD alternative, VituixCAD alternative, XSim alternative, Hornresp alternative, LS Graf Simulator"
     />
     <meta
       name="robots"
@@ -22,14 +22,19 @@
       name="googlebot"
       content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
     />
+    <meta name="author" content="Flavio Graf" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="application-name" content="LS Graf Simulator" />
     <meta name="apple-mobile-web-app-title" content="LS Graf Simulator" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#0B4EA2" />
 
-    <!-- Canonical -->
+    <!-- Canonical & Agentic / Markdown Discovery Links -->
     <link rel="canonical" href="https://ls.graf.me.uk/" />
+    <link rel="alternate" type="text/markdown" href="https://ls.graf.me.uk/index.md" title="LS Graf Simulator — Loudspeaker &amp; Crossover Engineering Reference (Markdown)" />
+    <link rel="llms-txt" href="https://ls.graf.me.uk/llms.txt" />
+    <link rel="ai-catalog" href="https://ls.graf.me.uk/.well-known/ai-catalog.json" />
+    <link rel="sitemap" type="application/xml" href="https://ls.graf.me.uk/sitemap.xml" />
 
     <!-- Icons -->
     <link rel="icon" href="https://ls.graf.me.uk/favicon/favicon.svg" type="image/svg+xml" />
@@ -43,11 +48,12 @@
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="LS Graf Simulator" />
-    <meta property="og:title" content="LS Graf Simulator | Loudspeaker Design & Crossover Simulation" />
+    <meta property="og:title" content="LS Graf Simulator | Loudspeaker Enclosure &amp; Crossover Design CAD" />
     <meta
       property="og:description"
-      content="Design loudspeakers, model enclosures and horns, and simulate crossovers and system response in one web app."
+      content="Simulate sealed, bass-reflex, passive radiator, bandpass, transmission-line, and horn enclosures alongside passive RLC and active DSP crossovers with a 1,308-driver Thiele-Small database."
     />
     <meta property="og:url" content="https://ls.graf.me.uk/" />
     <meta property="og:image" content="https://ls.graf.me.uk/ls-blueprint.png" />
@@ -57,51 +63,262 @@
     <meta property="og:image:height" content="960" />
     <meta
       property="og:image:alt"
-      content="LS Graf Simulator share image showing a loudspeaker beside a technical blueprint cutaway."
+      content="LS Graf Simulator technical blueprint cutaway showing loudspeaker driver, enclosure waveguide, and crossover network."
     />
 
     <!-- Twitter / X card compatibility -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="LS Graf Simulator | Loudspeaker Design & Crossover Simulation" />
+    <meta name="twitter:title" content="LS Graf Simulator | Loudspeaker Enclosure &amp; Crossover Design CAD" />
     <meta
       name="twitter:description"
-      content="Design loudspeakers, model enclosures and horns, and simulate crossovers and system response in one web app."
+      content="Design speaker cabinets (Sealed, Vented, TL, Horn, Bandpass, PR) and passive/active crossovers in your browser with real-time Rust/WASM acoustic physics."
     />
     <meta name="twitter:image" content="https://ls.graf.me.uk/ls-blueprint.png" />
     <meta
       name="twitter:image:alt"
-      content="LS Graf Simulator share image showing a loudspeaker beside a technical blueprint cutaway."
+      content="LS Graf Simulator technical blueprint cutaway showing loudspeaker driver, enclosure waveguide, and crossover network."
     />
 
-    <!-- Structured data -->
+    <!-- Comprehensive Schema.org JSON-LD Graph -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "LS Graf Simulator",
-      "url": "https://ls.graf.me.uk/",
-      "applicationCategory": "MultimediaApplication",
-      "description": "A web-based loudspeaker design simulator for enclosure, horn, crossover, and system response modeling.",
-      "image": "https://ls.graf.me.uk/ls-blueprint.png",
-      "screenshot": "https://ls.graf.me.uk/ls-blueprint.png",
-      "publisher": {
-        "@type": "Organization",
-        "name": "LS Graf Simulator",
-        "url": "https://ls.graf.me.uk/",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://ls.graf.me.uk/favicon/favicon.svg"
+      "@graph": [
+        {
+          "@type": ["WebApplication", "SoftwareApplication"],
+          "@id": "https://ls.graf.me.uk/#application",
+          "name": "LS Graf Simulator",
+          "alternateName": [
+            "LS Graf Loudspeaker Simulator",
+            "Loudspeaker Enclosure & Crossover Simulator"
+          ],
+          "url": "https://ls.graf.me.uk/",
+          "applicationCategory": "DesignApplication",
+          "applicationSubCategory": "Acoustic Simulation & Loudspeaker CAD",
+          "operatingSystem": "All (Web Browser via WebAssembly)",
+          "browserRequirements": "Requires JavaScript and WebAssembly",
+          "softwareVersion": "2.4",
+          "datePublished": "2026-01-15",
+          "dateModified": "2026-11-07",
+          "inLanguage": "en",
+          "isAccessibleForFree": true,
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+          },
+          "description": "Free web-based loudspeaker enclosure calculator, passive RLC and active DSP crossover designer, Transfer Matrix Method (TMM) horn and transmission-line solver, and 3D speaker cabinet cut-list generator with 1,308 verified Thiele-Small driver presets.",
+          "featureList": [
+            "Sealed Box (Acoustic Suspension) calculator with Bessel (Qtc=0.577), Butterworth (Qtc=0.707), and Chebyshev alignments",
+            "Vented Box (Bass-Reflex / Helmholtz Port) simulator with B4, QB3, SC4, and EBS alignments, circular and slot port calculator, pipe standing-wave resonance, and port air velocity chuffing analysis",
+            "Passive Radiator (Drone Cone) mass-spring-compliance enclosure modeling",
+            "4th-Order Single-Reflex and 6th-Order Dual-Reflex Bandpass subwoofer modeling",
+            "Quarter-Wave Transmission Line (TL) solver using 2x2 Acoustic Transfer Matrix Method (TMM) with multi-zone Delany-Bazley fibrous damping, taper profiles, folds, and driver offset",
+            "Multi-Segment Acoustic Horn simulator supporting Conical, Exponential, Hyperbolic (Salmon T-parameter), and Tractrix flare profiles",
+            "Open Baffle dipole radiation and finite baffle diffraction simulator",
+            "Passive RLC Crossover Designer with interactive live schematic, 1st/2nd/4th-order Butterworth and Linkwitz-Riley (LR2, LR4) topologies, Series Parallel R||C and R||L networks, Sperrkreis, Saugkreis, Zobel impedance flattening, conjugate Fs resonance notch, L-Pad attenuator, and E12/E24 component snapping",
+            "Active DSP Crossover & Biquad Filter Designer with Parametric EQ (PEQ), Low/High Shelving, All-Pass phase filters, Linkwitz Transform sealed-box sub-bass extension, Z-offset time-alignment delay calculator, and miniDSP/Equalizer APO biquad export",
+            "Multi-angle FRD frequency response and ZMA complex impedance measurement import with horizontal polar directivity and Reverse-Null phase alignment verification",
+            "3D Isometric Speaker Cabinet Calculator with MDF/Birch Plywood panel cut-list, internal volume displacement, and shared Baffle Step compensation",
+            "Verified 1,308-driver Thiele-Small database plus custom driver creation and local catalog storage"
+          ],
+          "image": "https://ls.graf.me.uk/ls-blueprint.png",
+          "screenshot": "https://ls.graf.me.uk/ls-blueprint.png",
+          "sameAs": [
+            "https://github.com/flaviograf-AG/loudspeaker-sim"
+          ],
+          "author": {
+            "@type": "Person",
+            "@id": "https://ls.graf.me.uk/#author",
+            "name": "Flavio Graf",
+            "url": "https://www.linkedin.com/in/digital-business/",
+            "sameAs": [
+              "https://www.linkedin.com/in/digital-business/",
+              "https://github.com/flaviograf-AG"
+            ]
+          },
+          "publisher": {
+            "@type": "Organization",
+            "@id": "https://ls.graf.me.uk/#organization",
+            "name": "LS Graf Simulator",
+            "url": "https://ls.graf.me.uk/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://ls.graf.me.uk/favicon/favicon.svg"
+            }
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://ls.graf.me.uk/#website",
+          "url": "https://ls.graf.me.uk/",
+          "name": "LS Graf Simulator",
+          "description": "Loudspeaker Enclosure Calculator, Horn & Transmission-Line TMM Solver, and Passive/Active Crossover Design CAD",
+          "publisher": {
+            "@id": "https://ls.graf.me.uk/#organization"
+          }
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://ls.graf.me.uk/#webpage",
+          "url": "https://ls.graf.me.uk/",
+          "name": "LS Graf Simulator | Loudspeaker Enclosure Calculator & Passive/Active Crossover Design CAD",
+          "isPartOf": {
+            "@id": "https://ls.graf.me.uk/#website"
+          },
+          "about": {
+            "@id": "https://ls.graf.me.uk/#application"
+          },
+          "datePublished": "2026-01-15",
+          "dateModified": "2026-11-07",
+          "description": "Design 1-way to 4-way loudspeaker cabinets and passive RLC or active DSP crossovers in your browser using a real-time Rust/WebAssembly acoustic solver."
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://ls.graf.me.uk/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How do I choose between a Sealed and a Vented (Bass-Reflex) loudspeaker enclosure?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Calculate the driver's Efficiency Bandwidth Product (EBP = Fs / Qes) and total Q factor (Qts). Drivers with Qts > 0.45 and EBP < 50 work best in Sealed (acoustic suspension) enclosures, where Qtc = 0.707 (Butterworth) yields maximally flat bass and Qtc = 0.577 (Bessel) yields optimal transient response. Drivers with Qts between 0.25 and 0.42 and EBP > 60 work best in Vented (Bass-Reflex) enclosures using B4, QB3, SC4, or EBS port alignments."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why do passive crossovers require a Zobel network, L-Pad, and Baffle Step compensation?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Textbook crossover formulas assume a purely resistive load, whereas real loudspeaker drivers exhibit rising impedance at high frequencies due to voice-coil inductance (Le) and a fundamental resonance peak at Fs. A Zobel shunt network (Rz = 1.25 * Re, Cz = Le / Re^2) flattens rising inductive impedance so passive low-pass filters roll off accurately. A Baffle Step parallel R||L network compensates for the 4 to 6 dB bass loss that occurs below f_bsc = 115 / W_m where radiation transitions from 2-pi half-space to 4-pi full-space. An L-Pad attenuates higher-sensitivity tweeters while preserving constant load impedance."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I verify crossover phase alignment using the Reverse-Null test?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "In a 2nd-order (LR2) or 4th-order (LR4) Linkwitz-Riley crossover, the woofer and tweeter are designed to be in-phase (0 degrees relative phase) at the crossover frequency. Inverting the polarity of one driver by 180 degrees (the Reverse-Null Test) causes the two drivers to cancel out at the crossover frequency, producing a deep, symmetrical notch (-20 to -40 dB) when acoustic centers and crossover slopes are properly aligned."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can LS Graf Simulator import multi-angle FRD and ZMA measurements?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Each way supports importing standard .frd frequency response files (on-axis plus multiple off-axis angles such as 15, 30, 45, and 60 degrees) and .zma complex impedance files from REW, ARTA, or Clio. You can also enable Hybrid Mode to simulate enclosure volume and port tuning changes on top of a measured FRD response."
+              }
+            }
+          ]
         }
-      }
+      ]
     }
     </script>
 
     <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Playfair+Display:wght@400;700&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Pre-rendered semantic engineering content for search engines, AI answer engines, and non-JS crawlers.
+           Automatically replaced by the interactive React + WebAssembly application on mount. -->
+      <main style="max-width: 960px; margin: 0 auto; padding: 24px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #0f172a;">
+        <article>
+          <header>
+            <h1>LS Graf Simulator — Loudspeaker Enclosure Calculator &amp; Passive/Active Crossover Design CAD</h1>
+            <p>
+              <strong>LS Graf Simulator</strong> is a free, browser-based loudspeaker design and acoustic simulation application powered by a Rust/WebAssembly physics engine and a verified <strong>1,308-driver Thiele-Small database</strong>. It unifies 1-way, 2-way, 3-way, and 4-way <strong>speaker cabinet modeling</strong> (Sealed, Bass-Reflex/Vented, Passive Radiator, 4th &amp; 6th-Order Bandpass, Quarter-Wave Transmission Line, Multi-Segment Horn, and Open Baffle), <strong>passive RLC ladder crossover synthesis</strong>, <strong>active DSP biquad filtering</strong> (including Linkwitz Transform and Nelder-Mead optimization), <strong>multi-angle FRD/ZMA measurement import</strong>, and <strong>3D cabinet cut-list generation</strong> in a single real-time workspace — serving as a modern, cross-platform online alternative to WinISD, VituixCAD, XSim, Boxsim, and Hornresp.
+            </p>
+            <p>
+              <small>Published: <time datetime="2026-01-15">January 15, 2026</time> · Last Updated: <time datetime="2026-11-07">November 7, 2026</time> · Author: <a href="https://www.linkedin.com/in/digital-business/">Flavio Graf</a> · <a href="https://ls.graf.me.uk/index.md">Markdown Edition</a> · <a href="https://ls.graf.me.uk/llms-full.txt">LLM Engineering Reference</a></small>
+            </p>
+          </header>
+
+          <section>
+            <h2>What Loudspeaker Enclosure Types Can You Simulate?</h2>
+            <p>
+              Loudspeaker enclosure design governs low-frequency extension (<em>F3</em>, <em>F6</em>, <em>F10</em>), transient damping (group delay), electrical impedance loading, and mechanical cone excursion vs. <em>Xmax</em>. LS Graf Simulator models seven distinct acoustic alignments across 20 Hz to 20 kHz:
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Enclosure Alignment</th>
+                  <th>Acoustic Solver Model</th>
+                  <th>Key Design Parameters &amp; Readouts</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Sealed (Closed Box)</strong></td>
+                  <td>2nd-order acoustic suspension (12 dB/oct roll-off)</td>
+                  <td>Internal volume <em>Vb</em> (L), box loss <em>Ql</em>, system resonance <em>Fc = Fs · √(1 + Vas/Vb)</em>, total <em>Qtc</em> presets: Bessel (0.577), Butterworth (0.707), Chebyshev (0.957)</td>
+                </tr>
+                <tr>
+                  <td><strong>Vented (Bass-Reflex)</strong></td>
+                  <td>4th-order Helmholtz resonator (24 dB/oct roll-off)</td>
+                  <td>Box volume <em>Vb</em>, port area <em>Sp</em>, port length <em>Lp</em>, Helmholtz tuning <em>Fb</em>, <em>B4 / QB3 / SC4 / EBS</em> alignments, circular &amp; slot ports, organ-pipe resonance <em>f_pipe</em>, port air velocity <em>V_port</em> vs. 17 m/s chuffing threshold</td>
+                </tr>
+                <tr>
+                  <td><strong>Passive Radiator (PR)</strong></td>
+                  <td>4th-order coupled mass-compliance drone cone</td>
+                  <td>Box volume <em>Vb</em>, radiator area <em>Sd(PR)</em>, compliance <em>Cms(PR)</em>, moving mass <em>Mms(PR)</em>, mechanical damping <em>Rms(PR)</em></td>
+                </tr>
+                <tr>
+                  <td><strong>4th &amp; 6th-Order Bandpass</strong></td>
+                  <td>Single-reflex (sealed rear + vented front) &amp; dual-reflex (vented rear + vented front)</td>
+                  <td>Rear chamber volume <em>V_rear</em>, front chamber volume <em>V_front</em>, front and rear port tunings <em>Fb(front)</em> &amp; <em>Fb(rear)</em></td>
+                </tr>
+                <tr>
+                  <td><strong>Quarter-Wave Transmission Line</strong></td>
+                  <td>2×2 Acoustic Transfer Matrix Method (TMM) waveguide</td>
+                  <td>Line length <em>L</em> (<em>f_λ/4 = c / 4L</em>), driver &amp; mouth cross-sectional areas, Straight/Conical/Exponential taper, driver offset %, 180° folds, multi-zone Delany-Bazley fibrous stuffing</td>
+                </tr>
+                <tr>
+                  <td><strong>Multi-Segment Horn</strong></td>
+                  <td>Cascaded 2×2 TMM horn waveguide + rear chamber</td>
+                  <td>Up to 4 segments with Conical, Exponential, Hyperbolic (Salmon <em>T</em>-parameter), or Tractrix flare profiles, throat/mouth areas, flare cutoff <em>fc</em>, and sealed/vented rear chamber</td>
+                </tr>
+                <tr>
+                  <td><strong>Open Baffle (Dipole)</strong></td>
+                  <td>Finite-baffle dipole path-length cancellation</td>
+                  <td>Baffle width <em>W</em>, height <em>H</em>, asymmetric driver offset, dipole cancellation frequency</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <h2>How Does Passive RLC &amp; Active DSP Crossover Simulation Work?</h2>
+            <p>
+              Designing an accurate loudspeaker crossover requires modeling the interaction between filter components, complex driver impedance <em>Z(f)</em>, acoustic phase, physical voice-coil depth offset (<em>Z_offset</em>), and cabinet front-baffle diffraction. LS Graf Simulator supports <strong>Active DSP</strong>, <strong>Passive RLC</strong>, and <strong>Hybrid</strong> crossover architectures:
+            </p>
+            <ul>
+              <li><strong>Interactive Passive RLC Ladder Network:</strong> Build custom passive networks with Series &amp; Shunt Inductors (<em>L</em> with DC resistance <em>DCR</em>), Capacitors (<em>C</em>), Resistors (<em>R</em>), parallel <strong>R ∥ C</strong> high-frequency bypass networks, <strong>Baffle-Step R ∥ L</strong> networks (<em>f_bsc = 115 / W_m</em>), parallel-RLC traps (<em>Sperrkreis</em>), series-RLC shunt notches (<em>Saugkreis</em>), <strong>Zobel impedance linearization</strong> (<em>Rz = 1.25 · Re, Cz = Le / Re²</em>), conjugate <strong>Fs resonance notches</strong>, and <strong>L-Pad attenuators</strong>.</li>
+              <li><strong>Standard Filter Targets &amp; Reverse-Null Verification:</strong> Compare actual acoustic driver roll-offs against ideal 1st-order Butterworth (6 dB/oct), 2nd-order Butterworth (<em>BW2</em>, 12 dB/oct), 2nd-order Linkwitz-Riley (<em>LR2</em>, 12 dB/oct), and 4th-order Linkwitz-Riley (<em>LR4</em>, 24 dB/oct) target slopes, and run a 1-click <strong>Reverse-Null Polarity Test</strong> to verify phase coherence at the crossover frequency.</li>
+              <li><strong>Active DSP Biquad &amp; Linkwitz Transform Lab:</strong> Apply per-way Parametric EQ (<em>PEQ</em>), Low/High Shelving, 1st/2nd-order All-Pass phase filters, and <strong>Linkwitz Transform</strong> sealed-box sub-bass extension (<em>f0, Q0 → fp, Qp</em>), then export exact DSP biquad coefficients for miniDSP and Equalizer APO.</li>
+              <li><strong>Multi-Angle FRD &amp; ZMA Measurement Import:</strong> Upload on-axis and off-axis (15°, 30°, 45°, 60°) <code>.frd</code> frequency response and <code>.zma</code> impedance files to evaluate off-axis polar directivity, or enable <em>Hybrid Mode</em> to simulate box and port changes on top of measured driver data.</li>
+              <li><strong>3D Cabinet Cut-List &amp; Passive BOM Generator:</strong> Automatically compute MDF or Birch Plywood panel cut-lists (Butt Joint or 45° Miter), internal bracing/driver/port volume displacements, vertical driver spacing vs. crossover wavelength (<em>d_ctc vs. λ</em>), and export a complete Markdown Bill of Materials (BOM) with E12/E24 standard component values.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Frequently Asked Questions (Loudspeaker Enclosure &amp; Crossover Design)</h2>
+            <h3>How do I choose between a Sealed and a Vented (Bass-Reflex) enclosure?</h3>
+            <p>
+              Divide the driver's free-air resonance <em>Fs</em> by its electrical Q factor <em>Qes</em> to find the <strong>Efficiency Bandwidth Product (EBP = Fs / Qes)</strong>. Drivers with <em>Qts &gt; 0.45</em> and <em>EBP &lt; 50</em> are best suited for <strong>Sealed</strong> enclosures (where <em>Qtc = 0.707</em> gives a maximally flat Butterworth response and <em>Qtc = 0.577</em> gives a transient-optimal Bessel response). Drivers with <em>0.25 ≤ Qts ≤ 0.42</em> and <em>EBP &gt; 60</em> excel in <strong>Vented (Bass-Reflex)</strong> enclosures using <em>B4</em>, <em>QB3</em>, <em>SC4</em>, or <em>EBS</em> alignments.
+            </p>
+            <h3>Why do textbook passive crossover calculators fail on real loudspeaker drivers?</h3>
+            <p>
+              Textbook LC formulas assume a constant 4 Ω or 8 Ω resistor. Real loudspeaker drivers have rising impedance at high frequencies from voice-coil inductance (<em>Le</em>), a large impedance peak at fundamental resonance (<em>Fs</em>), non-flat acoustic frequency response, and a 4–6 dB baffle-step transition at <em>f_bsc ≈ 115 / W_m</em>. LS Graf Simulator solves the full complex voltage-divider ladder against the driver's real complex impedance <em>Z(f)</em> and provides 1-click Zobel, conjugate <em>Fs</em> notch, Baffle-Step <em>R ∥ L</em>, and L-Pad calculators.
+            </p>
+          </section>
+        </article>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

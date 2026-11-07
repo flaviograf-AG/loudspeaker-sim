@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://ls.graf.me.uk/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://ls.graf.me.uk/ls-blueprint.png</image:loc>
+      <image:title>LS Graf Simulator — Loudspeaker Enclosure &amp; Crossover Design Blueprint</image:title>
+      <image:caption>Interactive loudspeaker cabinet, bass reflex port, transmission line, horn, and passive/active crossover simulator.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://ls.graf.me.uk/radiographic-rosewood-tl.png</image:loc>
+      <image:title>Quarter-Wave Transmission Line Loudspeaker Cutaway</image:title>
+      <image:caption>Transfer Matrix Method (TMM) quarter-wave transmission line enclosure modeling in LS Graf Simulator.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ls.graf.me.uk/index.md</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ls.graf.me.uk/llms.txt</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://ls.graf.me.uk/llms-full.txt</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>
+

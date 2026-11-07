@@ -1,0 +1,68 @@
+# robots.txt for LS Graf Simulator (https://ls.graf.me.uk)
+# Loudspeaker Enclosure, Horn, Transmission Line & Crossover Design Simulator
+
+# Search Engine & AI Answer Engine Crawlers (Citation & Indexing Allowed)
+User-agent: Googlebot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Bingbot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Applebot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: OAI-SearchBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: ChatGPT-User
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Claude-SearchBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Claude-User
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: PerplexityBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Perplexity-User
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+# AI Grounding & Model Knowledge Crawlers
+User-agent: Google-Extended
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: GPTBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: ClaudeBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: Applebot-Extended
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: CCBot
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: *
+Allow: /
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+Sitemap: https://ls.graf.me.uk/sitemap.xml
+Agentmap: https://ls.graf.me.uk/.well-known/ai-catalog.json
+

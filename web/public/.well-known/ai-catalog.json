@@ -1,0 +1,31 @@
+{
+  "specVersion": "1.0",
+  "entries": [
+    {
+      "identifier": "urn:air:ls.graf.me.uk:simulator-webapp",
+      "displayName": "LS Graf Simulator — Loudspeaker Enclosure & Crossover CAD",
+      "description": "Interactive browser-based loudspeaker enclosure calculator (Sealed, Bass-Reflex, Passive Radiator, 4th/6th-Order Bandpass, Quarter-Wave Transmission Line, Multi-Segment Horn, Open Baffle) and Passive RLC / Active DSP Crossover simulator with a 1,308-driver Thiele-Small database.",
+      "type": "text/html",
+      "url": "https://ls.graf.me.uk/",
+      "representativeQueries": [
+        "Calculate sealed vs bass-reflex speaker box volume and port length from Thiele-Small parameters",
+        "Design a 2-way or 3-way passive RLC crossover with Zobel, L-Pad, and baffle step compensation",
+        "Simulate a quarter-wave transmission line or exponential horn loudspeaker using Transfer Matrix Method",
+        "Calculate Linkwitz Transform biquad filters and DSP time alignment delay for an active studio monitor"
+      ]
+    },
+    {
+      "identifier": "urn:air:ls.graf.me.uk:acoustics-engineering-reference",
+      "displayName": "Loudspeaker Enclosure & Crossover Engineering Reference (Markdown)",
+      "description": "Machine-readable Markdown reference guide containing Thiele-Small equations, Helmholtz port tuning formulas, Linkwitz-Riley crossover synthesis, Zobel/L-Pad/Baffle-Step formulas, and FAQs.",
+      "type": "text/markdown",
+      "url": "https://ls.graf.me.uk/llms-full.txt",
+      "representativeQueries": [
+        "What is the formula for loudspeaker baffle step frequency and Zobel network component values?",
+        "How do I choose between a sealed box and a vented bass-reflex enclosure using EBP and Qts?",
+        "How does the reverse-null polarity test verify Linkwitz-Riley crossover phase alignment?"
+      ]
+    }
+  ]
+}
+

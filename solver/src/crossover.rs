@@ -41,6 +41,16 @@ pub enum PassiveBlock {
     /// Series notch: R + L + C in series.
     /// Blocks a narrow frequency band.
     NotchSeries { ohms: f64, henries: f64, farads: f64 },
+    /// Resistor in parallel with a capacitor in the series signal path (R || C).
+    /// Used for HF bypass / contour / shelving attenuation across a series resistor.
+    SeriesParallelRC { ohms: f64, farads: f64 },
+    /// Resistor in parallel with an inductor in the series signal path (R || L).
+    /// Classic Baffle Step Compensation (BSC) network.
+    SeriesParallelRL { ohms: f64, henries: f64, dcr_ohms: f64 },
+    /// Parallel RLC tank (R || L || C) in the series signal path (Sperrkreis / series bandstop trap).
+    SeriesParallelRLC { ohms: f64, henries: f64, farads: f64 },
+    /// Series RLC branch (R + L + C) shunted to ground (Saugkreis / shunt series-RLC notch).
+    ShuntSeriesRLC { ohms: f64, henries: f64, farads: f64 },
 }
 
 /// Compute the impedance of a passive block at angular frequency omega.
@@ -79,6 +89,33 @@ fn block_impedances(block: &PassiveBlock, omega: f64) -> (Complex<f64>, Complex<
         PassiveBlock::NotchSeries { ohms, henries, farads } =>
             // R + L + C in series
             (Complex::new(*ohms, 0.0) + j * omega * henries + 1.0 / (j * omega * farads), inf),
+        PassiveBlock::SeriesParallelRC { ohms, farads } => {
+            // R || C in series signal path
+            let y_r = 1.0 / Complex::new(ohms.max(1e-6), 0.0);
+            let y_c = j * omega * farads.max(1e-15);
+            (1.0 / (y_r + y_c), inf)
+        }
+        PassiveBlock::SeriesParallelRL { ohms, henries, dcr_ohms } => {
+            // R || (R_dcr + jwL) in series signal path
+            let y_r = 1.0 / Complex::new(ohms.max(1e-6), 0.0);
+            let z_l = Complex::new(*dcr_ohms, 0.0) + j * omega * henries.max(1e-12);
+            let y_l = 1.0 / z_l;
+            (1.0 / (y_r + y_l), inf)
+        }
+        PassiveBlock::SeriesParallelRLC { ohms, henries, farads } => {
+            // R || L || C in series signal path (Sperrkreis)
+            let y_r = 1.0 / Complex::new(ohms.max(1e-6), 0.0);
+            let y_l = 1.0 / (j * omega * henries.max(1e-12));
+            let y_c = j * omega * farads.max(1e-15);
+            (1.0 / (y_r + y_l + y_c), inf)
+        }
+        PassiveBlock::ShuntSeriesRLC { ohms, henries, farads } => {
+            // R + L + C in series, shunted to ground (Saugkreis)
+            let z_total = Complex::new(ohms.max(1e-6), 0.0)
+                + j * omega * henries.max(1e-12)
+                + 1.0 / (j * omega * farads.max(1e-15));
+            (zero, z_total)
+        }
     }
 }
 

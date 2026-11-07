@@ -398,5 +398,9 @@ fn passive_block_to_json(pb: &crossover::PassiveBlock) -> system_api::PassiveFil
         crossover::PassiveBlock::LPad { series_ohms, shunt_ohms } => system_api::PassiveFilterJson::LPad { series_ohms: *series_ohms, shunt_ohms: *shunt_ohms },
         crossover::PassiveBlock::NotchShunt { ohms, henries, farads } => system_api::PassiveFilterJson::NotchShunt { ohms: *ohms, henries: *henries, farads: *farads },
         crossover::PassiveBlock::NotchSeries { ohms, henries, farads } => system_api::PassiveFilterJson::NotchSeries { ohms: *ohms, henries: *henries, farads: *farads },
+        crossover::PassiveBlock::SeriesParallelRC { ohms, farads } => system_api::PassiveFilterJson::SeriesParallelRC { ohms: *ohms, farads: *farads },
+        crossover::PassiveBlock::SeriesParallelRL { ohms, henries, dcr_ohms } => system_api::PassiveFilterJson::SeriesParallelRL { ohms: *ohms, henries: *henries, dcr_ohms: *dcr_ohms },
+        crossover::PassiveBlock::SeriesParallelRLC { ohms, henries, farads } => system_api::PassiveFilterJson::SeriesParallelRLC { ohms: *ohms, henries: *henries, farads: *farads },
+        crossover::PassiveBlock::ShuntSeriesRLC { ohms, henries, farads } => system_api::PassiveFilterJson::ShuntSeriesRLC { ohms: *ohms, henries: *henries, farads: *farads },
     }
 }

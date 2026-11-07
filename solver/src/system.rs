@@ -144,19 +144,59 @@ pub fn solve_system(project: &SpeakerProject) -> Result<SystemResult, String> {
                     *src_v.last().unwrap()
                 };
 
-                let spl: Vec<f64> = freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.spl_db, f)).collect();
-                let phase: Vec<f64> = freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.phase_deg, f)).collect();
-                let z_mag: Vec<f64> = if m.impedance_ohm.is_empty() {
+                let mut spl: Vec<f64> = freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.spl_db, f)).collect();
+                let mut phase: Vec<f64> = freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.phase_deg, f)).collect();
+                let mut z_mag: Vec<f64> = if m.impedance_ohm.is_empty() {
                     vec![way.driver.re_ohm; n] // fallback to Re if no ZMA
                 } else {
                     freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.impedance_ohm, f)).collect()
                 };
-                let z_phase: Vec<f64> = if m.impedance_phase_deg.is_empty() {
+                let mut z_phase: Vec<f64> = if m.impedance_phase_deg.is_empty() {
                     vec![0.0; n]
                 } else {
                     freqs.iter().map(|&f| interp(&m.frequencies_hz, &m.impedance_phase_deg, f)).collect()
                 };
-                (spl, phase, z_mag, z_phase, vec![0.0; n], None)
+                let mut disp = vec![0.0; n];
+                let mut port_vel = None;
+
+                // Optional Hybrid FRD + Enclosure Simulation mode:
+                // Superimposes the simulated enclosure's acoustic loading relative to an infinite baffle
+                // onto the measured FRD, and provides simulated box impedance (when no ZMA) + excursion/port velocity.
+                if m.simulate_enclosure {
+                    let box_input = SimulationInput {
+                        driver: way.driver.clone(),
+                        enclosure: way.enclosure.clone(),
+                        freq_start_hz: project.freq_start_hz,
+                        freq_end_hz: project.freq_end_hz,
+                        freq_points: project.freq_points,
+                        drive_voltage_rms: project.drive_voltage_rms,
+                    };
+                    let ib_input = SimulationInput {
+                        driver: way.driver.clone(),
+                        enclosure: EnclosureConfig::Sealed(SealedBoxParams {
+                            volume_m3: (way.driver.vas_m3 * 1000.0).max(1.0),
+                            ql: 100.0,
+                        }),
+                        freq_start_hz: project.freq_start_hz,
+                        freq_end_hz: project.freq_end_hz,
+                        freq_points: project.freq_points,
+                        drive_voltage_rms: project.drive_voltage_rms,
+                    };
+                    if let (Ok(box_res), Ok(ib_res)) = (solve_simulation(&box_input), solve_simulation(&ib_input)) {
+                        for i in 0..n {
+                            spl[i] += box_res.spl_db[i] - ib_res.spl_db[i];
+                            phase[i] += box_res.acoustic_phase_deg[i] - ib_res.acoustic_phase_deg[i];
+                        }
+                        if m.impedance_ohm.is_empty() {
+                            z_mag = box_res.impedance_ohm;
+                            z_phase = box_res.impedance_phase_deg;
+                        }
+                        disp = box_res.cone_displacement_mm;
+                        port_vel = box_res.port_velocity_ms;
+                    }
+                }
+
+                (spl, phase, z_mag, z_phase, disp, port_vel)
             } else {
                 // T/S-based simulation
                 let raw_input = SimulationInput {

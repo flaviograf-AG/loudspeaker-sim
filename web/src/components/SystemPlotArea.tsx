@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { SystemResult, SimulationResult, CabinetDimensions, WayDesign } from '../types';
+import type { SystemResult, SimulationResult, CabinetDimensions, WayDesign, CrossoverPoint, CrossoverSlope } from '../types';
 import type { OverlayData } from './ImportOverlay';
 import { FrequencyPlot } from './FrequencyPlot';
+import { InfoTooltip } from './InfoTooltip';
 
 const WAY_COLORS = ['#00809E', '#c0392b', '#27ae60', '#8e44ad', '#d4a017', '#e67e22'];
 const SNAP_COLORS = ['#95a5a6', '#7f8c8d', '#bdc3c7', '#9b59b6', '#1abc9c', '#f39c12'];
@@ -47,6 +48,46 @@ function interpolateOverlay(overlayFreqs: number[], overlayValues: number[], sim
   });
 }
 
+/** Ideal acoustic target filter magnitude in dB for LP or HP at f_xo */
+function computeTargetSlopeGainDb(f: number, fxo: number, slope: CrossoverSlope, kind: 'lp' | 'hp'): number {
+  const r = kind === 'lp' ? f / Math.max(fxo, 1) : Math.max(fxo, 1) / Math.max(f, 1);
+  const r2 = r * r;
+  let magSq = 1;
+  switch (slope) {
+    case '1st':
+      magSq = 1 / (1 + r2);
+      break;
+    case 'BW2':
+      magSq = 1 / (1 + r2 * r2);
+      break;
+    case 'LR2':
+      magSq = 1 / ((1 + r2) * (1 + r2));
+      break;
+    case 'LR4':
+      magSq = 1 / ((1 + r2 * r2) * (1 + r2 * r2));
+      break;
+  }
+  return Math.max(-55, 10 * Math.log10(Math.max(magSq, 1e-12)));
+}
+
+/** Find low-frequency roll-off point (e.g., F3 = -3 dB, F6 = -6 dB, F10 = -10 dB) relative to reference passband SPL */
+function findLowFreqCutoffHz(freqs: number[], spl: number[], refSpl: number, dropDb: number): number | null {
+  const target = refSpl - dropDb;
+  // Find first index from low frequency upward where SPL reaches target
+  for (let i = 0; i < freqs.length; i++) {
+    if (spl[i] >= target) {
+      if (i === 0) return null; // already above target at lowest frequency
+      const s0 = spl[i - 1];
+      const s1 = spl[i];
+      const f0 = freqs[i - 1];
+      const f1 = freqs[i];
+      const frac = Math.abs(s1 - s0) > 1e-6 ? (target - s0) / (s1 - s0) : 0.5;
+      return f0 + Math.max(0, Math.min(1, frac)) * (f1 - f0);
+    }
+  }
+  return null;
+}
+
 interface Props {
   result: SystemResult | null;
   /** Supplementary single-driver result for displacement/port velocity (fallback) */
@@ -58,6 +99,7 @@ interface Props {
   viewFocus?: 'all' | 'enclosure' | 'crossover';
   cabinet?: CabinetDimensions;
   ways?: WayDesign[];
+  crossoverPoints?: CrossoverPoint[];
 }
 
 export function SystemPlotArea({
@@ -70,8 +112,10 @@ export function SystemPlotArea({
   viewFocus = 'all',
   cabinet,
   ways,
+  crossoverPoints,
 }: Props) {
   const [showPolarBaffle, setShowPolarBaffle] = useState(false);
+  const [showTargetSlopes, setShowTargetSlopes] = useState(false);
 
   if (!result) {
     return (
@@ -133,6 +177,116 @@ export function SystemPlotArea({
       ]
     : [];
 
+  // Multi-angle measured Off-Axis FRD system summation (when any way has measured.off_axis curves)
+  const measuredAngles = Array.from(
+    new Set(
+      (ways ?? []).flatMap((w) => (w.measured?.off_axis ?? []).map((oa) => oa.angle_deg))
+    )
+  ).sort((a, b) => a - b);
+
+  const OFF_AXIS_COLORS = ['#0284c7', '#d97706', '#7c3aed', '#059669', '#dc2626', '#475569'];
+
+  const measuredOffAxisSeries = measuredAngles.map((angleDeg, angleIdx) => {
+    // Pre-interpolate each way's on-axis and off-axis FRD onto result.frequencies_hz
+    const perWaySplDelta: number[][] = [];
+    const perWayPhaseDelta: number[][] = [];
+
+    (ways ?? []).forEach((w) => {
+      const oa = w.measured?.off_axis?.find((o) => o.angle_deg === angleDeg);
+      if (oa && w.measured && w.measured.spl_db.length > 0 && oa.spl_db.length > 0) {
+        const onSpl = interpolateOverlay(w.measured.frequencies_hz, w.measured.spl_db, result.frequencies_hz);
+        const offSpl = interpolateOverlay(oa.frequencies_hz, oa.spl_db, result.frequencies_hz);
+        perWaySplDelta.push(offSpl.map((v, k) => v - onSpl[k]));
+
+        if (oa.phase_deg.length > 0 && w.measured.phase_deg.length > 0) {
+          const onPh = interpolateOverlay(w.measured.frequencies_hz, w.measured.phase_deg, result.frequencies_hz);
+          const offPh = interpolateOverlay(oa.frequencies_hz, oa.phase_deg, result.frequencies_hz);
+          perWayPhaseDelta.push(offPh.map((v, k) => v - onPh[k]));
+        } else {
+          perWayPhaseDelta.push(result.frequencies_hz.map(() => 0));
+        }
+      } else {
+        // Fallback to piston directivity for ways without an off-axis FRD at this angle
+        const rWay = Math.sqrt(Math.max(w.driver.sd_m2, 1e-4) / Math.PI);
+        perWaySplDelta.push(
+          result.frequencies_hz.map((f) => {
+            const kaSin = ((2 * Math.PI * f) / C0) * rWay * Math.sin((angleDeg * Math.PI) / 180);
+            return jincDirectivityDb(kaSin);
+          })
+        );
+        perWayPhaseDelta.push(result.frequencies_hz.map(() => 0));
+      }
+    });
+
+    const data = result.frequencies_hz.map((_, fIdx) => {
+      let sumRe = 0;
+      let sumIm = 0;
+      result.ways.forEach((rw, wIdx) => {
+        const spl = rw.spl_db[fIdx] + (perWaySplDelta[wIdx]?.[fIdx] ?? 0);
+        const phDeg = (rw.phase_deg?.[fIdx] ?? 0) + (perWayPhaseDelta[wIdx]?.[fIdx] ?? 0);
+        const phRad = (phDeg * Math.PI) / 180;
+        const mag = Math.pow(10, spl / 20);
+        sumRe += mag * Math.cos(phRad);
+        sumIm += mag * Math.sin(phRad);
+      });
+      const totalMag = Math.hypot(sumRe, sumIm);
+      return totalMag > 1e-12 ? 20 * Math.log10(totalMag) : -120;
+    });
+
+    return {
+      label: isSingleWay ? `${angleDeg}° Off-Axis (FRD)` : `System ${angleDeg}° (FRD)`,
+      data,
+      color: OFF_AXIS_COLORS[angleIdx % OFF_AXIS_COLORS.length],
+      dash: true,
+    };
+  });
+
+  // Compute passband reference SPL (150 Hz - 2000 Hz average, or peak - 1.5 dB for subwoofers)
+  const passbandIndices = result.frequencies_hz
+    .map((f, idx) => (f >= 150 && f <= 2000 && isFinite(result.system_spl_db[idx]) ? idx : -1))
+    .filter((idx) => idx >= 0);
+  const refSplDb =
+    passbandIndices.length > 0
+      ? passbandIndices.reduce((acc, idx) => acc + result.system_spl_db[idx], 0) / passbandIndices.length
+      : Math.max(...result.system_spl_db.filter((v) => isFinite(v)), 85) - 1.5;
+
+  const f3Hz = findLowFreqCutoffHz(result.frequencies_hz, result.system_spl_db, refSplDb, 3);
+  const f6Hz = findLowFreqCutoffHz(result.frequencies_hz, result.system_spl_db, refSplDb, 6);
+  const f10Hz = findLowFreqCutoffHz(result.frequencies_hz, result.system_spl_db, refSplDb, 10);
+
+  // Passband ripple (+/- dB between 100 Hz and 10 kHz)
+  const midHighVals = result.frequencies_hz
+    .map((f, idx) => (f >= 100 && f <= 10000 ? result.system_spl_db[idx] : NaN))
+    .filter((v) => isFinite(v));
+  const ripplePlusMinusDb =
+    midHighVals.length > 2 ? (Math.max(...midHighVals) - Math.min(...midHighVals)) / 2 : 0;
+
+  // Target Acoustic Crossover Slope Overlay (for voicing passive/active crossovers)
+  const targetSlopeSeries =
+    showTargetSlopes && crossoverPoints && crossoverPoints.length > 0
+      ? crossoverPoints.flatMap((pt, idx) => {
+          const loName = result.ways[pt.low_way_index]?.name ?? `Way ${pt.low_way_index + 1}`;
+          const hiName = pt.high_way_index !== null ? result.ways[pt.high_way_index]?.name ?? `Way ${pt.high_way_index + 1}` : null;
+          const curves = [
+            {
+              label: `Target ${loName} LP (${pt.slope} @ ${pt.freq_hz}Hz)`,
+              data: result.frequencies_hz.map((f) => refSplDb + computeTargetSlopeGainDb(f, pt.freq_hz, pt.slope, 'lp')),
+              color: idx === 0 ? '#0ea5e9' : '#14b8a6',
+              dash: true,
+            },
+          ];
+          if (hiName) {
+            curves.push({
+              label: `Target ${hiName} HP (${pt.slope} @ ${pt.freq_hz}Hz)`,
+              data: result.frequencies_hz.map((f) => refSplDb + computeTargetSlopeGainDb(f, pt.freq_hz, pt.slope, 'hp')),
+              color: idx === 0 ? '#f43f5e' : '#f97316',
+              dash: true,
+            });
+          }
+          return curves;
+        })
+      : [];
+
   // Per-way SPL + system total
   const splSeries = [
     ...result.ways.map((w, i) => ({
@@ -147,6 +301,8 @@ export function SystemPlotArea({
       color: '#1a1a1a',
       dash: false,
     }] : []),
+    ...targetSlopeSeries,
+    ...measuredOffAxisSeries,
     ...polarOverlaySeries,
     // Snapshots
     ...(snapshots || []).map((s, i) => ({
@@ -292,8 +448,124 @@ export function SystemPlotArea({
         ]
       : [];
 
+  // Peak cone excursion & peak port velocity across all ways
+  const peakDispMm = Math.max(
+    0,
+    ...result.ways.flatMap((w) => w.cone_displacement_mm ?? []),
+    ...(supplement?.cone_displacement_mm ?? [])
+  );
+  const primaryXmaxMm = wayXmaxMm?.[0] ?? xmaxMm ?? 6;
+  const dispExceeded = primaryXmaxMm > 0 && peakDispMm > primaryXmaxMm;
+
+  const peakPortVelMs = Math.max(
+    0,
+    ...result.ways.flatMap((w) => w.port_velocity_ms ?? []),
+    ...(supplement?.port_velocity_ms ?? [])
+  );
+  const hasPortVel = waysWithPortVel.length > 0 || !!supplement?.port_velocity_ms;
+  const portChuffWarning = hasPortVel && peakPortVelMs > 17;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* Live Acoustic Metrics & Health Summary Bar */}
+      <div
+        data-testid="acoustic-metrics-bar"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6,
+          padding: '5px 10px',
+          background: '#f8fafc',
+          border: '1px solid #cbd5e1',
+          borderRadius: 6,
+          fontSize: 11,
+          color: '#334155',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          <span title="Average passband sensitivity (150 Hz – 2 kHz) and response ripple (±dB from 100 Hz – 10 kHz)">
+            <strong>SPL<sub>ref</sub>:</strong> {refSplDb.toFixed(1)} dB{' '}
+            <span style={{ color: '#64748b' }}>(±{ripplePlusMinusDb.toFixed(1)} dB)</span>
+          </span>
+          <span title="Low-frequency cutoff points where response drops -3 dB (F3), -6 dB (F6), and -10 dB (F10) below passband level">
+            <strong>F3:</strong> {f3Hz ? `${f3Hz.toFixed(1)} Hz` : '—'} ·{' '}
+            <strong>F6:</strong> {f6Hz ? `${f6Hz.toFixed(1)} Hz` : '—'} ·{' '}
+            <strong>F10:</strong> {f10Hz ? `${f10Hz.toFixed(1)} Hz` : '—'}
+            <InfoTooltip
+              variant="item"
+              title="F3 / F6 / F10 — Low-Frequency Extension Cutoffs"
+              text="F3 (-3 dB, half acoustic power) is the standard anechoic bass cutoff rating. F6 (-6 dB) and F10 (-10 dB) indicate usable in-room bass extension with room boundary gain."
+              links={[{ label: 'Wikipedia: Cutoff Frequency (-3 dB)', url: 'https://en.wikipedia.org/wiki/Cutoff_frequency' }]}
+            />
+          </span>
+          <span
+            style={{
+              color: minZWarning ? '#b91c1c' : '#15803d',
+              fontWeight: minZWarning ? 700 : 500,
+            }}
+            title="Minimum electrical impedance across the frequency sweep. Keep ≥ 3.2 Ω for 4 Ω nominal amplifier stability."
+          >
+            <strong>Z<sub>min</sub>:</strong> {result.min_impedance_ohm.toFixed(1)} Ω @{' '}
+            {result.min_impedance_freq_hz.toFixed(0)} Hz {minZWarning ? '⚠' : '✓'}
+          </span>
+          {peakDispMm > 0 && (
+            <span
+              style={{
+                color: dispExceeded ? '#b91c1c' : '#334155',
+                fontWeight: dispExceeded ? 700 : 400,
+              }}
+              title="Peak cone excursion across the sweep compared against driver Xmax limit"
+            >
+              <strong>X<sub>peak</sub>:</strong> {peakDispMm.toFixed(2)} / {primaryXmaxMm.toFixed(1)} mm{' '}
+              {dispExceeded ? '⚠ >Xmax' : '✓'}
+            </span>
+          )}
+          {hasPortVel && (
+            <span
+              style={{
+                color: portChuffWarning ? '#b91c1c' : '#334155',
+                fontWeight: portChuffWarning ? 700 : 400,
+              }}
+              title="Peak port air velocity. Keep below ~17 m/s (Mach 0.05) to avoid audible port turbulence / chuffing."
+            >
+              <strong>V<sub>port</sub>:</strong> {peakPortVelMs.toFixed(1)} m/s{' '}
+              {portChuffWarning ? '⚠ Chuffing' : '✓'}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          {!isSingleWay && crossoverPoints && crossoverPoints.length > 0 && (
+            <label
+              style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none', color: '#0369a1', fontWeight: 600 }}
+              title="Overlay ideal textbook acoustic LP & HP crossover target slopes (LR4, LR2, BW2, 1st) on the SPL chart to guide passive/active voicing"
+            >
+              <input
+                type="checkbox"
+                checked={showTargetSlopes}
+                data-testid="toggle-target-slopes"
+                onChange={(e) => setShowTargetSlopes(e.target.checked)}
+              />
+              Target XO Slopes
+            </label>
+          )}
+          <label
+            style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', userSelect: 'none' }}
+            title={`Baffle width: ${Math.round(baffleWidthM * 100)} cm (f_bsc ≈ ${fStepHz} Hz)`}
+          >
+            <input
+              type="checkbox"
+              checked={showPolarBaffle}
+              data-testid="toggle-polar-baffle"
+              onChange={(e) => setShowPolarBaffle(e.target.checked)}
+            />
+            Baffle &amp; Off-Axis (0°/30°/60°)
+          </label>
+        </div>
+      </div>
+
       {minZWarning && (
         <div style={{
           background: '#fee', border: '1px solid #e0a0a0', borderRadius: 4,
@@ -302,21 +574,6 @@ export function SystemPlotArea({
           Min |Z| = {result.min_impedance_ohm.toFixed(1)}&Omega; at {result.min_impedance_freq_hz.toFixed(0)}Hz (below 3.2&Omega; safe limit)
         </div>
       )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 6px' }}>
-        <span style={{ fontSize: 11, color: 'var(--graf-warm-500, #6b655e)' }}>
-          Baffle width: <strong>{Math.round(baffleWidthM * 100)} cm</strong> &middot; Baffle step f<sub>3dB</sub> &approx; <strong>{fStepHz} Hz</strong>
-        </span>
-        <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
-          <input
-            type="checkbox"
-            checked={showPolarBaffle}
-            data-testid="toggle-polar-baffle"
-            onChange={(e) => setShowPolarBaffle(e.target.checked)}
-          />
-          Overlay Baffle Step &amp; Off-Axis Directivity (0&deg; / 30&deg; / 60&deg;)
-        </label>
-      </div>
 
       <FrequencyPlot
         title={isSingleWay ? 'SPL (dB) — 1m, 2.83V' : 'System SPL (dB) — per-way + combined'}

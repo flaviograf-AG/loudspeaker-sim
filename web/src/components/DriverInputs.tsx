@@ -7,6 +7,7 @@ import {
   parseAnalyzerOrDatasheetText,
 } from '../compute';
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 
 interface Props {
   params: DriverParams;
@@ -55,7 +56,10 @@ export function DriverInputs({ params, onChange }: Props) {
   return (
     <div className="section-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div className="section-title" style={{ margin: 0 }}>Driver (Thiele-Small)</div>
+        <div className="section-title" style={{ margin: 0 }}>
+          Driver (Thiele-Small)
+          <InfoTooltip variant="section" docKey="section:driver-ts" />
+        </div>
         <div style={{ display: 'flex', gap: 3 }}>
           <button
             className={`graf-btn graf-btn-sm ${showPhysical ? 'graf-btn-primary' : 'graf-btn-outline'}`}
@@ -204,6 +208,7 @@ export function DriverInputs({ params, onChange }: Props) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>
               Lumped Physical Components (⇄ Syncs T/S)
+              <InfoTooltip variant="section" docKey="section:physical-params" />
             </span>
             <button
               className="graf-btn graf-btn-sm graf-btn-outline"
@@ -306,6 +311,7 @@ export function DriverInputs({ params, onChange }: Props) {
       <div className="derived-params" style={{ marginTop: 6 }}>
         <span title="Total Q factor — parallel combination of Qes and Qms. Controls transient damping.">
           Qts={metrics.qts.toFixed(3)}
+          <InfoTooltip variant="item" docKey="param:qts" />
         </span>
         <span title="Force factor (Bl product) — magnetic flux × voice coil length.">
           Bl={metrics.bl_tm.toFixed(2)} T·m
@@ -327,6 +333,7 @@ export function DriverInputs({ params, onChange }: Props) {
         </span>
         <span title="Efficiency Bandwidth Product (Fs / Qes) and recommended enclosure alignment.">
           EBP={metrics.ebp.toFixed(0)} → {metrics.recommended_enclosure}
+          <InfoTooltip variant="item" docKey="param:ebp" />
         </span>
       </div>
     </div>

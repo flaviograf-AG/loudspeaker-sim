@@ -245,6 +245,107 @@ export function SharedSystemBar({
   const primaryRe = design.ways[0]?.driver.re_ohm ?? 8;
   const bsc = computeBaffleStepParams(baffleW, primaryRe, 4.5);
 
+  // Build actionable Design Advisor suggestions
+  const advisorItems: { id: string; severity: 'warn' | 'tip'; message: string; actionLabel: string; onFix: () => void }[] = [];
+  const wooferMetrics = design.ways[0] ? deriveDriverMetrics(design.ways[0].driver) : null;
+
+  design.crossover_points.forEach((pt, ptIdx) => {
+    if (pt.high_way_index !== null) {
+      const highWay = design.ways[pt.high_way_index];
+      if (highWay) {
+        const highMetrics = deriveDriverMetrics(highWay.driver);
+        if (pt.freq_hz < highMetrics.min_safe_xo_hz) {
+          advisorItems.push({
+            id: `safe-xo-${ptIdx}`,
+            severity: 'warn',
+            message: `${highWay.name} crossover (${pt.freq_hz} Hz) is below 2×Fs (${highMetrics.min_safe_xo_hz} Hz) — risk of thermal/excursion distortion`,
+            actionLabel: `Set XO to ${highMetrics.min_safe_xo_hz} Hz`,
+            onFix: () => {
+              const nextPts = [...design.crossover_points];
+              nextPts[ptIdx] = { ...pt, freq_hz: highMetrics.min_safe_xo_hz };
+              onUpdateDesign({ crossover_points: nextPts });
+            },
+          });
+        }
+      }
+    }
+  });
+
+  if (design.ways.length > 1 && wooferMetrics) {
+    design.ways.forEach((w, wIdx) => {
+      const wm = deriveDriverMetrics(w.driver);
+      if (wIdx === 0 && mode === 'passive' && w.driver.le_h >= 0.25e-3) {
+        const hasZobel = w.passive_filters.some((pf) => pf.type === 'ZobelShunt');
+        if (!hasZobel && w.passive_filters.length > 0) {
+          advisorItems.push({
+            id: `zobel-${wIdx}`,
+            severity: 'tip',
+            message: `${w.name} has Le=${(w.driver.le_h * 1000).toFixed(2)} mH without a Zobel network — rising impedance may skew passive LP rolloff`,
+            actionLabel: `+ Add Zobel (${wm.zobel.r_ohm}Ω / ${wm.zobel.c_uf}µF)`,
+            onFix: () => {
+              const nextWays = design.ways.map((wayItem, idx) =>
+                idx === wIdx
+                  ? {
+                      ...wayItem,
+                      passive_filters: [
+                        ...wayItem.passive_filters,
+                        { type: 'ZobelShunt' as const, ohms: wm.zobel.r_ohm, farads: wm.zobel.c_farads },
+                      ],
+                    }
+                  : wayItem
+              );
+              onUpdateDesign({ ways: nextWays });
+            },
+          });
+        }
+      }
+      if (wIdx > 0) {
+        const sensDelta = Number((wm.sensitivity_2v83_db - wooferMetrics.sensitivity_2v83_db).toFixed(1));
+        if (mode === 'passive' && sensDelta > 1.5 && w.passive_filters.length > 0) {
+          const hasLPad = w.passive_filters.some((pf) => pf.type === 'LPad');
+          if (!hasLPad) {
+            const ratio = Math.pow(10, sensDelta / 20);
+            const rSer = Number(((w.driver.re_ohm * (ratio - 1)) / ratio).toFixed(2));
+            const rShnt = Number(((w.driver.re_ohm * ratio) / (ratio - 1)).toFixed(2));
+            advisorItems.push({
+              id: `lpad-${wIdx}`,
+              severity: 'warn',
+              message: `${w.name} is +${sensDelta} dB louder than ${design.ways[0].name} without a passive L-Pad`,
+              actionLabel: `+ Add -${sensDelta} dB L-Pad`,
+              onFix: () => {
+                const nextWays = design.ways.map((wayItem, idx) =>
+                  idx === wIdx
+                    ? {
+                        ...wayItem,
+                        passive_filters: [
+                          ...wayItem.passive_filters,
+                          { type: 'LPad' as const, series_ohms: rSer, shunt_ohms: rShnt },
+                        ],
+                      }
+                    : wayItem
+                );
+                onUpdateDesign({ ways: nextWays });
+              },
+            });
+          }
+        } else if (mode === 'active' && sensDelta > 1.5 && Math.abs(w.gain_db) < 0.2) {
+          advisorItems.push({
+            id: `active-level-${wIdx}`,
+            severity: 'tip',
+            message: `${w.name} sensitivity is +${sensDelta} dB higher than ${design.ways[0].name}`,
+            actionLabel: `Match Gain (-${sensDelta} dB)`,
+            onFix: () => {
+              const nextWays = design.ways.map((wayItem, idx) =>
+                idx === wIdx ? { ...wayItem, gain_db: -sensDelta } : wayItem
+              );
+              onUpdateDesign({ ways: nextWays });
+            },
+          });
+        }
+      }
+    });
+  }
+
   return (
     <div
       data-testid="shared-system-bar"
@@ -415,6 +516,53 @@ export function SharedSystemBar({
           </span>
         </div>
       </div>
+
+      {/* Actionable Design Health Advisor Strip */}
+      {advisorItems.length > 0 && (
+        <div
+          data-testid="design-advisor-strip"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            paddingTop: 2,
+          }}
+        >
+          {advisorItems.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 8px',
+                borderRadius: 5,
+                fontSize: 10.5,
+                background: item.severity === 'warn' ? '#fffbeb' : '#f0fdf4',
+                border: `1px solid ${item.severity === 'warn' ? '#fcd34d' : '#bbf7d0'}`,
+                color: item.severity === 'warn' ? '#92400e' : '#166534',
+              }}
+            >
+              <span>
+                <strong>{item.severity === 'warn' ? '⚠ Advisor:' : '💡 Tip:'}</strong> {item.message}
+              </span>
+              <button
+                type="button"
+                className="graf-btn graf-btn-sm graf-btn-outline"
+                style={{
+                  fontSize: 9.5,
+                  padding: '1px 6px',
+                  background: '#ffffff',
+                  fontWeight: 600,
+                }}
+                onClick={item.onFix}
+              >
+                {item.actionLabel}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

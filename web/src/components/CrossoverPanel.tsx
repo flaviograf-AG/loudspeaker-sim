@@ -2,6 +2,7 @@ import { CrossoverPointsEditor } from './CrossoverPointsEditor';
 import { PerWayEqEditor } from './PerWayEqEditor';
 import { PassiveWizard } from './PassiveWizard';
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 import {
   deriveDriverMetrics,
   populatePassiveFiltersFromPoints,
@@ -85,7 +86,10 @@ export function CrossoverPanel({
       {/* Explicit Crossover Mode Selector */}
       <div className="section-card" style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <div className="section-title" style={{ margin: 0 }}>Crossover Architecture</div>
+          <div className="section-title" style={{ margin: 0 }}>
+            Crossover Architecture
+            <InfoTooltip variant="section" docKey="section:crossover-mode" />
+          </div>
         </div>
         <div className="btn-row" style={{ marginBottom: 6 }}>
           {(
@@ -142,15 +146,11 @@ export function CrossoverPanel({
       <CrossoverPointsEditor
         points={design.crossover_points}
         ways={design.ways}
-        onChange={(pts) => {
-          if (mode === 'passive' && onUpdateDesign) {
-            const synthesizedWays = populatePassiveFiltersFromPoints(design.ways, pts, {
-              includeZobel: true,
-              includeLPad: true,
-            });
-            onUpdateDesign({ crossover_points: pts, ways: synthesizedWays });
-          } else {
-            onUpdatePoints(pts);
+        onChange={onUpdatePoints}
+        onToggleWayInvert={(wayIdx) => {
+          const targetWay = design.ways[wayIdx];
+          if (targetWay) {
+            onUpdateWay(wayIdx, { inverted: !targetWay.inverted });
           }
         }}
       />
@@ -160,8 +160,9 @@ export function CrossoverPanel({
         <>
           <div className="section-subtitle" style={{ marginTop: 8, marginBottom: 4 }}>
             {way.name} Alignment & Level
+            <InfoTooltip variant="section" docKey="section:driver-alignment" />
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
             <label title="Enable/disable this way" style={{ fontSize: 12, cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -178,6 +179,38 @@ export function CrossoverPanel({
               />{' '}
               Inv
             </label>
+            {activeWay > 0 && mode !== 'passive' && (
+              <button
+                type="button"
+                className="graf-btn graf-btn-sm graf-btn-outline"
+                style={{ fontSize: 10, padding: '1px 5px' }}
+                title={`Match ${way.name} active gain to primary Woofer sensitivity (${refSens.toFixed(1)} dB vs ${wayMetrics.sensitivity_2v83_db.toFixed(1)} dB)`}
+                onClick={() =>
+                  onUpdateWay(activeWay, {
+                    gain_db: Number((refSens - wayMetrics.sensitivity_2v83_db).toFixed(1)),
+                  })
+                }
+              >
+                Match Level ({Number((refSens - wayMetrics.sensitivity_2v83_db).toFixed(1))} dB)
+              </button>
+            )}
+            <button
+              type="button"
+              className="graf-btn graf-btn-sm graf-btn-outline"
+              style={{ fontSize: 10, padding: '1px 5px' }}
+              title={`Convert physical acoustic center depth difference into DSP time alignment delay (c = 343.2 m/s → 29.1 µs/cm)`}
+              onClick={() => {
+                const maxZ = Math.max(...design.ways.map((w) => w.z_offset_m));
+                const relativeDepthM = Math.max(0, maxZ - way.z_offset_m);
+                const delayS =
+                  relativeDepthM > 0
+                    ? Number((relativeDepthM / 343.21).toPrecision(4))
+                    : Number((Math.abs(way.z_offset_m) / 343.21).toPrecision(4));
+                onUpdateWay(activeWay, { delay_s: delayS });
+              }}
+            >
+              Sync Delay from Z
+            </button>
           </div>
           <NumericInput
             label="Gain"
@@ -216,6 +249,8 @@ export function CrossoverPanel({
         <PerWayEqEditor
           filters={design.per_way_eq[activeWay] ?? []}
           onChange={(eq) => onUpdateEq(activeWay, eq)}
+          driver={way.driver}
+          enclosure={way.enclosure}
         />
       )}
 

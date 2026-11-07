@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { InfoTooltip, resolveKnowledgeEntry, type TooltipLink } from './InfoTooltip';
 
 interface NumericInputProps {
   label: string;
@@ -8,14 +9,17 @@ interface NumericInputProps {
   max?: number;
   unit?: string;
   tooltip?: string;
+  docKey?: string;
+  links?: TooltipLink[];
   onChange: (value: number) => void;
 }
 
-export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, onChange }: NumericInputProps) {
+export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, docKey, links, onChange }: NumericInputProps) {
   const [draft, setDraft] = useState(formatVal(value));
   const [focused, setFocused] = useState(false);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const kb = resolveKnowledgeEntry(label, docKey);
 
   // Sync from parent when not focused (undo, external change)
   useEffect(() => {
@@ -48,7 +52,18 @@ export function NumericInput({ label, value, step = 1, min, max, unit, tooltip, 
 
   return (
     <div className="param-row" title={tooltip}>
-      <span className="param-label">{label}</span>
+      <span className="param-label">
+        {label}
+        {(tooltip || kb) && (
+          <InfoTooltip
+            variant="item"
+            title={kb?.title ?? `${label}${unit ? ` (${unit})` : ''}`}
+            text={tooltip ?? kb?.body}
+            formula={kb?.formula}
+            links={links ?? kb?.links}
+          />
+        )}
+      </span>
       <input
         type="number"
         className="graf-form-control"

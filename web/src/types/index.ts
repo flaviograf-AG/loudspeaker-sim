@@ -165,7 +165,29 @@ export type PassiveFilter =
   | { type: 'ZobelShunt'; ohms: number; farads: number; bypassed?: boolean }
   | { type: 'LPad'; series_ohms: number; shunt_ohms: number; bypassed?: boolean }
   | { type: 'NotchShunt'; ohms: number; henries: number; farads: number; bypassed?: boolean }
-  | { type: 'NotchSeries'; ohms: number; henries: number; farads: number; bypassed?: boolean };
+  | { type: 'NotchSeries'; ohms: number; henries: number; farads: number; bypassed?: boolean }
+  | { type: 'SeriesParallelRC'; ohms: number; farads: number; bypassed?: boolean }
+  | { type: 'SeriesParallelRL'; ohms: number; henries: number; dcr_ohms: number; bypassed?: boolean }
+  | { type: 'SeriesParallelRLC'; ohms: number; henries: number; farads: number; bypassed?: boolean }
+  | { type: 'ShuntSeriesRLC'; ohms: number; henries: number; farads: number; bypassed?: boolean };
+
+export interface OffAxisMeasurement {
+  angle_deg: number;
+  label?: string;
+  frequencies_hz: number[];
+  spl_db: number[];
+  phase_deg: number[];
+}
+
+export interface MeasuredWayData {
+  frequencies_hz: number[];
+  spl_db: number[];
+  phase_deg: number[];
+  impedance_ohm: number[];
+  impedance_phase_deg: number[];
+  simulate_enclosure?: boolean;
+  off_axis?: OffAxisMeasurement[];
+}
 
 export type ActiveFilter =
   | { type: 'LowPass1'; freq_hz: number; bypassed?: boolean }
@@ -197,13 +219,7 @@ export interface WayInput {
   z_offset_m: number;
   enabled: boolean;
   preset_name?: string;
-  measured?: {
-    frequencies_hz: number[];
-    spl_db: number[];
-    phase_deg: number[];
-    impedance_ohm: number[];
-    impedance_phase_deg: number[];
-  };
+  measured?: MeasuredWayData;
   source_impedance_ohm?: number;
 }
 
@@ -287,13 +303,7 @@ export interface WayDesign {
   z_offset_m: number;
   enabled: boolean;
   preset_name?: string;
-  measured?: {
-    frequencies_hz: number[];
-    spl_db: number[];
-    phase_deg: number[];
-    impedance_ohm: number[];
-    impedance_phase_deg: number[];
-  };
+  measured?: MeasuredWayData;
 }
 
 export interface DesignState {

@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import type { SystemTopology, EnclosureType, WayInput } from '../types';
-import { TOPOLOGY_TEMPLATES, ENCLOSURE_TYPES_FOR_ROLE, buildWaysFromSetup } from '../systemSetup';
+import { useState, useEffect } from 'react';
+import type { SystemTopology, EnclosureType, WayInput, WayDesign } from '../types';
+import { TOPOLOGY_TEMPLATES, ENCLOSURE_TYPES_FOR_ROLE, buildWaysFromSetup, computeDefaultEnclosure } from '../systemSetup';
 
 interface Props {
-  onComplete: (topology: SystemTopology, ways: WayInput[]) => void;
+  onComplete: (topology: SystemTopology, ways: WayInput[], preserveExisting?: boolean) => void;
+  onCancel?: () => void;
   initialTopology?: SystemTopology;
+  currentWays?: WayDesign[];
+  isReopened?: boolean;
 }
 
 const TOPOLOGY_LABELS: Record<SystemTopology, { label: string; desc: string; tip: string }> = {
@@ -26,12 +29,23 @@ const ENCLOSURE_LABELS: Record<EnclosureType, string> = {
   OpenBaffle: 'Open Baffle',
 };
 
-export function SetupWizard({ onComplete, initialTopology }: Props) {
+export function SetupWizard({ onComplete, onCancel, initialTopology, currentWays, isReopened = false }: Props) {
   const [topology, setTopology] = useState<SystemTopology>(initialTopology ?? '2-way');
   const templates = TOPOLOGY_TEMPLATES[topology];
-  const [enclosures, setEnclosures] = useState<EnclosureType[]>(
-    templates.map(t => t.defaultEnclosureType)
+  const [enclosures, setEnclosures] = useState<EnclosureType[]>(() =>
+    templates.map((t, i) => currentWays?.[i]?.enclosure.type ?? t.defaultEnclosureType)
   );
+  const [preserveExisting, setPreserveExisting] = useState<boolean>(isReopened);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onCancel) {
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
 
   const handleTopologyChange = (t: SystemTopology) => {
     setTopology(t);
@@ -48,13 +62,65 @@ export function SetupWizard({ onComplete, initialTopology }: Props) {
 
   const handleStart = () => {
     const ways = buildWaysFromSetup(topology, enclosures);
-    onComplete(topology, ways);
+    if (preserveExisting && currentWays && currentWays.length > 0) {
+      const mergedWays = ways.map((w, idx) => {
+        // Match by name first (e.g. Woofer, Tweeter), then by index
+        const existing =
+          currentWays.find((cw) => cw.name.toLowerCase() === w.name.toLowerCase()) ??
+          currentWays[idx];
+        if (!existing) return w;
+        const desiredEncType = enclosures[idx] ?? w.enclosure.type;
+        const nextEnclosure =
+          existing.enclosure.type === desiredEncType
+            ? existing.enclosure
+            : computeDefaultEnclosure(existing.driver, desiredEncType);
+        return {
+          ...w,
+          driver: existing.driver,
+          enclosure: nextEnclosure,
+          passive_filters: existing.passive_filters,
+          gain_db: existing.gain_db,
+          delay_s: existing.delay_s,
+          inverted: existing.inverted,
+          z_offset_m: existing.z_offset_m,
+          enabled: existing.enabled,
+          preset_name: existing.preset_name,
+          measured: existing.measured,
+        };
+      });
+      onComplete(topology, mergedWays, true);
+      return;
+    }
+    onComplete(topology, ways, false);
   };
 
   return (
-    <div className="setup-overlay">
-      <div className="setup-wizard">
-        <h2 className="setup-wizard-title">New Speaker Design</h2>
+    <div
+      className="setup-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && onCancel) {
+          onCancel();
+        }
+      }}
+    >
+      <div className="setup-wizard" style={{ position: 'relative' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 className="setup-wizard-title" style={{ marginBottom: 0 }}>
+            {isReopened ? 'Change Speaker System' : 'New Speaker Design'}
+          </h2>
+          {onCancel && (
+            <button
+              type="button"
+              className="graf-btn graf-btn-sm graf-btn-outline"
+              onClick={onCancel}
+              title="Close wizard and keep current design (Esc)"
+              data-testid="setup-cancel-close"
+              style={{ fontSize: 13, padding: '2px 8px' }}
+            >
+              ✕ Close
+            </button>
+          )}
+        </div>
 
         {/* Step 1: Topology */}
         <div className="setup-section">
@@ -98,9 +164,54 @@ export function SetupWizard({ onComplete, initialTopology }: Props) {
           </div>
         </div>
 
-        <button className="graf-btn graf-btn-primary setup-start-btn" onClick={handleStart}>
-          Start Designing
-        </button>
+        {currentWays && currentWays.length > 0 && (
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              color: '#334155',
+              marginBottom: 12,
+              cursor: 'pointer',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 6,
+              padding: '6px 10px',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={preserveExisting}
+              onChange={(e) => setPreserveExisting(e.target.checked)}
+              data-testid="setup-preserve-checkbox"
+            />
+            <span>
+              Keep existing drivers, measurements (FRD/ZMA) &amp; crossover components where ways match
+            </span>
+          </label>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          {onCancel && (
+            <button
+              type="button"
+              className="graf-btn graf-btn-outline"
+              style={{ flex: '0 0 auto', padding: '10px 16px', fontSize: 14, fontWeight: 600 }}
+              onClick={onCancel}
+              data-testid="setup-cancel-btn"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            className="graf-btn graf-btn-primary setup-start-btn"
+            style={{ marginTop: 0, flex: 1 }}
+            onClick={handleStart}
+          >
+            Start Designing
+          </button>
+        </div>
       </div>
     </div>
   );

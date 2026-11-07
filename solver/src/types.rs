@@ -452,4 +452,8 @@ pub struct MeasuredDriverData {
     /// Electrical impedance phase (degrees) — from ZMA file (optional)
     #[serde(default)]
     pub impedance_phase_deg: Vec<f64>,
+    /// When true, applies the T/S enclosure low-frequency loading transfer function
+    /// onto the measured FRD and uses simulated box impedance (if no ZMA) + excursion/port velocity.
+    #[serde(default)]
+    pub simulate_enclosure: bool,
 }

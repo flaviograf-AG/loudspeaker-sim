@@ -4,6 +4,8 @@ import type { PassiveFilter } from '../types';
 interface Props {
   filters: PassiveFilter[];
   driverRe?: number;
+  selectedIndex?: number | null;
+  onSelectFilter?: (index: number) => void;
 }
 
 const H = 160;
@@ -88,7 +90,7 @@ function fmtL(h: number): string { return h >= 1e-3 ? `${(h * 1e3).toFixed(2)} m
 function fmtC(f: number): string { return f >= 1e-6 ? `${(f * 1e6).toFixed(1)} µF` : `${(f * 1e9).toFixed(0)} nF`; }
 function fmtR(r: number): string { return `${r.toFixed(1)} Ω`; }
 
-export function CrossoverSchematic({ filters, driverRe }: Props) {
+export function CrossoverSchematic({ filters, driverRe, selectedIndex, onSelectFilter }: Props) {
   if (filters.length === 0) return null;
 
   const elements: ReactElement[] = [];
@@ -111,6 +113,8 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
   for (let fi = 0; fi < filters.length; fi++) {
     const pf = filters[fi];
     const bp = !!pf.bypassed;
+    const isSelected = selectedIndex === fi;
+    const xStart = x;
     // Collect block elements, then wrap in <g> with bypass styling if needed
     const blockElems: ReactElement[] = [];
 
@@ -127,6 +131,63 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
       blockElems.push(drawResistor(x, Y_MID, fmtR(pf.ohms)));
       blockElems.push(<line key={`w${x}`} x1={x + 48} y1={Y_MID} x2={x + SERIES_W} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
       x += SERIES_W;
+
+    // --- Parallel R || C in series path (Resistor bypassed by Capacitor) ---
+    } else if (pf.type === 'SeriesParallelRC') {
+      const wPar = 66;
+      const yTopBranch = Y_MID - 16;
+      const yBotBranch = Y_MID + 18;
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`prc-l1-${x}`} x1={x} y1={yTopBranch} x2={x} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prc-t1-${x}`} x1={x} y1={yTopBranch} x2={x + 6} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x + 6, yTopBranch, fmtR(pf.ohms)));
+      blockElems.push(<line key={`prc-t2-${x}`} x1={x + 54} y1={yTopBranch} x2={x + 56} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prc-b1-${x}`} x1={x} y1={yBotBranch} x2={x + 10} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawCapacitor(x + 10, yBotBranch, fmtC(pf.farads)));
+      blockElems.push(<line key={`prc-b2-${x}`} x1={x + 46} y1={yBotBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prc-r1-${x}`} x1={x + 56} y1={yTopBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x + 56, Y_MID));
+      blockElems.push(<line key={`prc-w-${x}`} x1={x + 56} y1={Y_MID} x2={x + wPar} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      x += wPar;
+
+    // --- Parallel R || L in series path (Baffle Step Compensation RL) ---
+    } else if (pf.type === 'SeriesParallelRL') {
+      const wPar = 66;
+      const yTopBranch = Y_MID - 16;
+      const yBotBranch = Y_MID + 18;
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`prl-l1-${x}`} x1={x} y1={yTopBranch} x2={x} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prl-t1-${x}`} x1={x} y1={yTopBranch} x2={x + 6} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x + 6, yTopBranch, fmtR(pf.ohms)));
+      blockElems.push(<line key={`prl-t2-${x}`} x1={x + 54} y1={yTopBranch} x2={x + 56} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prl-b1-${x}`} x1={x} y1={yBotBranch} x2={x + 10} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawInductor(x + 10, yBotBranch, fmtL(pf.henries)));
+      blockElems.push(<line key={`prl-b2-${x}`} x1={x + 46} y1={yBotBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prl-r1-${x}`} x1={x + 56} y1={yTopBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x + 56, Y_MID));
+      blockElems.push(<line key={`prl-w-${x}`} x1={x + 56} y1={Y_MID} x2={x + wPar} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      x += wPar;
+
+    // --- Parallel R || L || C in series path (Sperrkreis / Series Tank Trap) ---
+    } else if (pf.type === 'SeriesParallelRLC') {
+      const wPar = 68;
+      const yTopBranch = Y_MID - 22;
+      const yBotBranch = Y_MID + 24;
+      blockElems.push(dot(x, Y_MID));
+      blockElems.push(<line key={`prlc-l1-${x}`} x1={x} y1={yTopBranch} x2={x} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prlc-t1-${x}`} x1={x} y1={yTopBranch} x2={x + 6} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawResistor(x + 6, yTopBranch, fmtR(pf.ohms)));
+      blockElems.push(<line key={`prlc-t2-${x}`} x1={x + 54} y1={yTopBranch} x2={x + 56} y2={yTopBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prlc-m1-${x}`} x1={x} y1={Y_MID} x2={x + 10} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawInductor(x + 10, Y_MID, fmtL(pf.henries)));
+      blockElems.push(<line key={`prlc-m2-${x}`} x1={x + 46} y1={Y_MID} x2={x + 56} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prlc-b1-${x}`} x1={x} y1={yBotBranch} x2={x + 10} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(drawCapacitor(x + 10, yBotBranch, fmtC(pf.farads)));
+      blockElems.push(<line key={`prlc-b2-${x}`} x1={x + 46} y1={yBotBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(<line key={`prlc-r1-${x}`} x1={x + 56} y1={yTopBranch} x2={x + 56} y2={yBotBranch} stroke="#333" strokeWidth={1.2} />);
+      blockElems.push(dot(x + 56, Y_MID));
+      blockElems.push(<line key={`prlc-w-${x}`} x1={x + 56} y1={Y_MID} x2={x + wPar} y2={Y_MID} stroke="#333" strokeWidth={1.2} />);
+      x += wPar;
 
     // --- Shunt components (vertical, branching to ground) ---
     } else if (pf.type === 'ShuntC') {
@@ -185,8 +246,8 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
       x += SHUNT_GAP;
 
     // --- Notch filters: show RLC detail ---
-    } else if (pf.type === 'NotchShunt' || pf.type === 'NotchSeries') {
-      const isShunt = pf.type === 'NotchShunt';
+    } else if (pf.type === 'NotchShunt' || pf.type === 'NotchSeries' || pf.type === 'ShuntSeriesRLC') {
+      const isShunt = pf.type === 'NotchShunt' || pf.type === 'ShuntSeriesRLC';
       blockElems.push(dot(x, Y_MID));
       blockElems.push(<line key={`nj${x}`} x1={x} y1={Y_MID} x2={x} y2={Y_MID + 4} stroke="#333" strokeWidth={1.2} />);
       // Draw R, L, C stacked vertically
@@ -200,12 +261,35 @@ export function CrossoverSchematic({ filters, driverRe }: Props) {
       x += SHUNT_GAP;
     }
 
-    // Wrap block elements — bypassed blocks get reduced opacity + dashed outline
-    if (bp) {
-      elements.push(<g key={`bp${fi}`} opacity={0.3} strokeDasharray="4 2">{blockElems}</g>);
-    } else {
-      elements.push(...blockElems);
+    if (isSelected) {
+      blockElems.unshift(
+        <rect
+          key={`sel-${fi}`}
+          x={xStart - 6}
+          y={4}
+          width={Math.max(24, x - xStart + 4)}
+          height={H - 8}
+          rx={4}
+          fill="rgba(37, 99, 235, 0.08)"
+          stroke="#2563eb"
+          strokeWidth={1.2}
+          strokeDasharray="3 2"
+        />
+      );
     }
+
+    // Wrap block elements — bypassed blocks get reduced opacity + dashed outline
+    elements.push(
+      <g
+        key={`blk-${fi}`}
+        opacity={bp ? 0.3 : 1}
+        strokeDasharray={bp ? '4 2' : undefined}
+        style={{ cursor: onSelectFilter ? 'pointer' : 'default' }}
+        onClick={() => onSelectFilter?.(fi)}
+      >
+        {blockElems}
+      </g>
+    );
   }
 
   // --- Driver load (speaker symbol) ---

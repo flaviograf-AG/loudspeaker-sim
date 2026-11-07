@@ -23,6 +23,10 @@ pub enum PassiveFilterJson {
     LPad { series_ohms: f64, shunt_ohms: f64 },
     NotchShunt { ohms: f64, henries: f64, farads: f64 },
     NotchSeries { ohms: f64, henries: f64, farads: f64 },
+    SeriesParallelRC { ohms: f64, farads: f64 },
+    SeriesParallelRL { ohms: f64, henries: f64, dcr_ohms: f64 },
+    SeriesParallelRLC { ohms: f64, henries: f64, farads: f64 },
+    ShuntSeriesRLC { ohms: f64, henries: f64, farads: f64 },
 }
 
 impl From<PassiveFilterJson> for PassiveBlock {
@@ -38,6 +42,10 @@ impl From<PassiveFilterJson> for PassiveBlock {
             PassiveFilterJson::LPad { series_ohms, shunt_ohms } => PassiveBlock::LPad { series_ohms, shunt_ohms },
             PassiveFilterJson::NotchShunt { ohms, henries, farads } => PassiveBlock::NotchShunt { ohms, henries, farads },
             PassiveFilterJson::NotchSeries { ohms, henries, farads } => PassiveBlock::NotchSeries { ohms, henries, farads },
+            PassiveFilterJson::SeriesParallelRC { ohms, farads } => PassiveBlock::SeriesParallelRC { ohms, farads },
+            PassiveFilterJson::SeriesParallelRL { ohms, henries, dcr_ohms } => PassiveBlock::SeriesParallelRL { ohms, henries, dcr_ohms },
+            PassiveFilterJson::SeriesParallelRLC { ohms, henries, farads } => PassiveBlock::SeriesParallelRLC { ohms, henries, farads },
+            PassiveFilterJson::ShuntSeriesRLC { ohms, henries, farads } => PassiveBlock::ShuntSeriesRLC { ohms, henries, farads },
         }
     }
 }

@@ -1,4 +1,5 @@
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 import { OptimizerPanel } from './OptimizerPanel';
 import { SaveLoad } from './SaveLoad';
 import { ExportControls } from './ExportControls';
@@ -27,14 +28,53 @@ export function SystemPanel({
   onUpdateDesign, onSetDesign, overlay, onSetOverlay,
   snapshots, onSetSnapshots, designUndo,
 }: SystemPanelProps) {
+  const primaryRe = design.ways[0]?.driver.re_ohm ?? 6.5;
+  const rNom = primaryRe >= 5.5 ? 8 : 4;
+  const currentPowerW = Number(((design.drive_voltage_rms ** 2) / rNom).toFixed(1));
+
+  const setPowerWatts = (watts: number) => {
+    const safeW = Math.max(0.05, watts);
+    const vRms = Number(Math.sqrt(safeW * rNom).toFixed(2));
+    onUpdateDesign({ drive_voltage_rms: vRms });
+  };
+
   return (
     <>
       {/* Frequency range */}
       <div className="section-card">
-        <div className="section-title">Simulation</div>
+        <div className="section-title">
+          Simulation
+          <InfoTooltip variant="section" docKey="section:simulation" />
+        </div>
         <NumericInput label="Drive" value={design.drive_voltage_rms} step={0.1} min={0.1} unit="V rms"
           tooltip="Amplifier drive voltage (RMS). 2.83V = 1W into 8ohm."
           onChange={(v) => onUpdateDesign({ drive_voltage_rms: v })} />
+        <NumericInput label="Power" value={currentPowerW} step={1} min={0.1} max={2000} unit={`W (${rNom}Ω)`}
+          tooltip={`Equivalent amplifier input power in Watts into ${rNom}Ω nominal load (P = V_rms² / ${rNom}Ω). Increase power to check cone excursion vs Xmax and port air velocity vs 17 m/s chuffing limit.`}
+          onChange={(w) => setPowerWatts(w)} />
+        <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+          {[
+            { label: '1W (2.83V)', v: 2.83 },
+            { label: '10W', w: 10 },
+            { label: '50W', w: 50 },
+            { label: '100W', w: 100 },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className="graf-btn graf-btn-sm graf-btn-outline"
+              style={{ fontSize: 10, padding: '1px 6px' }}
+              title={`Set amplifier drive level to ${preset.label} to inspect high-power cone excursion and port turbulence`}
+              onClick={() =>
+                preset.v !== undefined
+                  ? onUpdateDesign({ drive_voltage_rms: preset.v })
+                  : setPowerWatts(preset.w!)
+              }
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <NumericInput label="F start" value={design.freq_start_hz} step={1} min={1} unit="Hz"
           tooltip="Sweep start frequency."
           onChange={(v) => onUpdateDesign({ freq_start_hz: v })} />

@@ -204,7 +204,10 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
                 Some(PassiveBlock::SeriesL { henries, .. }) |
                 Some(PassiveBlock::ShuntL { henries, .. }) |
                 Some(PassiveBlock::NotchShunt { henries, .. }) |
-                Some(PassiveBlock::NotchSeries { henries, .. }) => *henries,
+                Some(PassiveBlock::NotchSeries { henries, .. }) |
+                Some(PassiveBlock::SeriesParallelRL { henries, .. }) |
+                Some(PassiveBlock::SeriesParallelRLC { henries, .. }) |
+                Some(PassiveBlock::ShuntSeriesRLC { henries, .. }) => *henries,
                 _ => 1.0e-3,
             }
         }
@@ -215,7 +218,10 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
                 Some(PassiveBlock::ShuntC { farads }) |
                 Some(PassiveBlock::ZobelShunt { farads, .. }) |
                 Some(PassiveBlock::NotchShunt { farads, .. }) |
-                Some(PassiveBlock::NotchSeries { farads, .. }) => *farads,
+                Some(PassiveBlock::NotchSeries { farads, .. }) |
+                Some(PassiveBlock::SeriesParallelRC { farads, .. }) |
+                Some(PassiveBlock::SeriesParallelRLC { farads, .. }) |
+                Some(PassiveBlock::ShuntSeriesRLC { farads, .. }) => *farads,
                 _ => 10.0e-6,
             }
         }
@@ -226,7 +232,11 @@ fn extract_values(project: &SpeakerProject, params: &[OptParam]) -> Vec<f64> {
                 Some(PassiveBlock::ShuntR { ohms }) |
                 Some(PassiveBlock::ZobelShunt { ohms, .. }) |
                 Some(PassiveBlock::NotchShunt { ohms, .. }) |
-                Some(PassiveBlock::NotchSeries { ohms, .. }) => *ohms,
+                Some(PassiveBlock::NotchSeries { ohms, .. }) |
+                Some(PassiveBlock::SeriesParallelRC { ohms, .. }) |
+                Some(PassiveBlock::SeriesParallelRL { ohms, .. }) |
+                Some(PassiveBlock::SeriesParallelRLC { ohms, .. }) |
+                Some(PassiveBlock::ShuntSeriesRLC { ohms, .. }) => *ohms,
                 Some(PassiveBlock::LPad { series_ohms, .. }) => *series_ohms,
                 _ => 8.0,
             }
@@ -344,7 +354,10 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
                         PassiveBlock::SeriesL { henries, .. } |
                         PassiveBlock::ShuntL { henries, .. } |
                         PassiveBlock::NotchShunt { henries, .. } |
-                        PassiveBlock::NotchSeries { henries, .. } => *henries = val,
+                        PassiveBlock::NotchSeries { henries, .. } |
+                        PassiveBlock::SeriesParallelRL { henries, .. } |
+                        PassiveBlock::SeriesParallelRLC { henries, .. } |
+                        PassiveBlock::ShuntSeriesRLC { henries, .. } => *henries = val,
                         _ => {}
                     }
                 }
@@ -358,7 +371,10 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
                         PassiveBlock::ShuntC { farads } |
                         PassiveBlock::ZobelShunt { farads, .. } |
                         PassiveBlock::NotchShunt { farads, .. } |
-                        PassiveBlock::NotchSeries { farads, .. } => *farads = val,
+                        PassiveBlock::NotchSeries { farads, .. } |
+                        PassiveBlock::SeriesParallelRC { farads, .. } |
+                        PassiveBlock::SeriesParallelRLC { farads, .. } |
+                        PassiveBlock::ShuntSeriesRLC { farads, .. } => *farads = val,
                         _ => {}
                     }
                 }
@@ -372,7 +388,11 @@ fn apply_values_bounded(project: &mut SpeakerProject, params: &[OptParam], value
                         PassiveBlock::ShuntR { ohms } |
                         PassiveBlock::ZobelShunt { ohms, .. } |
                         PassiveBlock::NotchShunt { ohms, .. } |
-                        PassiveBlock::NotchSeries { ohms, .. } => *ohms = val,
+                        PassiveBlock::NotchSeries { ohms, .. } |
+                        PassiveBlock::SeriesParallelRC { ohms, .. } |
+                        PassiveBlock::SeriesParallelRL { ohms, .. } |
+                        PassiveBlock::SeriesParallelRLC { ohms, .. } |
+                        PassiveBlock::ShuntSeriesRLC { ohms, .. } => *ohms = val,
                         PassiveBlock::LPad { series_ohms, .. } => *series_ohms = val,
                         _ => {}
                     }
@@ -978,10 +998,20 @@ pub fn snap_passive_to_e_series(project: &mut SpeakerProject, series: &str) {
                     *shunt_ohms = round_fn(*shunt_ohms);
                 }
                 PassiveBlock::NotchShunt { ohms, henries, farads } |
-                PassiveBlock::NotchSeries { ohms, henries, farads } => {
+                PassiveBlock::NotchSeries { ohms, henries, farads } |
+                PassiveBlock::SeriesParallelRLC { ohms, henries, farads } |
+                PassiveBlock::ShuntSeriesRLC { ohms, henries, farads } => {
                     *ohms = round_fn(*ohms);
                     *henries = round_fn(*henries);
                     *farads = round_fn(*farads);
+                }
+                PassiveBlock::SeriesParallelRC { ohms, farads } => {
+                    *ohms = round_fn(*ohms);
+                    *farads = round_fn(*farads);
+                }
+                PassiveBlock::SeriesParallelRL { ohms, henries, .. } => {
+                    *ohms = round_fn(*ohms);
+                    *henries = round_fn(*henries);
                 }
             }
         }

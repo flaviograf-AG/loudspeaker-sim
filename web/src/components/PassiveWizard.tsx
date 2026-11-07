@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NumericInput } from './NumericInput';
+import { CrossoverSchematic } from './CrossoverSchematic';
+import { InfoTooltip } from './InfoTooltip';
 import { deriveDriverMetrics, computeBaffleStepParams } from '../compute';
 import type { PassiveFilter, DriverParams } from '../types';
 
@@ -28,6 +30,42 @@ function snapToSeries(val: number, series: number[]): number {
   return Number((best * decade).toPrecision(4));
 }
 
+function stepE24(val: number, dir: -1 | 1): number {
+  if (val <= 0) return dir > 0 ? 0.1 : 0;
+  const decade = Math.pow(10, Math.floor(Math.log10(val)));
+  const mantissa = val / decade;
+  let closestIdx = 0;
+  let bestDiff = Math.abs(mantissa - E24[0]);
+  for (let i = 0; i < E24.length; i++) {
+    const diff = Math.abs(mantissa - E24[i]);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      closestIdx = i;
+    }
+  }
+  const currentSnapped = Number((E24[closestIdx] * decade).toPrecision(4));
+  let nextIdx = closestIdx;
+  let nextDecade = decade;
+  if (dir > 0) {
+    if (currentSnapped <= val * 1.005) {
+      nextIdx = closestIdx + 1;
+      if (nextIdx >= E24.length) {
+        nextIdx = 0;
+        nextDecade = decade * 10;
+      }
+    }
+  } else {
+    if (currentSnapped >= val * 0.995) {
+      nextIdx = closestIdx - 1;
+      if (nextIdx < 0) {
+        nextIdx = E24.length - 1;
+        nextDecade = decade / 10;
+      }
+    }
+  }
+  return Number((E24[nextIdx] * nextDecade).toPrecision(4));
+}
+
 interface PassiveWizardProps {
   crossoverFreq: number;
   driverRe: number;
@@ -50,6 +88,8 @@ export function PassiveWizard({
   onApply,
 }: PassiveWizardProps) {
   const [xoverFreq, setXoverFreq] = useState(crossoverFreq);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [showInlineSchematic, setShowInlineSchematic] = useState(true);
 
   // Sync from parent when crossover freq changes externally
   useEffect(() => {
@@ -145,10 +185,11 @@ export function PassiveWizard({
         },
       ];
     } else if (preset === 'bsc_rl') {
-      // Baffle step compensation: series L shunted by R, or modeled in ladder
+      // Baffle step compensation: parallel R || L in series path
       newFilters = [
         {
-          type: 'SeriesL',
+          type: 'SeriesParallelRL',
+          ohms: bsc.r_bsc_ohm,
           henries: bsc.l_bsc_henries,
           dcr_ohms: 0.2,
         },
@@ -173,6 +214,14 @@ export function PassiveWizard({
       newFilters = [{ type: 'NotchShunt', ohms: re, henries: re / wc, farads: 1 / (wc * re) }];
     else if (preset === 'series_notch')
       newFilters = [{ type: 'NotchSeries', ohms: 1, henries: 1 / wc, farads: 1 / (wc * 1) }];
+    else if (preset === 'series_parallel_rc')
+      newFilters = [{ type: 'SeriesParallelRC', ohms: 4.7, farads: Number((1 / (wc * 4.7)).toPrecision(3)) }];
+    else if (preset === 'series_parallel_rl')
+      newFilters = [{ type: 'SeriesParallelRL', ohms: bsc.r_bsc_ohm, henries: bsc.l_bsc_henries, dcr_ohms: 0.2 }];
+    else if (preset === 'series_parallel_rlc')
+      newFilters = [{ type: 'SeriesParallelRLC', ohms: re, henries: Number((re / (2 * wc)).toPrecision(3)), farads: Number((2 / (wc * re)).toPrecision(3)) }];
+    else if (preset === 'shunt_series_rlc')
+      newFilters = [{ type: 'ShuntSeriesRLC', ohms: re, henries: Number((re / wc).toPrecision(3)), farads: Number((1 / (wc * re)).toPrecision(3)) }];
     // Individual components
     else if (preset === 'series_r') newFilters = [{ type: 'SeriesR', ohms: 2.2 }];
     else if (preset === 'series_l') newFilters = [{ type: 'SeriesL', henries: 0.5e-3, dcr_ohms: 0.2 }];
@@ -199,10 +248,17 @@ export function PassiveWizard({
         case 'ShuntC':
           return { ...pf, farads: snapToSeries(pf.farads, series) };
         case 'ZobelShunt':
+        case 'SeriesParallelRC':
           return {
             ...pf,
             ohms: snapToSeries(pf.ohms, series),
             farads: snapToSeries(pf.farads, series),
+          };
+        case 'SeriesParallelRL':
+          return {
+            ...pf,
+            ohms: snapToSeries(pf.ohms, series),
+            henries: snapToSeries(pf.henries, series),
           };
         case 'LPad':
           return {
@@ -212,6 +268,8 @@ export function PassiveWizard({
           };
         case 'NotchShunt':
         case 'NotchSeries':
+        case 'SeriesParallelRLC':
+        case 'ShuntSeriesRLC':
           return {
             ...pf,
             ohms: snapToSeries(pf.ohms, series),
@@ -226,9 +284,26 @@ export function PassiveWizard({
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div className="section-subtitle" style={{ margin: 0 }}>Passive RLC Network</div>
+        <div className="section-subtitle" style={{ margin: 0 }}>
+          Passive RLC Network
+          <InfoTooltip variant="section" docKey="section:passive-rlc" />
+        </div>
         {passiveFilters.length > 0 && (
           <div style={{ display: 'flex', gap: 3 }}>
+            <button
+              className="graf-btn graf-btn-sm graf-btn-outline"
+              style={{
+                fontSize: 10,
+                padding: '1px 5px',
+                background: showInlineSchematic ? '#eff6ff' : undefined,
+                borderColor: showInlineSchematic ? '#93c5fd' : undefined,
+                color: showInlineSchematic ? '#1d4ed8' : undefined,
+              }}
+              title="Toggle live interactive circuit schematic inside this crossover editor"
+              onClick={() => setShowInlineSchematic(!showInlineSchematic)}
+            >
+              {showInlineSchematic ? 'Hide Circuit' : 'Show Circuit'}
+            </button>
             <button
               className="graf-btn graf-btn-sm graf-btn-outline"
               style={{ fontSize: 10, padding: '1px 5px' }}
@@ -256,6 +331,31 @@ export function PassiveWizard({
           </div>
         )}
       </div>
+
+      {/* Live Inline Circuit Schematic */}
+      {showInlineSchematic && passiveFilters.length > 0 && (
+        <div
+          style={{
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 5,
+            padding: '4px 6px',
+            marginBottom: 6,
+            overflowX: 'auto',
+          }}
+        >
+          <div style={{ fontSize: 9, color: '#64748b', marginBottom: 2, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Live Schematic (click component to highlight)</span>
+            <span>IN → Ladder → Driver ({re}Ω)</span>
+          </div>
+          <CrossoverSchematic
+            filters={passiveFilters}
+            driverRe={re}
+            selectedIndex={selectedIdx}
+            onSelectFilter={(idx) => setSelectedIdx(selectedIdx === idx ? null : idx)}
+          />
+        </div>
+      )}
 
       {/* 1-Click Shared-Parameter Compensation Calculators */}
       <div
@@ -322,13 +422,51 @@ export function PassiveWizard({
           filters[i] = updated;
           onApply(filters);
         };
-        const removePf = () => onApply(passiveFilters.filter((_, j) => j !== i));
+        const removePf = () => {
+          if (selectedIdx === i) setSelectedIdx(null);
+          onApply(passiveFilters.filter((_, j) => j !== i));
+        };
+        const movePf = (dir: -1 | 1) => {
+          const target = i + dir;
+          if (target < 0 || target >= passiveFilters.length) return;
+          const filters = [...passiveFilters];
+          const [item] = filters.splice(i, 1);
+          filters.splice(target, 0, item);
+          setSelectedIdx(target);
+          onApply(filters);
+        };
+
+        const labelForType = (t: PassiveFilter['type']): string => {
+          switch (t) {
+            case 'SeriesParallelRC':
+              return 'Ser (R ∥ C)';
+            case 'SeriesParallelRL':
+              return 'Ser (R ∥ L)';
+            case 'SeriesParallelRLC':
+              return 'Sperrkreis (R∥L∥C)';
+            case 'ShuntSeriesRLC':
+              return 'Saugkreis (R+L+C)';
+            case 'NotchShunt':
+              return 'P.Notch (Shunt)';
+            case 'NotchSeries':
+              return 'S.Notch (Shunt)';
+            default:
+              return t
+                .replace('Series', 'Ser ')
+                .replace('Shunt', 'Shnt ')
+                .replace('Zobel', 'Zobel ');
+          }
+        };
+
+        const isSelected = selectedIdx === i;
 
         return (
           <div
             key={i}
+            onClick={() => setSelectedIdx(i)}
             style={{
-              border: '1px solid var(--graf-warm-200)',
+              border: isSelected ? '1.5px solid #2563eb' : '1px solid var(--graf-warm-200)',
+              background: isSelected ? '#eff6ff' : undefined,
               borderRadius: 4,
               padding: '3px 6px',
               marginBottom: 3,
@@ -344,60 +482,141 @@ export function PassiveWizard({
                   title={pf.bypassed ? 'Enable this component' : 'Bypass this component'}
                   onChange={() => updatePf({ ...pf, bypassed: !pf.bypassed } as PassiveFilter)}
                 />
-                <strong>
-                  {pf.type
-                    .replace('Series', 'Ser ')
-                    .replace('Shunt', 'Shnt ')
-                    .replace('Zobel', 'Zobel ')
-                    .replace('NotchShunt', 'P.Notch')
-                    .replace('NotchSeries', 'S.Notch')}
-                </strong>
+                <strong>{labelForType(pf.type)}</strong>
               </label>
-              <button className="graf-btn graf-btn-sm" style={{ padding: '0 4px', fontSize: 9 }} onClick={removePf}>
-                x
-              </button>
+              <div style={{ display: 'flex', gap: 2 }}>
+                <button
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 9 }}
+                  disabled={i === 0}
+                  title="Move component left (toward amplifier)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePf(-1);
+                  }}
+                >
+                  ↑
+                </button>
+                <button
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 9 }}
+                  disabled={i === passiveFilters.length - 1}
+                  title="Move component right (toward driver)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    movePf(1);
+                  }}
+                >
+                  ↓
+                </button>
+                <button
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 9 }}
+                  title="Remove component"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removePf();
+                  }}
+                >
+                  x
+                </button>
+              </div>
             </div>
             {'ohms' in pf && !('farads' in pf) && !('henries' in pf) && (
               <div className="param-row">
                 <span className="param-label">R</span>
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step R down to previous E24 standard resistor value"
+                  onClick={() => updatePf({ ...pf, ohms: stepE24(pf.ohms, -1) } as PassiveFilter)}
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   className="graf-form-control"
-                  style={{ width: 70, fontSize: 11 }}
+                  style={{ width: 64, fontSize: 11 }}
                   value={parseFloat(pf.ohms.toFixed(2))}
                   step={0.1}
                   onChange={(e) => updatePf({ ...pf, ohms: parseFloat(e.target.value) || pf.ohms } as PassiveFilter)}
                 />
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step R up to next E24 standard resistor value"
+                  onClick={() => updatePf({ ...pf, ohms: stepE24(pf.ohms, 1) } as PassiveFilter)}
+                >
+                  +
+                </button>
                 <span className="param-unit">Ω</span>
               </div>
             )}
             {'ohms' in pf && ('farads' in pf || 'henries' in pf) && (
               <div className="param-row">
                 <span className="param-label">R</span>
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step R down to previous E24 standard resistor value"
+                  onClick={() => updatePf({ ...pf, ohms: stepE24(pf.ohms, -1) } as PassiveFilter)}
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   className="graf-form-control"
-                  style={{ width: 70, fontSize: 11 }}
+                  style={{ width: 64, fontSize: 11 }}
                   value={parseFloat(pf.ohms.toFixed(2))}
                   step={0.1}
                   onChange={(e) => updatePf({ ...pf, ohms: parseFloat(e.target.value) || pf.ohms } as PassiveFilter)}
                 />
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step R up to next E24 standard resistor value"
+                  onClick={() => updatePf({ ...pf, ohms: stepE24(pf.ohms, 1) } as PassiveFilter)}
+                >
+                  +
+                </button>
                 <span className="param-unit">Ω</span>
               </div>
             )}
             {'henries' in pf && (
               <div className="param-row">
                 <span className="param-label">L</span>
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step L down to previous E24 standard inductor value"
+                  onClick={() => updatePf({ ...pf, henries: stepE24(pf.henries * 1e3, -1) / 1e3 } as PassiveFilter)}
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   className="graf-form-control"
-                  style={{ width: 70, fontSize: 11 }}
+                  style={{ width: 64, fontSize: 11 }}
                   value={parseFloat((pf.henries * 1e3).toFixed(3))}
                   step={0.01}
                   onChange={(e) =>
                     updatePf({ ...pf, henries: (parseFloat(e.target.value) || 0) / 1e3 } as PassiveFilter)
                   }
                 />
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step L up to next E24 standard inductor value"
+                  onClick={() => updatePf({ ...pf, henries: stepE24(pf.henries * 1e3, 1) / 1e3 } as PassiveFilter)}
+                >
+                  +
+                </button>
                 <span className="param-unit">mH</span>
               </div>
             )}
@@ -418,16 +637,34 @@ export function PassiveWizard({
             {'farads' in pf && (
               <div className="param-row">
                 <span className="param-label">C</span>
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step C down to previous E24 standard capacitor value"
+                  onClick={() => updatePf({ ...pf, farads: stepE24(pf.farads * 1e6, -1) / 1e6 } as PassiveFilter)}
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   className="graf-form-control"
-                  style={{ width: 70, fontSize: 11 }}
+                  style={{ width: 64, fontSize: 11 }}
                   value={parseFloat((pf.farads * 1e6).toFixed(2))}
                   step={0.1}
                   onChange={(e) =>
                     updatePf({ ...pf, farads: (parseFloat(e.target.value) || 0) / 1e6 } as PassiveFilter)
                   }
                 />
+                <button
+                  type="button"
+                  className="graf-btn graf-btn-sm"
+                  style={{ padding: '0 4px', fontSize: 10 }}
+                  title="Step C up to next E24 standard capacitor value"
+                  onClick={() => updatePf({ ...pf, farads: stepE24(pf.farads * 1e6, 1) / 1e6 } as PassiveFilter)}
+                >
+                  +
+                </button>
                 <span className="param-unit">µF</span>
               </div>
             )}
@@ -435,30 +672,66 @@ export function PassiveWizard({
               <>
                 <div className="param-row">
                   <span className="param-label">R ser</span>
+                  <button
+                    type="button"
+                    className="graf-btn graf-btn-sm"
+                    style={{ padding: '0 4px', fontSize: 10 }}
+                    title="Step series R down to previous E24 value"
+                    onClick={() => updatePf({ ...pf, series_ohms: stepE24(pf.series_ohms, -1) } as PassiveFilter)}
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     className="graf-form-control"
-                    style={{ width: 70, fontSize: 11 }}
+                    style={{ width: 64, fontSize: 11 }}
                     value={parseFloat(pf.series_ohms.toFixed(2))}
                     step={0.1}
                     onChange={(e) =>
                       updatePf({ ...pf, series_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)
                     }
                   />
+                  <button
+                    type="button"
+                    className="graf-btn graf-btn-sm"
+                    style={{ padding: '0 4px', fontSize: 10 }}
+                    title="Step series R up to next E24 value"
+                    onClick={() => updatePf({ ...pf, series_ohms: stepE24(pf.series_ohms, 1) } as PassiveFilter)}
+                  >
+                    +
+                  </button>
                   <span className="param-unit">Ω</span>
                 </div>
                 <div className="param-row">
                   <span className="param-label">R shnt</span>
+                  <button
+                    type="button"
+                    className="graf-btn graf-btn-sm"
+                    style={{ padding: '0 4px', fontSize: 10 }}
+                    title="Step shunt R down to previous E24 value"
+                    onClick={() => updatePf({ ...pf, shunt_ohms: stepE24(pf.shunt_ohms, -1) } as PassiveFilter)}
+                  >
+                    −
+                  </button>
                   <input
                     type="number"
                     className="graf-form-control"
-                    style={{ width: 70, fontSize: 11 }}
+                    style={{ width: 64, fontSize: 11 }}
                     value={parseFloat(pf.shunt_ohms.toFixed(2))}
                     step={0.1}
                     onChange={(e) =>
                       updatePf({ ...pf, shunt_ohms: parseFloat(e.target.value) || 0 } as PassiveFilter)
                     }
                   />
+                  <button
+                    type="button"
+                    className="graf-btn graf-btn-sm"
+                    style={{ padding: '0 4px', fontSize: 10 }}
+                    title="Step shunt R up to next E24 value"
+                    onClick={() => updatePf({ ...pf, shunt_ohms: stepE24(pf.shunt_ohms, 1) } as PassiveFilter)}
+                  >
+                    +
+                  </button>
                   <span className="param-unit">Ω</span>
                 </div>
               </>
@@ -469,12 +742,12 @@ export function PassiveWizard({
 
       {/* Crossover frequency input */}
       <NumericInput
-        label="Xover freq"
+        label="Preset Calc Freq"
         value={xoverFreq}
         step={100}
         min={100}
         unit="Hz"
-        tooltip="Crossover frequency used by the topology wizard presets below"
+        tooltip="Helper frequency used only when adding a new topology preset below (does not overwrite existing components)"
         onChange={setXoverFreq}
       />
 
@@ -492,6 +765,30 @@ export function PassiveWizard({
         <option value="" disabled>
           + Add component / topology...
         </option>
+        <optgroup label="Parallel & Series Combinations (R∥C, R∥L, RLC)">
+          <option value="series_parallel_rc">Series Parallel R ∥ C (Cap parallel to Resistor)</option>
+          <option value="series_parallel_rl">Series Parallel R ∥ L (Baffle Step RL)</option>
+          <option value="series_parallel_rlc">Series Parallel-RLC Trap (Sperrkreis)</option>
+          <option value="shunt_series_rlc">Shunt Series-RLC Notch (Saugkreis)</option>
+        </optgroup>
+        <optgroup label="Individual Components">
+          <option value="series_r">Series R</option>
+          <option value="series_l">Series L</option>
+          <option value="series_c">Series C</option>
+          <option value="shunt_r">Shunt R</option>
+          <option value="shunt_l">Shunt L</option>
+          <option value="shunt_c">Shunt C</option>
+        </optgroup>
+        <optgroup label="Compensation (from Shared Driver & Baffle)">
+          <option value="zobel">Zobel Impedance Flattening (Shunt R+C)</option>
+          <option value="fs_notch">Conjugate Fs Resonance Notch</option>
+          <option value="bsc_rl">Baffle Step R ∥ L (from Cabinet W)</option>
+          <option value="auto_lpad">Auto L-Pad (from Driver Sensitivity)</option>
+          <option value="lpad_3db">L-Pad -3dB</option>
+          <option value="lpad_6db">L-Pad -6dB</option>
+          <option value="notch">Parallel Notch (at Calc Freq)</option>
+          <option value="series_notch">Series Notch (at Calc Freq)</option>
+        </optgroup>
         <optgroup label="1st Order (6 dB/oct)">
           <option value="1st_lp">1st-order LP</option>
           <option value="1st_hp">1st-order HP</option>
@@ -505,24 +802,6 @@ export function PassiveWizard({
         <optgroup label="4th Order (24 dB/oct)">
           <option value="lr4_lp">LR4 LP</option>
           <option value="lr4_hp">LR4 HP</option>
-        </optgroup>
-        <optgroup label="Compensation (from Shared Driver & Baffle)">
-          <option value="zobel">Zobel Impedance Flattening</option>
-          <option value="fs_notch">Conjugate Fs Resonance Notch</option>
-          <option value="bsc_rl">Baffle Step Inductor (from Cabinet W)</option>
-          <option value="auto_lpad">Auto L-Pad (from Driver Sensitivity)</option>
-          <option value="lpad_3db">L-Pad -3dB</option>
-          <option value="lpad_6db">L-Pad -6dB</option>
-          <option value="notch">Parallel Notch (at Xover)</option>
-          <option value="series_notch">Series Notch (at Xover)</option>
-        </optgroup>
-        <optgroup label="Individual Components">
-          <option value="series_r">Series R</option>
-          <option value="series_l">Series L</option>
-          <option value="series_c">Series C</option>
-          <option value="shunt_r">Shunt R</option>
-          <option value="shunt_l">Shunt L</option>
-          <option value="shunt_c">Shunt C</option>
         </optgroup>
       </select>
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { EnclosureConfig, EnclosureType, DriverParams, TaperProfile, StuffingZone, HornProfile, HornSegment } from '../types';
 import { DEFAULT_ENCLOSURES, computeDefaultEnclosure } from '../systemSetup';
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 import { loadDriverCatalogue } from './PresetSelector';
 import type { PassiveRadiatorPreset } from '../presets/drivers_db';
 
@@ -87,10 +88,13 @@ interface Props {
   onChangeType?: () => void;
   disabled?: boolean;
   disabledReason?: string;
+  hybridFrdActive?: boolean;
+  onToggleHybridFrd?: (enabled: boolean) => void;
+  onCompareAlignment?: (altConfig: EnclosureConfig, snapLabel: string) => void;
 }
 
 
-export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType, disabled, disabledReason }: Props) {
+export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts, hpCrossoverHz, onChange, lockType, onChangeType, disabled, disabledReason, hybridFrdActive, onToggleHybridFrd, onCompareAlignment }: Props) {
   const encType = config.type;
   const [targetFb, setTargetFb] = useState<number | null>(null);
   const [prPresets, setPrPresets] = useState<PassiveRadiatorPreset[]>(BUILTIN_PR_PRESETS);
@@ -174,7 +178,19 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
           fontSize: 12, lineHeight: 1.5,
         }}>
           <strong style={{ display: 'block', marginBottom: 2 }}>Using measured FRD</strong>
-          {disabledReason || 'Enclosure settings have no effect — the measurement already includes the enclosure.'}
+          <div>{disabledReason || 'Enclosure settings have no effect — the measurement already includes the enclosure.'}</div>
+          {onToggleHybridFrd && (
+            <button
+              type="button"
+              className="graf-btn graf-btn-sm graf-btn-primary"
+              style={{ marginTop: 6, fontSize: 11, width: '100%' }}
+              onClick={() => onToggleHybridFrd(true)}
+              title="Unlock enclosure simulation and apply simulated box & port loading to the measured FRD response"
+              data-testid="enable-hybrid-enclosure-btn"
+            >
+              Simulate Enclosure with Measured FRD
+            </button>
+          )}
         </div>
       </div>
     );
@@ -182,7 +198,38 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
 
   return (
     <div className="section-card">
-      <div className="section-title">Enclosure</div>
+      <div className="section-title">
+        Enclosure
+        <InfoTooltip variant="section" docKey="section:enclosure-type" />
+      </div>
+      {hybridFrdActive && onToggleHybridFrd && (
+        <div
+          style={{
+            padding: '5px 8px',
+            marginBottom: 8,
+            borderRadius: 5,
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            color: '#1e3a8a',
+            fontSize: 11,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <span><strong>Hybrid Mode:</strong> Applying box/port loading to measured FRD</span>
+          <button
+            type="button"
+            className="graf-btn graf-btn-sm graf-btn-outline"
+            style={{ fontSize: 10, padding: '1px 5px', whiteSpace: 'nowrap' }}
+            onClick={() => onToggleHybridFrd(false)}
+            title="Bypass enclosure simulation and use raw measured FRD only"
+          >
+            Raw FRD Only
+          </button>
+        </div>
+      )}
       {lockType ? (
         <div style={{ fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
           <strong>{encType === 'TransmissionLine' ? 'T-Line' : encType === 'PassiveRadiator' ? 'PR' : encType === 'OpenBaffle' ? 'OB' : encType === 'Bandpass' ? 'BP' : encType}</strong>
@@ -745,9 +792,39 @@ export function EnclosureInputs({ config, driver, driverVas, driverFs, driverQts
       {readouts.length > 0 && (
         <div className="derived-params" style={{ marginTop: 6 }}>
           {readouts.map((r) => (
-            <span key={r.label} title={r.tip}>{r.label}={r.value}</span>
+            <span key={r.label} title={r.tip}>
+              {r.label}={r.value}
+              <InfoTooltip
+                variant="item"
+                docKey={r.label === 'Qtc' ? 'param:qtc' : r.label.startsWith('Fb') ? 'param:fb' : undefined}
+                title={`${r.label} (${r.value})`}
+                text={r.tip}
+              />
+            </span>
           ))}
         </div>
+      )}
+
+      {/* 1-Click Sealed vs. Vented Alignment Comparison */}
+      {onCompareAlignment && driver && (config.type === 'Sealed' || config.type === 'Vented') && (
+        <button
+          type="button"
+          className="graf-btn graf-btn-sm graf-btn-outline"
+          style={{ width: '100%', marginTop: 6, fontSize: 11 }}
+          title="Save the current response as a comparison snapshot and switch between Sealed and Vented alignments to compare bass extension, group delay, and excursion side-by-side"
+          data-testid="compare-sealed-vented-btn"
+          onClick={() => {
+            const targetType: EnclosureType = config.type === 'Sealed' ? 'Vented' : 'Sealed';
+            const altConfig = computeDefaultEnclosure(driver, targetType, hpCrossoverHz);
+            const snapLabel =
+              config.type === 'Sealed'
+                ? `Sealed ${(config.volume_m3 * 1000).toFixed(1)}L`
+                : `Vented ${(config.volume_m3 * 1000).toFixed(1)}L`;
+            onCompareAlignment(altConfig, snapLabel);
+          }}
+        >
+          ⇄ Snapshot & Compare {config.type === 'Sealed' ? 'Vented (Bass Reflex)' : 'Sealed (Closed Box)'}
+        </button>
       )}
     </div>
   );

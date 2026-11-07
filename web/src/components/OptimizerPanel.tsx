@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { runOptimizer } from '../solver/wasm-bridge';
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 import type { WayInput, SystemInput } from '../types';
 
 interface Props {
@@ -222,7 +223,10 @@ export function OptimizerPanel({ ways, sysParams, onApply }: Props) {
   return (
     <div className="section-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div className="section-title" style={{ margin: 0 }}>Optimizer</div>
+        <div className="section-title" style={{ margin: 0 }}>
+          Optimizer
+          <InfoTooltip variant="section" docKey="section:optimizer" />
+        </div>
         <button
           className="graf-btn graf-btn-sm graf-btn-ghost"
           style={{ fontSize: 10, padding: '1px 5px' }}

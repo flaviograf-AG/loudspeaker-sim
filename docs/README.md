@@ -83,3 +83,4 @@ node web/scripts/test-driver-base-import.mjs
 npm --prefix web run build
 npx --prefix web playwright test
 ```
+

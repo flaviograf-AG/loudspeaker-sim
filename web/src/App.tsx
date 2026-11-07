@@ -55,6 +55,7 @@ function App() {
 
   // Skip wizard if loaded from URL
   const [didInit] = useState(() => urlState !== null);
+  const [hasCompletedSetup, setHasCompletedSetup] = useState(() => urlState !== null);
   useEffect(() => {
     if (didInit) setShowSetup(false);
   }, [didInit]);
@@ -216,14 +217,17 @@ function App() {
   }, [commitDesign]);
 
   // Setup wizard callback — converts WayInput[] to DesignState
-  const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[]) => {
+  const handleSetupComplete = useCallback((topo: SystemTopology, ways: WayInput[], preserveExisting?: boolean) => {
     const d = designRef.current;
-    const points = defaultCrossoverPoints(topo);
+    const defaultPoints = defaultCrossoverPoints(topo);
+    const points = preserveExisting
+      ? defaultPoints.map((pt, i) => d.crossover_points[i] ? { ...pt, freq_hz: d.crossover_points[i].freq_hz, slope: d.crossover_points[i].slope } : pt)
+      : defaultPoints;
     const primaryVolL = ways[0] ? getEnclosureVolumeLiters(ways[0].enclosure) : 18;
     setDesign({
       version: 2,
       topology: topo,
-      crossover_mode: 'active',
+      crossover_mode: preserveExisting ? (d.crossover_mode ?? 'active') : 'active',
       cabinet: computeGoldenCabinetDimensions(Math.max(1, primaryVolL), 18, 0.8, 0.5),
       ways: ways.map(w => ({
         name: w.name,
@@ -239,13 +243,14 @@ function App() {
         measured: w.measured,
       })),
       crossover_points: points,
-      per_way_eq: ways.map(() => []),
+      per_way_eq: ways.map((_, i) => (preserveExisting && d.per_way_eq[i]) ? d.per_way_eq[i] : []),
       freq_start_hz: d.freq_start_hz,
       freq_end_hz: d.freq_end_hz,
       freq_points: d.freq_points,
       drive_voltage_rms: d.drive_voltage_rms,
       source_impedance_ohm: d.source_impedance_ohm,
     });
+    setHasCompletedSetup(true);
     setShowSetup(false);
     setActiveWay(0);
     setActiveSection('driver');
@@ -329,7 +334,18 @@ function App() {
 
   return (
     <div className="app-layout">
-      {showSetup && <SetupWizard onComplete={handleSetupComplete} initialTopology={design.topology} />}
+      {showSetup && (
+        <SetupWizard
+          onComplete={handleSetupComplete}
+          onCancel={() => {
+            setHasCompletedSetup(true);
+            setShowSetup(false);
+          }}
+          initialTopology={design.topology}
+          currentWays={design.ways}
+          isReopened={hasCompletedSetup}
+        />
+      )}
 
       <div
         className="sidebar-drag-handle"
@@ -382,9 +398,12 @@ function App() {
           }}>
             <strong>{way.name}:</strong>{' '}
             FRD: {way.measured.spl_db.length > 0 ? `${way.measured.spl_db.length} pts` : 'none'}
+            {way.measured.off_axis && way.measured.off_axis.length > 0 ? ` (+${way.measured.off_axis.length} angles)` : ''}
             {' | '}
             ZMA: {way.measured.impedance_ohm.length > 0 ? `${way.measured.impedance_ohm.length} pts` : 'none'}
-            {' \u2014 using measured response (enclosure effect included in FRD)'}
+            {way.measured.simulate_enclosure
+              ? ' \u2014 hybrid FRD + simulated enclosure active'
+              : ' \u2014 using measured response (enclosure effect included in FRD)'}
           </div>
         )}
 
@@ -420,15 +439,40 @@ function App() {
                 onChange={(enc) => updateWay(safeActiveWay, { enclosure: enc })}
                 lockType={false}
                 onChangeType={() => setShowSetup(true)}
-                disabled={!!way.measured}
-                disabledReason="Measured data active — using measured FRD. Enclosure settings have no effect — the measurement already includes the enclosure."
+                disabled={!!way.measured && !way.measured.simulate_enclosure}
+                disabledReason="Measured data active — using measured FRD. Click below to simulate enclosure & port tuning on top of this FRD."
+                hybridFrdActive={!!way.measured?.simulate_enclosure}
+                onToggleHybridFrd={(enabled) => {
+                  if (!way.measured) return;
+                  updateWay(safeActiveWay, {
+                    measured: {
+                      ...way.measured,
+                      simulate_enclosure: enabled,
+                    },
+                  });
+                }}
+                onCompareAlignment={(altConfig, snapLabel) => {
+                  if (systemResult) {
+                    setSnapshots((prev) => [
+                      ...prev,
+                      {
+                        name: snapLabel,
+                        spl: [...systemResult.system_spl_db],
+                        freqs: [...systemResult.frequencies_hz],
+                      },
+                    ]);
+                  }
+                  updateWay(safeActiveWay, { enclosure: altConfig });
+                }}
               />
-              {!way.measured && way.enclosure.type !== 'OpenBaffle' && (
+              {(!way.measured || way.measured.simulate_enclosure) && way.enclosure.type !== 'OpenBaffle' && (
                 <CabinetCalculator
                   enclosure={way.enclosure}
                   driver={way.driver}
                   cabinet={currentCabinet}
                   onUpdateCabinet={updateCabinet}
+                  ways={design.ways}
+                  crossoverPoints={design.crossover_points}
                   onUpdateEnclosureVolume={(volume_m3) => {
                     const d = designRef.current;
                     const currentWay = d.ways[safeActiveWay];
@@ -518,6 +562,7 @@ function App() {
             viewFocus={workspaceTab === 'enclosure' ? 'enclosure' : workspaceTab === 'crossover' ? 'crossover' : 'all'}
             cabinet={currentCabinet}
             ways={design.ways}
+            crossoverPoints={design.crossover_points}
           />
         </div>
         {way && (
@@ -532,6 +577,8 @@ function App() {
                 : undefined
             }
             driverRe={way.driver.re_ohm}
+            ways={design.ways}
+            cabinet={currentCabinet}
           />
         )}
       </main>

@@ -23,6 +23,7 @@ fn flat_90db_measured() -> MeasuredDriverData {
         phase_deg,
         impedance_ohm,
         impedance_phase_deg,
+        simulate_enclosure: false,
     }
 }
 
@@ -253,4 +254,66 @@ fn passive_filter_affects_measured_data_system() {
     eprintln!("Passive filter + measured: diff@200Hz = {:.1} dB (expect <1)", diff_200);
     assert!(diff_200 < 1.0,
         "At 200 Hz, inductor should have minimal effect, got {:.1} dB diff", diff_200);
+}
+
+#[test]
+fn measured_data_with_simulate_enclosure_applies_box_loading() {
+    let mut measured = flat_90db_measured();
+    measured.simulate_enclosure = true;
+    measured.impedance_ohm = vec![];
+    measured.impedance_phase_deg = vec![];
+
+    let small_box = SpeakerProject {
+        ways: vec![Way {
+            name: "Woofer (small box)".into(),
+            driver: dummy_driver(),
+            enclosure: EnclosureConfig::Sealed(SealedBoxParams { volume_m3: 5e-3, ql: 7.0 }),
+            passive_filters: vec![],
+            active_filters: vec![],
+            gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+            measured: Some(measured.clone()),
+            source_impedance_ohm: 0.35,
+        }],
+        freq_start_hz: 20.0,
+        freq_end_hz: 10000.0,
+        freq_points: 100,
+        drive_voltage_rms: 2.83,
+    };
+
+    let vented_box = SpeakerProject {
+        ways: vec![Way {
+            name: "Woofer (vented box)".into(),
+            driver: dummy_driver(),
+            enclosure: EnclosureConfig::Vented(VentedBoxParams {
+                volume_m3: 35e-3,
+                port_area_m2: 25e-4,
+                port_length_m: 0.16,
+                num_ports: 1,
+                port_flanged: true,
+                ql: 7.0,
+                port_shape: PortShape::Circular,
+            }),
+            passive_filters: vec![],
+            active_filters: vec![],
+            gain_db: 0.0, delay_s: 0.0, inverted: false, z_offset_m: 0.0, enabled: true,
+            measured: Some(measured),
+            source_impedance_ohm: 0.35,
+        }],
+        freq_start_hz: 20.0,
+        freq_end_hz: 10000.0,
+        freq_points: 100,
+        drive_voltage_rms: 2.83,
+    };
+
+    let res_small = solve_system(&small_box).unwrap();
+    let res_vented = solve_system(&vented_box).unwrap();
+
+    // At 40 Hz, the 35L vented box has significantly more bass output than the 5L sealed box
+    let idx_40 = res_small.frequencies_hz.iter().position(|&f| f >= 40.0).unwrap();
+    assert!(
+        res_vented.system_spl_db[idx_40] > res_small.system_spl_db[idx_40] + 2.0,
+        "Vented box should boost 40 Hz over small sealed box in hybrid FRD+enclosure mode"
+    );
+    // And port velocity is populated on the vented box way
+    assert!(res_vented.ways[0].port_velocity_ms.is_some());
 }

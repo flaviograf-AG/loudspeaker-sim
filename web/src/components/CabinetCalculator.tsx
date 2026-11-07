@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { NumericInput } from './NumericInput';
+import { InfoTooltip } from './InfoTooltip';
 import { computeBaffleStepParams, computeGoldenCabinetDimensions } from '../compute';
-import type { CabinetDimensions, DriverParams, EnclosureConfig } from '../types';
+import type { CabinetDimensions, CrossoverPoint, DriverParams, EnclosureConfig, WayDesign } from '../types';
 
 interface CabinetCalculatorProps {
   enclosure: EnclosureConfig;
@@ -9,6 +10,8 @@ interface CabinetCalculatorProps {
   cabinet: CabinetDimensions;
   onUpdateCabinet: (cab: CabinetDimensions) => void;
   onUpdateEnclosureVolume?: (volume_m3: number) => void;
+  ways?: WayDesign[];
+  crossoverPoints?: CrossoverPoint[];
 }
 
 /** Extract primary internal volume in liters from any EnclosureConfig */
@@ -40,6 +43,8 @@ export function CabinetCalculator({
   cabinet,
   onUpdateCabinet,
   onUpdateEnclosureVolume,
+  ways,
+  crossoverPoints,
 }: CabinetCalculatorProps) {
   const [jointType, setJointType] = useState<'butt' | 'miter'>('butt');
   const [woodMaterial, setWoodMaterial] = useState<'mdf18' | 'birch18' | 'mdf25'>('mdf18');
@@ -123,10 +128,25 @@ export function CabinetCalculator({
   // Driver cutout diameter (cm) from shared Sd
   const driverDiaCm = 2 * Math.sqrt((driver.sd_m2 * 1e4) / Math.PI);
 
+  // Multi-way vertical center-to-center spacing vs. crossover wavelength check
+  const upperWay = ways && ways.length > 1 ? ways[ways.length - 1] : null;
+  const upperDiaCm = upperWay ? Math.max(2.8, 2 * Math.sqrt((upperWay.driver.sd_m2 * 1e4) / Math.PI)) : 0;
+  // Minimum physical flange-to-flange center spacing (approx 1.25 * r_woofer + 1.4 * r_tweeter + 1.5 cm margin)
+  const dCtcCm = upperWay ? Number((driverDiaCm * 0.62 + upperDiaCm * 0.7 + 2.2).toFixed(1)) : 0;
+  const highestXoHz =
+    crossoverPoints && crossoverPoints.length > 0
+      ? crossoverPoints[crossoverPoints.length - 1].freq_hz
+      : 2500;
+  const lambdaXoCm = Number((34321 / Math.max(100, highestXoHz)).toFixed(1));
+  const lobingRatio = lambdaXoCm > 0 ? dCtcCm / lambdaXoCm : 0;
+
   return (
     <div className="section-card" data-testid="cabinet-calculator">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <div className="section-title" style={{ marginBottom: 0 }}>3D Cabinet & Cut-List</div>
+        <div className="section-title" style={{ marginBottom: 0 }}>
+          3D Cabinet & Cut-List
+          <InfoTooltip variant="section" docKey="section:cabinet-3d" />
+        </div>
         <button
           className="graf-btn graf-btn-sm graf-btn-outline"
           title="Fit cabinet external dimensions to current enclosure volume using Golden Ratio"
@@ -253,10 +273,22 @@ export function CabinetCalculator({
         </span>
         <span title="Shared Baffle Step Frequency (f_3 = 115 / W_m) automatically shared with Crossover Designer">
           f_bsc={bsc.f_bsc_hz}Hz
+          <InfoTooltip variant="item" docKey="param:baffle-step" />
         </span>
         <span title="Effective cone diameter from shared driver Sd">
           Ø_cone={driverDiaCm.toFixed(1)}cm
         </span>
+        {upperWay && (
+          <span
+            style={{
+              color: lobingRatio <= 1.0 ? '#166534' : '#b45309',
+              fontWeight: 600,
+            }}
+            title={`Vertical driver center-to-center spacing (${dCtcCm} cm) vs. crossover wavelength λ = ${lambdaXoCm} cm at ${highestXoHz} Hz. Keeping d_ctc ≤ 1.0×λ prevents severe vertical off-axis lobing nulls.`}
+          >
+            d_ctc={dCtcCm}cm ({lobingRatio.toFixed(2)}×λ{lobingRatio <= 1.0 ? ' ✓' : ' ⚠'})
+          </span>
+        )}
       </div>
 
       {/* Isometric 3D SVG Cabinet Preview */}
@@ -275,6 +307,7 @@ export function CabinetCalculator({
           heightCm={cabinet.height_cm}
           depthCm={cabinet.depth_cm}
           driverDiaCm={driverDiaCm}
+          upperDiaCm={upperDiaCm}
           hasPort={enclosure.type === 'Vented' || enclosure.type === 'Bandpass'}
           fBscHz={bsc.f_bsc_hz}
         />
@@ -336,6 +369,7 @@ function CabinetIsometricSvg({
   heightCm,
   depthCm,
   driverDiaCm,
+  upperDiaCm = 0,
   hasPort,
   fBscHz,
 }: {
@@ -343,6 +377,7 @@ function CabinetIsometricSvg({
   heightCm: number;
   depthCm: number;
   driverDiaCm: number;
+  upperDiaCm?: number;
   hasPort: boolean;
   fBscHz: number;
 }) {
@@ -364,9 +399,12 @@ function CabinetIsometricSvg({
   const topPath = `M ${ox} ${oy} L ${ox + dx} ${oy + dy} L ${ox + w + dx} ${oy + dy} L ${ox + w} ${oy} Z`;
   const sidePath = `M ${ox + w} ${oy} L ${ox + w + dx} ${oy + dy} L ${ox + w + dx} ${oy + h + dy} L ${ox + w} ${oy + h} Z`;
 
-  const rDriver = Math.min(w * 0.38, h * 0.28, Math.max(6, (driverDiaCm * scale) / 2));
+  const hasTweeter = upperDiaCm > 0;
+  const rDriver = Math.min(w * 0.36, h * (hasTweeter ? 0.22 : 0.28), Math.max(6, (driverDiaCm * scale) / 2));
+  const rTweeter = hasTweeter ? Math.min(w * 0.2, h * 0.12, Math.max(4, (upperDiaCm * scale) / 2)) : 0;
   const cx = ox + w / 2;
-  const cy = oy + (hasPort ? h * 0.38 : h * 0.5);
+  const cyTweeter = oy + h * 0.22;
+  const cy = oy + (hasTweeter ? (hasPort ? h * 0.52 : h * 0.58) : hasPort ? h * 0.38 : h * 0.5);
 
   return (
     <svg width="210" height="135" viewBox="0 0 210 135" style={{ display: 'inline-block' }}>
@@ -377,7 +415,15 @@ function CabinetIsometricSvg({
       {/* Front baffle face */}
       <path d={frontPath} fill="#f1f5f9" stroke="#1e293b" strokeWidth="1.5" />
 
-      {/* Driver cutout & surround */}
+      {/* Tweeter cutout (multi-way) */}
+      {hasTweeter && (
+        <>
+          <circle cx={cx} cy={cyTweeter} r={rTweeter * 1.35} fill="#475569" stroke="#0f172a" strokeWidth="0.9" />
+          <circle cx={cx} cy={cyTweeter} r={rTweeter * 0.65} fill="#0f172a" />
+        </>
+      )}
+
+      {/* Woofer cutout & surround */}
       <circle cx={cx} cy={cy} r={rDriver} fill="#334155" stroke="#0f172a" strokeWidth="1.2" />
       <circle cx={cx} cy={cy} r={rDriver * 0.32} fill="#0f172a" />
 
@@ -385,8 +431,8 @@ function CabinetIsometricSvg({
       {hasPort && (
         <circle
           cx={cx}
-          cy={oy + h * 0.76}
-          r={Math.min(w * 0.16, h * 0.1, 8)}
+          cy={oy + (hasTweeter ? h * 0.83 : h * 0.76)}
+          r={Math.min(w * 0.15, h * 0.08, 7)}
           fill="#0f172a"
           stroke="#475569"
           strokeWidth="1"

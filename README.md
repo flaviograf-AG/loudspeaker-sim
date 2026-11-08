@@ -1,4 +1,4 @@
-# LS Graf Simulator
+# LS Graf Simulator - contributors welcome!
 
 **Browser-based loudspeaker design & crossover simulation tool.**
 
